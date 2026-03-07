@@ -4477,8 +4477,8 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-5 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold"><i class="fas fa-tv mr-2"></i>TV 연결 방법</h3>
@@ -4533,8 +4533,8 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto flex flex-col">
         <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex-shrink-0">
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-bold">유니트체어 모니터 설치 방법</h3>
@@ -4631,8 +4631,8 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 바로가기 생성 가이드 모달 -->
   <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-5 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>바로가기 직접 만들기</h3>
@@ -4705,8 +4705,8 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 자동 실행 가이드 모달 -->
   <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-5 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
             <h3 class="text-xl font-bold"><i class="fas fa-check-circle mr-2"></i>다운로드 완료!</h3>
@@ -4752,8 +4752,8 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실/체어 추가 모달 -->
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
           <p class="text-blue-100 text-sm mt-1">대기실 또는 체어를 추가하세요</p>
@@ -4883,7 +4883,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실 설치 가이드 모달 (단축 URL) -->
   <div id="guide-url-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('guide-url-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-4 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>단축 URL로 TV 연결하기</h3>
@@ -9801,7 +9801,7 @@ app.get('/admin/:adminCode', async (c) => {
       el.style.height = '100vh';
       el.style.minHeight = '100vh';
       el.style.zIndex = '9999';
-      el.style.overflowY = 'auto';
+      el.style.overflowY = '';
       
       // 4. 스크롤을 최상단으로
       window.scrollTo(0, 0);
