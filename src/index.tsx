@@ -4134,28 +4134,9 @@ app.get('/embed-old/:memberCode', async (c) => {
 app.get('/admin/:adminCode', async (c) => {
   const adminCode = c.req.param('adminCode')
   const isAdminQuery = c.req.query('is_admin') === '1'
-  const sessionToken = c.req.query('session') || ''
   let emailParam = normalizeEmail(c.req.query('email') || '')
 
   try {
-    const nowIso = new Date().toISOString()
-    let sessionRow: any = null
-    let sessionError = false
-
-    if (sessionToken) {
-      try {
-        sessionRow = await c.env.DB.prepare(`
-          SELECT s.user_id, u.admin_code
-          FROM sessions s
-          JOIN users u ON s.user_id = u.id
-          WHERE s.token = ? AND s.expires_at > ?
-        `).bind(sessionToken, nowIso).first()
-      } catch (err) {
-        console.error('Session lookup error:', err)
-        sessionError = true
-      }
-    }
-
     // 사용자 조회
     let user = await c.env.DB.prepare(
       'SELECT * FROM users WHERE admin_code = ?'
@@ -4168,6 +4149,7 @@ app.get('/admin/:adminCode', async (c) => {
       }
     }
 
+    // email 파라미터가 없으면 DB에 저장된 email 사용
     if (!emailParam && user.imweb_email) {
       emailParam = normalizeEmail(user.imweb_email)
     }
@@ -4176,63 +4158,35 @@ app.get('/admin/:adminCode', async (c) => {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일 정보가 없습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
+    // email이 DB와 다르면 차단
     if (user.imweb_email && normalizeEmail(user.imweb_email) !== emailParam) {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일이 일치하지 않습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
+    // email이 없으면 저장
     if (!user.imweb_email) {
       await c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
         .bind(emailParam, user.id).run()
     }
 
-    const sessionValid = !sessionError && sessionRow && sessionRow.admin_code === adminCode
-  
-  // 계정 상태 확인 (정지 또는 구독 만료)
-  if (user && !user.is_master) {
-    // 1. 계정 정지 확인
-    if (user.is_active === 0) {
-      return c.html(getBlockedPageHtml('계정이 정지되었습니다', user.suspended_reason || '관리자에 의해 정지됨', '관리자에게 문의하여 계정을 활성화해주세요.'))
-    }
-    
-    // 2. 구독 만료 확인 (무제한 플랜은 제외)
-    if (user.subscription_plan !== 'unlimited' && user.subscription_end) {
-      const endDate = new Date(user.subscription_end)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      if (endDate < today) {
-        // 구독 만료 - 계정 자동 정지
-        await c.env.DB.prepare(`
-          UPDATE users SET is_active = 0, suspended_reason = '구독 기간 만료'
-          WHERE id = ?
-        `).bind(user.id).run()
-        
-        return c.html(getBlockedPageHtml('구독 기간이 만료되었습니다', '만료일: ' + user.subscription_end, '서비스를 계속 이용하시려면 구독을 연장해주세요.'))
+    // 계정 상태 확인 (정지 또는 구독 만료)
+    if (user && !user.is_master) {
+      if (user.is_active === 0) {
+        return c.html(getBlockedPageHtml('계정이 정지되었습니다', user.suspended_reason || '관리자에 의해 정지됨', '관리자에게 문의하여 계정을 활성화해주세요.'))
+      }
+      if (user.subscription_plan !== 'unlimited' && user.subscription_end) {
+        const endDate = new Date(user.subscription_end)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        if (endDate < today) {
+          await c.env.DB.prepare(`UPDATE users SET is_active = 0, suspended_reason = '구독 기간 만료' WHERE id = ?`).bind(user.id).run()
+          return c.html(getBlockedPageHtml('구독 기간이 만료되었습니다', '만료일: ' + user.subscription_end, '서비스를 계속 이용하시려면 구독을 연장해주세요.'))
+        }
       }
     }
-  }
 
-  if (!sessionValid) {
-    const sessionTokenNew = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
-    await c.env.DB.prepare(`
-      INSERT INTO sessions (token, user_id, expires_at)
-      VALUES (?, ?, ?)
-    `).bind(sessionTokenNew, user.id, expiresAt).run()
-
-    const baseUrl = new URL(c.req.url).origin
-    const redirectUrl = new URL(baseUrl + '/admin/' + adminCode)
-    redirectUrl.searchParams.set('session', sessionTokenNew)
-    redirectUrl.searchParams.set('email', emailParam)
-    if (isAdminQuery) {
-      redirectUrl.searchParams.set('is_admin', '1')
-    }
-
-    return c.redirect(redirectUrl.toString())
-  }
-  
-  // 사용자가 없으면 생성
-  const finalUser = user || await getOrCreateUser(c.env.DB, adminCode)
+    // 세션 없이 바로 관리자 페이지 렌더링 (세션/리다이렉트 불필요)
+    const finalUser = user
   
   // 관리자 권한 체크:
   // 1. URL에 is_admin=1 파라미터가 있거나
@@ -4284,11 +4238,10 @@ app.get('/admin/:adminCode', async (c) => {
     try {
       const adminCode = "${adminCode}";
       const email = "${emailParam}";
-      const sessionToken = "${sessionToken}";
-      if (adminCode && email && sessionToken) {
+      if (adminCode && email) {
         localStorage.setItem('dental_tv_admin_code', adminCode);
         localStorage.setItem('dental_tv_email', email);
-        localStorage.setItem('dental_tv_session', sessionToken);
+        localStorage.removeItem('dental_tv_session');
       }
     } catch (e) {}
   </script>
@@ -12590,33 +12543,16 @@ app.get('/tv/:shortCode', async (c) => {
       enterFullscreen();
     });
 
-    // 관리자 버튼 이벤트 - 서버에서 이 TV 계정의 세션 토큰을 발급받아 직접 이동
-    // localStorage 완전 우회 → 어떤 계정으로 로그인되어 있어도 이 TV의 계정으로 이동
-    document.getElementById('btn-admin').addEventListener('click', async (e) => {
+    // 관리자 버튼 이벤트 - tvAdminCode/tvAdminEmail로 직접 이동 (세션/localStorage 우회)
+    document.getElementById('btn-admin').addEventListener('click', (e) => {
       e.stopPropagation();
-      const btn = document.getElementById('btn-admin');
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/tv-admin-token/' + SHORT_CODE, { method: 'POST' });
-        const data = await res.json();
-        if (data.success && data.adminUrl) {
-          // localStorage도 이 TV 계정으로 업데이트 (이후 로그인 페이지 자동로그인 맞춤)
-          if (data.adminCode) localStorage.setItem('dental_tv_admin_code', data.adminCode);
-          if (data.email) localStorage.setItem('dental_tv_email', data.email);
-          localStorage.removeItem('dental_tv_session');
-          // 현재 창(탭)에서 바로 이동 - 새 창 X (새 창은 localStorage 공유로 문제 발생)
-          window.location.href = data.adminUrl;
-        } else {
-          alert('관리자 페이지 이동 실패: ' + (data.error || '알 수 없는 오류'));
-          btn.textContent = '관리';
-          btn.disabled = false;
-        }
-      } catch (err) {
-        alert('서버 연결 오류');
-        btn.textContent = '관리';
-        btn.disabled = false;
+      if (!tvAdminCode) {
+        alert('관리자 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+        return;
       }
+      const adminUrl = new URL(location.origin + '/admin/' + tvAdminCode);
+      if (tvAdminEmail) adminUrl.searchParams.set('email', tvAdminEmail);
+      window.location.href = adminUrl.toString();
     });
 
     const fullscreenHint = document.getElementById('fullscreen-hint');
@@ -12733,10 +12669,9 @@ app.get('/login', (c) => {
     (function() {
       const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
       const savedEmail = localStorage.getItem('dental_tv_email');
-      const savedSession = localStorage.getItem('dental_tv_session');
       const urlEmail = new URLSearchParams(window.location.search).get('email');
 
-      // URL email이 있는데 저장된 email과 다르면 → localStorage 완전 초기화 (다른 계정 자동로그인 방지)
+      // URL email이 있는데 저장된 email과 다르면 → localStorage 완전 초기화
       if (urlEmail && savedEmail && savedEmail.toLowerCase() !== urlEmail.toLowerCase()) {
         localStorage.removeItem('dental_tv_admin_code');
         localStorage.removeItem('dental_tv_email');
@@ -12744,9 +12679,9 @@ app.get('/login', (c) => {
         return;
       }
 
-      if (savedAdminCode && savedEmail && savedSession) {
+      // adminCode + email 있으면 세션 없이 바로 관리자 페이지로
+      if (savedAdminCode && savedEmail) {
         const url = new URL('${baseUrl}/admin/' + savedAdminCode);
-        url.searchParams.set('session', savedSession);
         url.searchParams.set('email', savedEmail);
         window.location.replace(url.toString());
       }
@@ -12881,7 +12816,6 @@ app.get('/login', (c) => {
 
     const redirectToAdmin = (adminCode, sessionToken, email) => {
       const adminUrl = new URL(BASE_URL + '/admin/' + adminCode);
-      if (sessionToken) adminUrl.searchParams.set('session', sessionToken);
       if (email) adminUrl.searchParams.set('email', email);
       const params = new URLSearchParams(window.location.search);
       const isAdminFlag = params.get('is_admin');
@@ -12890,18 +12824,12 @@ app.get('/login', (c) => {
     };
 
     const resolveSessionInfo = async (sessionToken) => {
-      try {
-        const res = await fetch(BASE_URL + '/api/session-info?token=' + encodeURIComponent(sessionToken));
-        const data = await res.json();
-        if (data && data.success && data.adminCode && data.email) {
-          localStorage.setItem('dental_tv_admin_code', data.adminCode);
-          localStorage.setItem('dental_tv_email', data.email);
-          localStorage.setItem('dental_tv_session', sessionToken);
-          redirectToAdmin(data.adminCode, sessionToken, data.email);
-          return true;
-        }
-      } catch (e) {
-        console.error('Session info lookup failed:', e);
+      // 세션 기반 조회 제거 - localStorage에 adminCode+email 있으면 바로 이동
+      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
+      const savedEmail = localStorage.getItem('dental_tv_email');
+      if (savedAdminCode && savedEmail) {
+        redirectToAdmin(savedAdminCode, null, savedEmail);
+        return true;
       }
       return false;
     };
@@ -12939,15 +12867,14 @@ app.get('/login', (c) => {
         const data = await response.json();
         const params = new URLSearchParams(window.location.search);
 
-        if (data.success && data.adminCode && data.sessionToken) {
-          // adminCode 저장 (즉시 리다이렉트용)
+        if (data.success && data.adminCode) {
+          // adminCode + email 저장 (세션 불필요)
           localStorage.setItem('dental_tv_admin_code', data.adminCode);
           localStorage.setItem('dental_tv_email', normalizedEmail);
-          localStorage.setItem('dental_tv_session', data.sessionToken);
+          localStorage.removeItem('dental_tv_session');
 
-          // 관리자 페이지로 이동 (세션 토큰 포함)
+          // 관리자 페이지로 이동 (세션 없이 email만)
           const adminUrl = new URL(BASE_URL + '/admin/' + data.adminCode);
-          adminUrl.searchParams.set('session', data.sessionToken);
           adminUrl.searchParams.set('email', normalizedEmail);
           const isAdminFlag = params.get('is_admin');
           if (isAdminFlag) adminUrl.searchParams.set('is_admin', isAdminFlag);
@@ -13063,29 +12990,18 @@ app.get('/login', (c) => {
       if (autoLoginTriggered) return;
       const savedEmail = localStorage.getItem('dental_tv_email');
       const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
-      const savedSession = localStorage.getItem('dental_tv_session');
-
-      if (!savedEmail && savedSession) {
-        resolveSessionInfo(savedSession);
-        return;
-      }
 
       if (!savedEmail) return;
 
-      const loginContainer = document.getElementById('login-container');
-      const loadingContainer = document.getElementById('loading-container');
-      if (loginContainer && loadingContainer) {
-        loginContainer.classList.add('hidden');
-        loadingContainer.classList.remove('hidden');
-      }
-
-      if (savedAdminCode && savedSession) {
-        redirectToAdmin(savedAdminCode, savedSession, savedEmail);
-        return;
-      }
-
-      if (savedSession && !savedAdminCode) {
-        resolveSessionInfo(savedSession);
+      // adminCode + email 있으면 바로 관리자 페이지로
+      if (savedAdminCode && savedEmail) {
+        const loginContainer = document.getElementById('login-container');
+        const loadingContainer = document.getElementById('loading-container');
+        if (loginContainer && loadingContainer) {
+          loginContainer.classList.add('hidden');
+          loadingContainer.classList.remove('hidden');
+        }
+        redirectToAdmin(savedAdminCode, null, savedEmail);
         return;
       }
 
