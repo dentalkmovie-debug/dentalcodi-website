@@ -12650,15 +12650,23 @@ app.get('/', (c) => {
   var frame = document.getElementById('dental-tv-frame');
 
   function getMemberInfo() {
-    // 방법1: 아임웹 페이지 정보 객체 (JavaScript)
+    // 방법1: 아임웹 전역 객체 __IMWEB__.member (가장 신뢰도 높음)
     try {
-      var info = window._imweb_page_info;
-      if (info &amp;&amp; info.member_code &amp;&amp; info.member_email) {
-        return { mc: info.member_code, em: info.member_email };
+      var m = window.__IMWEB__ &amp;&amp; window.__IMWEB__.member;
+      if (m &amp;&amp; (m.code || m.id) &amp;&amp; m.email) {
+        return { mc: m.code || m.id, em: m.email };
       }
     } catch(e) {}
 
-    // 방법2: 아임웹 템플릿 변수 (코드 위젯용)
+    // 방법2: _imweb_page_info 객체
+    try {
+      var info = window._imweb_page_info;
+      if (info &amp;&amp; info.member_code &amp;&amp; (info.member_email || info.email)) {
+        return { mc: info.member_code, em: info.member_email || info.email };
+      }
+    } catch(e) {}
+
+    // 방법3: 아임웹 템플릿 변수 (코드 위젯에서 치환되는 경우)
     var mc = '{{ member_code }}';
     var em = '{{ user_email }}';
     if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
@@ -12676,9 +12684,9 @@ app.get('/', (c) => {
     }
   }
 
-  // 페이지 로드 후 실행 (아임웹 객체가 준비될 때까지 대기)
+  // 아임웹 객체가 준비될 때까지 대기 후 실행
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', function() { setTimeout(init, 300); });
   } else {
     setTimeout(init, 500);
   }
