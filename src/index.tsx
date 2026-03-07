@@ -6241,8 +6241,12 @@ app.get('/admin/:adminCode', async (c) => {
       // - 체어: 이름에 '체어'가 포함된 항목 (스크립트 다운로드 방식)
       // - 대기실: 이름에 '체어'가 없는 항목 (단축 URL + USB 북마크 방식)
       // =========================================================
-      const chairs = playlists.filter(p => p.name.includes('체어'));
-      const waitingRooms = playlists.filter(p => !p.name.includes('체어'));
+      const chairs = playlists
+        .filter(p => p.name.includes('체어'))
+        .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
+      const waitingRooms = playlists
+        .filter(p => !p.name.includes('체어'))
+        .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
       
       // 대기실/체어 분리하여 표시
       container.innerHTML = \`
@@ -6824,12 +6828,25 @@ app.get('/admin/:adminCode', async (c) => {
       
       container.addEventListener('drop', async (e) => {
         e.preventDefault();
-        // 새 순서 저장
-        const items = container.querySelectorAll('.playlist-sortable-item');
-        const newOrder = Array.from(items).map((item, idx) => ({
-          id: parseInt(item.dataset.playlistId),
-          sort_order: idx
-        }));
+        // 대기실과 체어 컨테이너를 모두 읽어 전체 순서를 한번에 저장
+        // (각 컨테이너가 따로 0부터 시작하면 sort_order 충돌 → 두 그룹을 합쳐서 연속된 인덱스 부여)
+        const waitingItems = document.querySelectorAll('#waitingroom-sortable-container .playlist-sortable-item');
+        const chairItems   = document.querySelectorAll('#chair-sortable-container .playlist-sortable-item');
+        
+        let idx = 0;
+        const newOrder = [];
+        waitingItems.forEach(item => {
+          newOrder.push({ id: parseInt(item.dataset.playlistId), sort_order: idx++ });
+        });
+        chairItems.forEach(item => {
+          newOrder.push({ id: parseInt(item.dataset.playlistId), sort_order: idx++ });
+        });
+        
+        // playlists 배열도 동기화 (30초 자동갱신 시 renderPlaylists가 새 순서 유지)
+        newOrder.forEach(({ id, sort_order }) => {
+          const p = playlists.find(p => p.id === id);
+          if (p) p.sort_order = sort_order;
+        });
         
         // API 호출하여 순서 저장
         try {
