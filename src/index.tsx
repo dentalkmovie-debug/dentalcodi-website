@@ -12648,25 +12648,24 @@ app.get('/', (c) => {
 (function() {
   var host = 'https://dental-tv.pages.dev';
   var frame = document.getElementById('dental-tv-frame');
+  var launched = false;
 
   function getMemberInfo() {
-    // 방법1: 아임웹 전역 객체 __IMWEB__.member (가장 신뢰도 높음)
+    // 방법1: 아임웹 전역 객체 window.__IMWEB__.member
     try {
       var m = window.__IMWEB__ &amp;&amp; window.__IMWEB__.member;
       if (m &amp;&amp; (m.code || m.id) &amp;&amp; m.email) {
-        return { mc: m.code || m.id, em: m.email };
+        return { mc: String(m.code || m.id), em: m.email };
       }
     } catch(e) {}
-
-    // 방법2: _imweb_page_info 객체
+    // 방법2: window._imweb_page_info
     try {
       var info = window._imweb_page_info;
       if (info &amp;&amp; info.member_code &amp;&amp; (info.member_email || info.email)) {
         return { mc: info.member_code, em: info.member_email || info.email };
       }
     } catch(e) {}
-
-    // 방법3: 아임웹 템플릿 변수 (코드 위젯에서 치환되는 경우)
+    // 방법3: 아임웹 템플릿 변수 치환값
     var mc = '{{ member_code }}';
     var em = '{{ user_email }}';
     if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
@@ -12675,21 +12674,27 @@ app.get('/', (c) => {
     return null;
   }
 
-  function init() {
+  function launch() {
+    if (launched) return;
     var info = getMemberInfo();
     if (info &amp;&amp; info.mc &amp;&amp; info.em) {
+      launched = true;
       frame.src = host + '/embed/' + encodeURIComponent(info.mc) + '?email=' + encodeURIComponent(info.em);
-    } else {
-      frame.src = host + '/not-logged-in';
     }
   }
 
-  // 아임웹 객체가 준비될 때까지 대기 후 실행
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() { setTimeout(init, 300); });
-  } else {
-    setTimeout(init, 500);
-  }
+  // 폴링: 최대 5초간 100ms마다 시도 (아임웹 객체 준비 대기)
+  var attempts = 0;
+  var poll = setInterval(function() {
+    attempts++;
+    launch();
+    if (launched || attempts >= 50) {
+      clearInterval(poll);
+      if (!launched) {
+        frame.src = host + '/not-logged-in';
+      }
+    }
+  }, 100);
 
   window.addEventListener('message', function(e) {
     if (e.data &amp;&amp; e.data.type === 'setHeight') {
