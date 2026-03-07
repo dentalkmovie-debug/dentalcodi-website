@@ -2298,13 +2298,21 @@ app.get('/embed/:memberCode', async (c) => {
   }
 
   if (!imwebMemberValid) {
-    return c.html(`
-      <div style="font-family: sans-serif; padding: 24px;">
-        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">가입된 이메일과 계정이 일치하지 않습니다.</h1>
-        <p style="margin: 4px 0;">등록 이메일: <strong>${registeredEmail || '확인 불가'}</strong></p>
-        <p style="margin: 4px 0;">입력 이메일: <strong>${normalizedEmail}</strong></p>
-      </div>
-    `)
+    // 아임웹에서 찾지 못해도 DB에 등록된 계정이면 허용 (레거시 계정 지원)
+    const dbUser = await c.env.DB.prepare(
+      'SELECT * FROM users WHERE lower(imweb_email) = ? OR imweb_member_id = ?'
+    ).bind(normalizedEmail, memberCode).first() as any
+
+    if (!dbUser) {
+      return c.html(`
+        <div style="font-family: sans-serif; padding: 24px;">
+          <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">가입된 이메일과 계정이 일치하지 않습니다.</h1>
+          <p style="margin: 4px 0;">등록 이메일: <strong>${registeredEmail || '확인 불가'}</strong></p>
+          <p style="margin: 4px 0;">입력 이메일: <strong>${normalizedEmail}</strong></p>
+        </div>
+      `)
+    }
+    // DB에 있는 계정이면 계속 진행
   }
 
   const finalMemberName = apiMemberName || memberName
