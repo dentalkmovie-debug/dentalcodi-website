@@ -4240,12 +4240,17 @@ app.get('/admin/:adminCode', async (c) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>치과 TV 관리자</title>
   <script>
+    // adminCode/email은 URL 파라미터로만 관리 (localStorage 저장 안 함)
+    // localStorage는 /login 페이지에서만 사용
     try {
       const adminCode = "${adminCode}";
       const email = "${emailParam}";
-      if (adminCode && email) {
-        localStorage.setItem('dental_tv_admin_code', adminCode);
-        localStorage.setItem('dental_tv_email', email);
+      // 현재 페이지와 localStorage의 계정이 다르면 localStorage 초기화
+      // (다른 계정 페이지를 열었을 때 로그인 페이지가 엉뚱한 계정으로 이동하는 것 방지)
+      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
+      if (savedAdminCode && savedAdminCode !== adminCode) {
+        localStorage.removeItem('dental_tv_admin_code');
+        localStorage.removeItem('dental_tv_email');
         localStorage.removeItem('dental_tv_session');
       }
     } catch (e) {}
@@ -12670,25 +12675,15 @@ app.get('/login', (c) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>치과 TV 로그인</title>
   <script>
-    // 저장된 계정이 있으면 자동 로그인 (세션 포함)
+    // URL email이 없고 localStorage에도 없으면 → 로그인 폼 표시 (자동 이동 없음)
+    // localStorage 자동 이동 제거: 다른 계정 페이지를 열었을 때 꼬이는 문제 방지
     (function() {
-      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
-      const savedEmail = localStorage.getItem('dental_tv_email');
-      const urlEmail = new URLSearchParams(window.location.search).get('email');
-
-      // URL email이 있는데 저장된 email과 다르면 → localStorage 완전 초기화
-      if (urlEmail && savedEmail && savedEmail.toLowerCase() !== urlEmail.toLowerCase()) {
-        localStorage.removeItem('dental_tv_admin_code');
-        localStorage.removeItem('dental_tv_email');
-        localStorage.removeItem('dental_tv_session');
-        return;
-      }
-
-      // adminCode + email 있으면 세션 없이 바로 관리자 페이지로
-      if (savedAdminCode && savedEmail) {
-        const url = new URL('${baseUrl}/admin/' + savedAdminCode);
-        url.searchParams.set('email', savedEmail);
-        window.location.replace(url.toString());
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlEmail = urlParams.get('email');
+      const urlMemberCode = urlParams.get('memberCode') || urlParams.get('member_code');
+      // URL에 email도 memberCode도 없으면 → 로그인 폼만 보여줌 (localStorage 무시)
+      if (!urlEmail && !urlMemberCode) {
+        return; // 수동 입력 대기
       }
     })();
   </script>
@@ -12829,13 +12824,7 @@ app.get('/login', (c) => {
     };
 
     const resolveSessionInfo = async (sessionToken) => {
-      // 세션 기반 조회 제거 - localStorage에 adminCode+email 있으면 바로 이동
-      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
-      const savedEmail = localStorage.getItem('dental_tv_email');
-      if (savedAdminCode && savedEmail) {
-        redirectToAdmin(savedAdminCode, null, savedEmail);
-        return true;
-      }
+      // 세션/localStorage 기반 자동 이동 완전 제거 (계정 혼용 방지)
       return false;
     };
 
@@ -12873,12 +12862,12 @@ app.get('/login', (c) => {
         const params = new URLSearchParams(window.location.search);
 
         if (data.success && data.adminCode) {
-          // adminCode + email 저장 (세션 불필요)
-          localStorage.setItem('dental_tv_admin_code', data.adminCode);
-          localStorage.setItem('dental_tv_email', normalizedEmail);
+          // localStorage 저장 제거 - URL 파라미터로만 인증 (계정 혼용 방지)
+          localStorage.removeItem('dental_tv_admin_code');
+          localStorage.removeItem('dental_tv_email');
           localStorage.removeItem('dental_tv_session');
 
-          // 관리자 페이지로 이동 (세션 없이 email만)
+          // 관리자 페이지로 이동 (email 파라미터 포함)
           const adminUrl = new URL(BASE_URL + '/admin/' + data.adminCode);
           adminUrl.searchParams.set('email', normalizedEmail);
           const isAdminFlag = params.get('is_admin');
@@ -12966,13 +12955,6 @@ app.get('/login', (c) => {
         return;
       }
 
-      const savedEmail = localStorage.getItem('dental_tv_email');
-      if (urlEmail && savedEmail && urlEmail.toLowerCase() !== savedEmail.toLowerCase()) {
-        localStorage.removeItem('dental_tv_admin_code');
-        localStorage.removeItem('dental_tv_email');
-        localStorage.removeItem('dental_tv_session');
-      }
-
       autoLoginTriggered = true;
 
       fetch(BASE_URL + '/api/imweb/member?' + query)
@@ -12990,32 +12972,8 @@ app.get('/login', (c) => {
         });
     })();
 
-    // 저장된 이메일이 있으면 입력 없이 자동 로그인 시도
-    (function() {
-      if (autoLoginTriggered) return;
-      const savedEmail = localStorage.getItem('dental_tv_email');
-      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
-
-      if (!savedEmail) return;
-
-      // adminCode + email 있으면 바로 관리자 페이지로
-      if (savedAdminCode && savedEmail) {
-        const loginContainer = document.getElementById('login-container');
-        const loadingContainer = document.getElementById('loading-container');
-        if (loginContainer && loadingContainer) {
-          loginContainer.classList.add('hidden');
-          loadingContainer.classList.remove('hidden');
-        }
-        redirectToAdmin(savedAdminCode, null, savedEmail);
-        return;
-      }
-
-      const params = new URLSearchParams(window.location.search);
-      const memberCode = sanitizeParam(params.get('memberCode') || params.get('member_code'));
-      const expectedEmail = sanitizeParam(params.get('email')) || savedEmail;
-      lockEmail(savedEmail, '저장된 이메일: ' + savedEmail);
-      performLogin(savedEmail, memberCode, expectedEmail, true);
-    })();
+    // localStorage 기반 자동 로그인 완전 제거 (계정 혼용 방지)
+    // URL에 memberCode 또는 email이 있을 때만 자동 로그인 (아임웹 위젯 경로)
 
     function login() {
       const email = document.getElementById('email-input').value.trim();
