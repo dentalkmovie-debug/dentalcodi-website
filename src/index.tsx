@@ -12743,11 +12743,69 @@ app.get('/not-logged-in', (c) => {
       이 페이지는 <strong>아임웹 회원 로그인</strong> 후 이용하실 수 있습니다.<br>
       상단 메뉴에서 로그인 후 다시 방문해 주세요.
     </p>
-    <div class="bg-blue-50 rounded-xl p-4 text-left text-xs text-blue-700">
+    <div class="bg-blue-50 rounded-xl p-4 text-left text-xs text-blue-700 mb-4">
       <p class="font-semibold mb-1">💡 안내</p>
       <p>아임웹 일반 회원 계정으로 로그인하시면<br>본인의 치과 TV 관리 화면이 자동으로 표시됩니다.</p>
     </div>
+    <div id="debug-info" class="bg-yellow-50 rounded-xl p-4 text-left text-xs text-yellow-800 hidden">
+      <p class="font-semibold mb-2">🔍 디버그 정보 (개발용)</p>
+      <pre id="debug-text" class="whitespace-pre-wrap break-all"></pre>
+    </div>
+    <button id="debug-btn" onclick="runDebug()" class="mt-4 text-xs text-gray-400 underline">디버그 정보 확인</button>
   </div>
+  <script>
+  function runDebug() {
+    var info = {};
+    // 부모창(아임웹)의 객체 읽기 시도
+    try {
+      var p = window.parent;
+      if (p && p.__IMWEB__) {
+        info.__IMWEB__ = {
+          member: p.__IMWEB__.member || null
+        };
+      } else {
+        info.__IMWEB__ = 'not found';
+      }
+    } catch(e) { info.__IMWEB__error = e.message; }
+
+    try {
+      var p = window.parent;
+      if (p && p._imweb_page_info) {
+        info._imweb_page_info = p._imweb_page_info;
+      } else {
+        info._imweb_page_info = 'not found';
+      }
+    } catch(e) { info._imweb_page_infoError = e.message; }
+
+    // 현재 창(iframe)에서도 확인
+    try {
+      info.self__IMWEB__ = window.__IMWEB__ ? JSON.stringify(window.__IMWEB__) : 'not found';
+    } catch(e) {}
+
+    // URL 파라미터
+    info.url = window.location.href;
+    info.parentUrl = '';
+    try { info.parentUrl = window.parent.location.href; } catch(e) { info.parentUrl = 'cross-origin blocked'; }
+
+    var el = document.getElementById('debug-text');
+    var div = document.getElementById('debug-info');
+    el.textContent = JSON.stringify(info, null, 2);
+    div.classList.remove('hidden');
+  }
+
+  // 자동으로 부모창에서 회원 정보 읽어서 재시도
+  setTimeout(function() {
+    try {
+      var p = window.parent;
+      var m = p && p.__IMWEB__ && p.__IMWEB__.member;
+      if (m && (m.code || m.id) && m.email) {
+        var mc = m.code || m.id;
+        var em = m.email;
+        window.location.href = 'https://dental-tv.pages.dev/embed/' + encodeURIComponent(mc) + '?email=' + encodeURIComponent(em);
+      }
+    } catch(e) {}
+  }, 1000);
+  </script>
 </body>
 </html>
   `)
