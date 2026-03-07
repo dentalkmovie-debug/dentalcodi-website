@@ -9779,18 +9779,27 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
-      // fixed top:0: body가 scroll 없으므로 항상 실제 viewport 기준으로 표시
+      // #app이 스크롤 컨테이너 → 모달을 #app 기준 absolute로 현재 보이는 위치에 표시
+      const appEl = document.getElementById('app');
+      
+      // 모달을 #app 안으로 이동
+      if (appEl && el.parentElement !== appEl) {
+        appEl.appendChild(el);
+      }
+      
+      // #app의 현재 스크롤 위치
+      const scrollTop = appEl ? appEl.scrollTop : (window.scrollY || 0);
+      const viewH = appEl ? appEl.clientHeight : window.innerHeight;
+      
       el.style.display = 'flex';
-      el.style.position = 'fixed';
-      el.style.top = '0';
+      el.style.position = 'absolute';
+      el.style.top = scrollTop + 'px';
       el.style.left = '0';
       el.style.right = '0';
-      el.style.bottom = '0';
-      el.style.height = '';
+      el.style.bottom = 'auto';
+      el.style.height = viewH + 'px';
       el.style.zIndex = '9999';
       
-      // body 대신 #app에 modal-open 클래스 적용
-      const appEl = document.getElementById('app');
       if (appEl) appEl.classList.add('modal-open');
       document.body.classList.add('modal-open');
     }
