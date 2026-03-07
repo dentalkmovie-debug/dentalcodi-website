@@ -9025,12 +9025,15 @@ app.get('/admin/:adminCode', async (c) => {
           // 모든 관련 입력창 업데이트
           updateAllUrlDisplays(playlistId, shortUrlDisplay, data.shortUrl);
           
-          // 클립보드에 복사
-          await navigator.clipboard.writeText(data.shortUrl);
-          
-          showToast('✅ 단축 URL 생성 완료!\\n' + shortUrlDisplay + '\\n(클립보드에 복사됨)', 'success', 5000);
+          // 클립보드 복사 (iframe 환경에서 실패해도 무시)
+          try {
+            await navigator.clipboard.writeText(data.shortUrl);
+            showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay + ' (클립보드 복사됨)', 'success', 5000);
+          } catch (clipErr) {
+            showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
+          }
         } else {
-          throw new Error(data.error || '생성 실패');
+          showToast('단축 URL 생성 실패: ' + (data.error || ''), 'error');
         }
       } catch (e) {
         console.error('단축 URL 생성 오류:', e);
