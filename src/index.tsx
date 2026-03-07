@@ -4477,52 +4477,44 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
-        <div class="p-5 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl">
-          <div class="flex justify-between items-center">
-            <h3 class="text-xl font-bold"><i class="fas fa-tv mr-2"></i>TV 연결 방법</h3>
-            <button onclick="closeModal('tv-guide-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
-          </div>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+        <!-- 헤더 -->
+        <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
+          <h3 class="font-bold"><i class="fas fa-tv mr-2"></i>TV 연결 방법</h3>
+          <button onclick="closeModal('tv-guide-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        
-        <div class="p-5 space-y-4">
-          <!-- 방법 1: URL 직접 입력 -->
-          <div class="border-2 border-blue-200 rounded-xl p-4 bg-blue-50">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">1</span>
-              <h4 class="font-bold text-blue-800">URL 직접 입력</h4>
+        <!-- 방법 1 -->
+        <div class="px-5 py-4 space-y-3">
+          <div class="border-2 border-blue-200 rounded-xl p-3.5 bg-blue-50">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">1</span>
+              <h4 class="font-bold text-blue-800 text-sm">URL 직접 입력</h4>
             </div>
-            <ol class="list-decimal list-inside space-y-1 text-gray-700 text-sm ml-1">
-              <li>TV 웹브라우저 실행</li>
-              <li><strong>"단축"</strong> 버튼으로 짧은 URL 생성</li>
-              <li>TV에서 단축 URL 입력 (예: <span class="text-blue-600 font-mono">dub.sh/abc</span>)</li>
+            <ol class="space-y-1 text-gray-700 text-xs ml-1">
+              <li>① TV 웹브라우저 실행</li>
+              <li>② <strong>「단축」</strong> 버튼으로 짧은 URL 생성</li>
+              <li>③ TV에서 단축 URL 입력 후 전체화면</li>
             </ol>
           </div>
-          
-          <!-- 방법 2: USB 북마크 -->
-          <div class="border-2 border-green-200 rounded-xl p-4 bg-green-50">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="bg-green-500 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">2</span>
-              <h4 class="font-bold text-green-800">USB 북마크</h4>
-              <span class="bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded-full">추천</span>
+          <!-- 방법 2 -->
+          <div class="border-2 border-green-200 rounded-xl p-3.5 bg-green-50">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">2</span>
+              <h4 class="font-bold text-green-800 text-sm">USB 북마크</h4>
+              <span class="bg-green-100 text-green-600 text-xs px-1.5 py-0.5 rounded-full">추천</span>
             </div>
-            <ol class="list-decimal list-inside space-y-1 text-gray-700 text-sm ml-1">
-              <li><strong>"USB 북마크 다운로드"</strong> 클릭</li>
-              <li>다운로드된 HTML 파일을 USB에 복사</li>
-              <li>USB를 TV에 연결</li>
-              <li>TV 브라우저에서 파일 열기 → 링크 클릭!</li>
+            <ol class="space-y-1 text-gray-700 text-xs ml-1">
+              <li>① <strong>「USB 북마크 다운로드」</strong> 클릭</li>
+              <li>② HTML 파일을 USB에 복사 후 TV에 연결</li>
+              <li>③ TV 브라우저에서 파일 열기 → 링크 클릭</li>
             </ol>
-            <div class="mt-3 p-2 bg-white rounded-lg text-xs text-gray-600">
-              <i class="fas fa-info-circle text-green-500 mr-1"></i>
-              한 번 설정하면 TV 북마크에 저장해두고 계속 사용 가능
-            </div>
           </div>
         </div>
-        
-        <div class="p-4 border-t bg-gray-50 rounded-b-xl">
-          <button onclick="closeModal('tv-guide-modal')" 
-            class="w-full bg-indigo-500 text-white py-2.5 rounded-lg hover:bg-indigo-600 font-medium">
+        <!-- 버튼 -->
+        <div class="px-5 pb-4">
+          <button onclick="closeModal('tv-guide-modal')"
+            class="w-full bg-indigo-500 text-white py-2.5 rounded-lg hover:bg-indigo-600 text-sm font-medium">
             확인
           </button>
         </div>
@@ -4533,92 +4525,65 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto flex flex-col">
-        <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex-shrink-0">
-          <div class="flex justify-between items-center">
-            <h3 class="text-lg font-bold">유니트체어 모니터 설치 방법</h3>
-            <button onclick="closeModal('script-download-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+        <!-- 헤더 -->
+        <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
+          <h3 class="font-bold"><i class="fas fa-desktop mr-2"></i>유니트체어 모니터 설치</h3>
+          <button onclick="closeModal('script-download-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <!-- 설치 단계 -->
+        <div class="px-5 py-4 space-y-2.5">
+          <div class="flex items-start gap-3">
+            <span class="bg-indigo-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">1</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">스크립트 파일 다운로드</p>
+              <p class="text-xs text-gray-500">아래에서 BAT 또는 VBS 선택 후 다운로드</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="bg-indigo-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">2</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">시작 프로그램 폴더에 복사</p>
+              <p class="text-xs text-gray-500"><kbd class="bg-yellow-100 px-1 rounded font-mono">Win+R</kbd> → <kbd class="bg-yellow-100 px-1 rounded font-mono">shell:startup</kbd> → 파일 복사</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="bg-indigo-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">3</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">파일 더블클릭 → 전체화면 재생</p>
+              <p class="text-xs text-gray-500">PC 재부팅 시 자동으로 전체화면 시작</p>
+            </div>
           </div>
         </div>
-        
-        <div class="p-4 overflow-y-auto flex-1 space-y-3">
-          <!-- 설치 단계 -->
-          <div class="space-y-2">
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">1</span>
-              <div>
-                <p class="font-medium text-gray-800 text-sm">스크립트 파일 다운로드</p>
-                <p class="text-xs text-gray-500">BAT, VBS 파일을 선택하여 다운로드 합니다.</p>
-              </div>
-            </div>
-            
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">2</span>
-              <div>
-                <p class="font-medium text-gray-800 text-sm">시작 프로그램 폴더에 복사</p>
-                <p class="text-xs text-gray-500">실행창(Win+R)에서 <span class="bg-yellow-100 px-1 rounded font-mono">shell:startup</span> 입력 → 시작 프로그램 폴더가 열리면 다운로드 파일을 드래그로 복사</p>
-              </div>
-            </div>
-            
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">3</span>
-              <div>
-                <p class="font-medium text-gray-800 text-sm">복사한 파일 더블 클릭 실행</p>
-                <p class="text-xs text-gray-500">복사한 파일을 더블 클릭하면 전체화면으로 재생 시작됩니다.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p class="text-xs text-gray-700"><strong>참고.</strong> PC를 재부팅하면 자동으로 전체화면이 시작됩니다. 필요 시 브라우저 감추기 하시고 다른 창을 열면 됩니다.</p>
-          </div>
-
-          <!-- 파일 형식 선택 -->
-          <div class="border rounded-lg p-3 bg-white">
+        <!-- 파일 형식 선택 -->
+        <div class="px-5 pb-4">
+          <div class="border rounded-lg p-3 bg-gray-50">
             <p class="text-xs font-medium text-gray-500 mb-2">파일 형식 선택</p>
             <div class="flex gap-2 mb-3">
               <label class="flex-1 cursor-pointer">
                 <input type="radio" name="script-type" value="bat" checked class="hidden peer">
-                <div class="p-2.5 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 text-sm transition-all">
-                  <p class="font-bold text-gray-800 peer-checked:text-indigo-700">BAT</p>
-                  <p class="text-xs text-gray-500">검정 창이 잠깐 표시됨</p>
-                  <p class="text-xs text-gray-400">문제 확인에 유리</p>
+                <div class="p-2 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all">
+                  <p class="font-bold text-sm text-gray-800">BAT</p>
+                  <p class="text-xs text-gray-400">검정 창 잠깐 표시</p>
                 </div>
               </label>
               <label class="flex-1 cursor-pointer">
                 <input type="radio" name="script-type" value="vbs" class="hidden peer">
-                <div class="p-2.5 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 text-sm transition-all">
-                  <p class="font-bold text-gray-800 peer-checked:text-indigo-700">VBS</p>
-                  <p class="text-xs text-gray-500">창 없이 바로 실행</p>
-                  <p class="text-xs text-gray-400">깔끔한 시작</p>
+                <div class="p-2 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all">
+                  <p class="font-bold text-sm text-gray-800">VBS</p>
+                  <p class="text-xs text-gray-400">창 없이 바로 실행</p>
                 </div>
               </label>
             </div>
-            
             <div class="flex gap-2">
-              <button onclick="copyInstallLink()" class="flex-1 bg-indigo-500 text-white py-2.5 rounded-lg hover:bg-indigo-600 text-sm font-medium">
-                링크 복사
+              <button onclick="copyInstallLink()" class="flex-1 bg-indigo-500 text-white py-2 rounded-lg hover:bg-indigo-600 text-sm font-medium">
+                <i class="fas fa-link mr-1"></i>링크 복사
               </button>
-              <button onclick="downloadInstallScript()" class="flex-1 bg-gray-400 text-white py-2.5 rounded-lg hover:bg-gray-500 text-sm font-medium">
-                다운로드
+              <button onclick="downloadInstallScript()" class="flex-1 bg-gray-400 text-white py-2 rounded-lg hover:bg-gray-500 text-sm font-medium">
+                <i class="fas fa-download mr-1"></i>다운로드
               </button>
             </div>
-          </div>
-
-          <!-- 링크 복사 설명 -->
-          <div class="bg-indigo-50 rounded-lg p-3">
-            <p class="text-xs font-medium text-indigo-800 mb-1">링크 복사 사용법</p>
-            <p class="text-xs text-indigo-600">• 복사된 URL을 <strong>PC 브라우저 주소창</strong>에 직접 입력하면 바로 재생됩니다</p>
-            <p class="text-xs text-indigo-600">• 즐겨찾기에 저장해두면 다음에 바로 실행할 수 있습니다</p>
-          </div>
-          
-          <!-- 사용법 -->
-          <div class="bg-blue-50 rounded-lg p-3">
-            <p class="text-xs font-medium text-blue-800 mb-1">설치 후 사용법</p>
-            <p class="text-xs text-blue-600">• 전체화면 해제: <span class="font-medium">ESC</span> 또는 <span class="font-medium">F11</span></p>
-            <p class="text-xs text-blue-600">• 전체화면 복귀: 화면 아무곳이나 클릭</p>
-            <p class="text-xs text-blue-600">• 창을 닫았을 때: <span class="font-medium">shell:startup</span> 폴더의 BAT/VBS를 더블클릭하거나 PC 재부팅</p>
           </div>
         </div>
       </div>
@@ -4631,70 +4596,44 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 바로가기 생성 가이드 모달 -->
   <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
-        <div class="p-5 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl">
-          <div class="flex justify-between items-center">
-            <h3 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>바로가기 직접 만들기</h3>
-            <button onclick="closeModal('shortcut-guide-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
-          </div>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+        <div class="px-5 py-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl flex justify-between items-center">
+          <h3 class="font-bold"><i class="fas fa-link mr-2"></i>바로가기 직접 만들기</h3>
+          <button onclick="closeModal('shortcut-guide-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        
-        <div class="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-            <i class="fas fa-info-circle text-yellow-500 mr-1"></i>
-            스크립트 파일 없이 가장 안전한 방법입니다
+        <div class="px-5 py-4 space-y-3">
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 text-xs">
+            <i class="fas fa-info-circle text-yellow-500 mr-1"></i>스크립트 파일 없이 가장 안전한 방법
           </div>
-          
-          <ol class="space-y-4 text-sm">
-            <li class="flex gap-3">
-              <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs">1</span>
-              <div>
-                <p class="font-medium">바탕화면에서 우클릭 → 새로 만들기 → 바로 가기</p>
-              </div>
+          <ol class="space-y-2.5 text-xs">
+            <li class="flex gap-2.5 items-start">
+              <span class="bg-purple-500 text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">1</span>
+              <p class="text-gray-700">바탕화면 우클릭 → 새로 만들기 → 바로 가기</p>
             </li>
-            <li class="flex gap-3">
-              <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs">2</span>
-              <div>
-                <p class="font-medium mb-2">아래 내용 복사해서 붙여넣기:</p>
-                <div class="bg-gray-100 p-2 rounded font-mono text-xs break-all" id="shortcut-command">
-                  <!-- JavaScript로 동적 업데이트 -->
-                </div>
-                <button onclick="copyShortcutCommand()" class="mt-2 text-purple-600 text-xs hover:underline">
+            <li class="flex gap-2.5 items-start">
+              <span class="bg-purple-500 text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">2</span>
+              <div class="flex-1">
+                <p class="text-gray-700 mb-1.5">아래 내용 복사해서 붙여넣기:</p>
+                <div class="bg-gray-100 p-2 rounded font-mono text-xs break-all" id="shortcut-command"></div>
+                <button onclick="copyShortcutCommand()" class="mt-1.5 text-purple-600 text-xs hover:underline">
                   <i class="fas fa-copy mr-1"></i>복사하기
                 </button>
               </div>
             </li>
-            <li class="flex gap-3">
-              <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs">3</span>
-              <div>
-                <p class="font-medium">이름 입력 (예: "1번 체어")</p>
-              </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs">4</span>
-              <div>
-                <p class="font-medium">각 체어별로 반복 (URL만 변경)</p>
-              </div>
-            </li>
-            <li class="flex gap-3">
-              <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs">5</span>
-              <div>
-                <p class="font-medium">시작프로그램 등록: Win+R → shell:startup → 바로가기 복사</p>
-              </div>
+            <li class="flex gap-2.5 items-start">
+              <span class="bg-purple-500 text-white w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">3</span>
+              <p class="text-gray-700">이름 입력 후 → <kbd class="bg-gray-100 px-1 rounded font-mono">Win+R</kbd> → <kbd class="bg-gray-100 px-1 rounded font-mono">shell:startup</kbd> → 바로가기 복사</p>
             </li>
           </ol>
-          
-          <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <p class="font-medium text-purple-800 mb-2">각 체어 URL:</p>
-            <div class="space-y-1 text-xs font-mono" id="all-chair-urls">
-            </div>
+          <div class="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+            <p class="text-xs font-medium text-purple-800 mb-1">각 체어 URL:</p>
+            <div class="space-y-1 text-xs font-mono max-h-24 overflow-y-auto" id="all-chair-urls"></div>
           </div>
         </div>
-        
-        <div class="p-4 border-t bg-gray-50 rounded-b-xl">
-          <button onclick="closeModal('shortcut-guide-modal')" 
-            class="w-full bg-purple-500 text-white py-2.5 rounded-lg hover:bg-purple-600 font-medium">
+        <div class="px-5 pb-4">
+          <button onclick="closeModal('shortcut-guide-modal')"
+            class="w-full bg-purple-500 text-white py-2.5 rounded-lg hover:bg-purple-600 text-sm font-medium">
             확인
           </button>
         </div>
@@ -4705,43 +4644,35 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 자동 실행 가이드 모달 -->
   <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
-        <div class="p-5 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl">
-          <div class="flex justify-between items-center">
-            <h3 class="text-xl font-bold"><i class="fas fa-check-circle mr-2"></i>다운로드 완료!</h3>
-            <button onclick="closeModal('autorun-guide-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
-          </div>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+        <div class="px-5 py-4 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl flex justify-between items-center">
+          <h3 class="font-bold"><i class="fas fa-check-circle mr-2"></i>다운로드 완료!</h3>
+          <button onclick="closeModal('autorun-guide-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        
-        <div class="p-5 space-y-4">
-          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p class="font-bold text-green-800 mb-2">📁 치과TV_자동실행.bat</p>
-            <p class="text-sm text-green-700">이 파일을 실행하면 모든 체어 화면이 자동으로 열립니다</p>
+        <div class="px-5 py-4 space-y-3">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p class="font-bold text-green-800 text-sm">📁 치과TV_자동실행.bat</p>
+            <p class="text-xs text-green-700 mt-1">실행하면 모든 체어 화면이 자동으로 열립니다</p>
           </div>
-          
-          <div class="space-y-3">
-            <p class="font-bold text-gray-800">사용 방법:</p>
-            <ol class="list-decimal list-inside space-y-2 text-gray-700 text-sm">
-              <li>다운로드된 <strong>치과TV_자동실행.bat</strong> 파일을 데스크 PC에 저장</li>
-              <li>파일을 더블클릭하면 모든 체어 화면이 크롬으로 열림</li>
-              <li>각 크롬 창을 해당 체어 모니터로 드래그</li>
+          <div>
+            <p class="text-xs font-bold text-gray-700 mb-1.5">사용 방법</p>
+            <ol class="space-y-1 text-xs text-gray-600">
+              <li>① 파일 더블클릭 → 모든 체어 화면이 크롬으로 열림</li>
+              <li>② 각 크롬 창을 해당 체어 모니터로 드래그</li>
             </ol>
           </div>
-          
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p class="font-bold text-blue-800 mb-2"><i class="fas fa-magic mr-1"></i>PC 시작 시 자동 실행 설정</p>
-            <ol class="list-decimal list-inside space-y-1 text-blue-700 text-sm">
-              <li><strong>Win + R</strong> 키 → <strong>shell:startup</strong> 입력 → 확인</li>
-              <li>열린 폴더에 bat 파일 복사</li>
-              <li>이제 PC 켜면 자동 실행!</li>
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p class="text-xs font-bold text-blue-800 mb-1.5"><i class="fas fa-magic mr-1"></i>PC 시작 시 자동 실행</p>
+            <ol class="space-y-1 text-xs text-blue-700">
+              <li>① <kbd class="bg-white px-1 rounded border">Win+R</kbd> → <kbd class="bg-white px-1 rounded border font-mono">shell:startup</kbd> 입력</li>
+              <li>② 열린 폴더에 bat 파일 복사 → PC 켜면 자동 실행!</li>
             </ol>
           </div>
         </div>
-        
-        <div class="p-4 border-t bg-gray-50 rounded-b-xl">
-          <button onclick="closeModal('autorun-guide-modal')" 
-            class="w-full bg-green-500 text-white py-2.5 rounded-lg hover:bg-green-600 font-medium">
+        <div class="px-5 pb-4">
+          <button onclick="closeModal('autorun-guide-modal')"
+            class="w-full bg-green-500 text-white py-2.5 rounded-lg hover:bg-green-600 text-sm font-medium">
             확인
           </button>
         </div>
@@ -4883,74 +4814,56 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실 설치 가이드 모달 (단축 URL) -->
   <div id="guide-url-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('guide-url-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-t-xl">
-          <h3 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>단축 URL로 TV 연결하기</h3>
-          <p class="text-blue-100 text-sm mt-1">리모컨으로 주소만 입력하면 끝!</p>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+        <!-- 헤더 -->
+        <div class="px-5 py-4 border-b bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-t-xl flex justify-between items-center">
+          <div>
+            <h3 class="font-bold"><i class="fas fa-link mr-2"></i>대기실 TV 연결</h3>
+            <p class="text-blue-100 text-xs mt-0.5">리모컨으로 주소 입력 후 접속</p>
+          </div>
+          <button onclick="closeModal('guide-url-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        
-        <div class="p-6">
-          <!-- 단축 URL 표시 -->
-          <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6 text-center">
-            <p class="text-sm text-blue-600 mb-2">TV에 입력할 주소</p>
-            <p id="guide-short-url" class="text-2xl font-bold text-blue-800 font-mono"></p>
-            <button onclick="copyGuideUrl()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+        <!-- URL 표시 -->
+        <div class="px-5 pt-4 pb-2">
+          <div class="bg-blue-50 border-2 border-blue-200 rounded-xl py-3 text-center">
+            <p class="text-xs text-blue-500 mb-1">TV에 입력할 주소</p>
+            <p id="guide-short-url" class="text-2xl font-bold text-blue-800 font-mono tracking-wide"></p>
+            <button onclick="copyGuideUrl()" class="mt-1.5 text-xs text-blue-600 hover:text-blue-800">
               <i class="fas fa-copy mr-1"></i>복사하기
             </button>
           </div>
-          
-          <!-- 설치 단계 -->
-          <div class="space-y-4">
-            <div class="flex gap-4">
-              <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">1</div>
-              <div>
-                <p class="font-bold text-gray-800">TV 인터넷 브라우저 열기</p>
-                <p class="text-sm text-gray-500 mt-1">리모컨에서 <strong>인터넷</strong> 또는 <strong>웹브라우저</strong> 버튼을 누르세요</p>
-              </div>
-            </div>
-            
-            <div class="flex gap-4">
-              <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">2</div>
-              <div>
-                <p class="font-bold text-gray-800">주소창에 URL 입력</p>
-                <p class="text-sm text-gray-500 mt-1">리모컨으로 위 주소를 입력하고 <strong>이동</strong> 버튼을 누르세요</p>
-              </div>
-            </div>
-            
-            <div class="flex gap-4">
-              <div class="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">3</div>
-              <div>
-                <p class="font-bold text-gray-800">전체화면으로 재생</p>
-                <p class="text-sm text-gray-500 mt-1">화면을 터치하거나 클릭하면 전체화면으로 재생됩니다</p>
-              </div>
+        </div>
+        <!-- 3단계 -->
+        <div class="px-5 py-3 space-y-2">
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs">1</div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">TV 웹브라우저 열기</p>
+              <p class="text-xs text-gray-500">리모컨에서 인터넷/웹브라우저 버튼</p>
             </div>
           </div>
-          
-          <div class="mt-6 border-2 border-blue-200 rounded-xl p-4 bg-blue-50">
-            <div class="flex items-center gap-2 mb-3">
-              <span class="bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">4</span>
-              <h4 class="font-bold text-blue-800">직접 입력 방식 안내</h4>
-              <span class="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full">필수</span>
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs">2</div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">주소창에 위 URL 입력 후 이동</p>
+              <p class="text-xs text-gray-500">북마크로 저장하면 다음에도 바로 접속</p>
             </div>
-            <ol class="list-decimal list-inside space-y-1 text-gray-700 text-sm ml-1">
-              <li>TV 브라우저에서 주소창을 엽니다.</li>
-              <li>위의 <strong>단축 URL</strong>을 입력합니다.</li>
-              <li>접속 후 전체화면으로 전환합니다.</li>
-              <li>다음에도 쉽게 열려면 북마크로 저장합니다.</li>
-            </ol>
-            <p class="mt-3 text-xs text-blue-700">
-              <i class="fas fa-info-circle mr-1"></i>
-              USB 인식 문제로 <strong>URL 직접 입력 방식만 지원</strong>합니다.
-            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs">3</div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">화면 클릭 → 전체화면 재생</p>
+              <p class="text-xs text-gray-500">터치하거나 클릭하면 전체화면으로 전환</p>
+            </div>
           </div>
         </div>
-        
-        <div class="p-4 border-t bg-gray-50 rounded-b-xl flex gap-3">
-          <button onclick="makeUrlShorter()" class="flex-1 px-4 py-2.5 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50">
+        <!-- 버튼 -->
+        <div class="px-5 pb-4 pt-2 flex gap-2">
+          <button onclick="makeUrlShorter()" class="flex-1 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 text-sm">
             단축 URL 생성
           </button>
-          <button onclick="closeModal('guide-url-modal')" class="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+          <button onclick="closeModal('guide-url-modal')" class="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium">
             확인
           </button>
         </div>
