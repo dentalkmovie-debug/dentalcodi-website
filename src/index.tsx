@@ -8253,41 +8253,44 @@ app.get('/admin/:adminCode', async (c) => {
     
     // 라이브러리에서 플레이리스트로 아이템 추가
     function addToPlaylistFromLibrary(itemId) {
+      if (!currentPlaylist) return;
+      const sid = String(itemId);
       const allItems = [...(masterItemsCache || []), ...(currentPlaylist.items || [])];
-      const item = allItems.find(i => String(i.id) === String(itemId));
-      if (!item) return;
-
-      const normalizedId = Number(item.id);
-      const finalId = Number.isNaN(normalizedId) ? item.id : normalizedId;
+      const item = allItems.find(i => String(i.id) === sid);
+      if (!item) { console.warn('[Playlist] item not found:', itemId); return; }
 
       if (!Array.isArray(currentPlaylist.activeItemIds)) currentPlaylist.activeItemIds = [];
 
-      if (currentPlaylist.activeItemIds.some(id => String(id) === String(finalId))) {
+      // 이미 있으면 무시
+      if (currentPlaylist.activeItemIds.some(id => String(id) === sid)) {
         showToast('이미 재생목록에 있습니다.');
         return;
       }
 
-      // 1) 상태 즉시 변경
-      currentPlaylist.activeItemIds.push(finalId);
-      // 2) UI 즉시 동기 렌더 (await 없음)
+      // 항상 String 타입으로 통일 저장 (숫자 vs 문자열 불일치 방지)
+      currentPlaylist.activeItemIds.push(sid);
       _renderPlaylistOnly();
       _updateLibraryPlusButtons();
-      // 3) 서버 저장은 백그라운드 (UI 블로킹 없음)
       saveActiveItems().then(ok => {
         if (ok) showToast('재생목록에 추가되었습니다.');
         else showToast('저장 실패', 'error');
       });
     }
     
-    function removeFromPlaylist(index) {
-      if (!Array.isArray(currentPlaylist.activeItemIds)) return;
-
-      // 1) 상태 즉시 변경
-      currentPlaylist.activeItemIds.splice(index, 1);
-      // 2) UI 즉시 동기 렌더
+    // 플레이리스트에서 제거 - itemId 기반 (index는 DOM 재렌더 후 불일치 발생)
+    function removeFromPlaylist(itemId) {
+      if (!currentPlaylist || !Array.isArray(currentPlaylist.activeItemIds)) return;
+      const sid = String(itemId);
+      const before = currentPlaylist.activeItemIds.length;
+      currentPlaylist.activeItemIds = currentPlaylist.activeItemIds.filter(
+        id => String(id) !== sid
+      );
+      if (currentPlaylist.activeItemIds.length === before) {
+        console.warn('[Playlist] removeFromPlaylist: item not found', itemId);
+        return;
+      }
       _renderPlaylistOnly();
       _updateLibraryPlusButtons();
-      // 3) 서버 저장 백그라운드
       saveActiveItems().then(ok => {
         if (ok) showToast('재생목록에서 제거되었습니다.');
         else showToast('저장 실패', 'error');
@@ -8505,7 +8508,7 @@ app.get('/admin/:adminCode', async (c) => {
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
           </div>
-          <button onclick="removeFromPlaylist(\${index})" 
+          <button onclick="removeFromPlaylist('\${item.id}')" 
                   class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
             <i class="fas fa-times"></i>
           </button>
@@ -8553,7 +8556,7 @@ app.get('/admin/:adminCode', async (c) => {
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
           </div>
-          <button onclick="removeFromPlaylist(\${index})"
+          <button onclick="removeFromPlaylist('\${item.id}')"
                   class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
             <i class="fas fa-times"></i>
           </button>
@@ -8562,36 +8565,27 @@ app.get('/admin/:adminCode', async (c) => {
       initPlaylistItemsSortable();
     }
 
-    // 라이브러리의 + 버튼/이미 추가된 항목 표시 업데이트
+    // 라이브러리의 + 버튼 상태 업데이트 (렌더 후 호출)
     function _updateLibraryPlusButtons() {
       if (!currentPlaylist) return;
       const activeIds = (currentPlaylist.activeItemIds || []).map(id => String(id));
-      // 공용 영상 항목
+      // 공용 영상
       document.querySelectorAll('[data-library-id][data-library-master="1"]').forEach(el => {
         const id = String(el.getAttribute('data-library-id'));
-        const icon = el.querySelector('.fa-plus');
-        if (activeIds.includes(id)) {
-          el.style.opacity = '0.5';
-          el.style.pointerEvents = 'none';
-          if (icon) { icon.className = 'fas fa-check text-green-500'; }
-        } else {
-          el.style.opacity = '';
-          el.style.pointerEvents = '';
-          if (icon) { icon.className = 'fas fa-plus text-purple-400'; }
-        }
+        const inPlaylist = activeIds.includes(id);
+        el.style.opacity = inPlaylist ? '0.5' : '';
+        el.style.pointerEvents = inPlaylist ? 'none' : '';
+        const icon = el.querySelector('i');
+        if (icon) icon.className = inPlaylist ? 'fas fa-check text-green-500' : 'fas fa-plus text-purple-400';
       });
-      // 내 영상 항목
+      // 내 영상
       document.querySelectorAll('[data-library-id][data-library-master="0"]').forEach(el => {
         const id = String(el.getAttribute('data-library-id'));
-        const btn = el.querySelector('button[onclick^="addToPlaylistFromLibrary"]');
+        const inPlaylist = activeIds.includes(id);
+        const btn = el.querySelector('button[title="재생목록에 추가"]');
         if (btn) {
-          if (activeIds.includes(id)) {
-            btn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
-            btn.disabled = true;
-          } else {
-            btn.innerHTML = '<i class="fas fa-plus"></i>';
-            btn.disabled = false;
-          }
+          btn.innerHTML = inPlaylist ? '<i class="fas fa-check text-green-500"></i>' : '<i class="fas fa-plus"></i>';
+          btn.disabled = inPlaylist;
         }
       });
     }
@@ -8710,11 +8704,12 @@ app.get('/admin/:adminCode', async (c) => {
         animation: 150,
         handle: '.drag-handle',
         onEnd: function(evt) {
-          const activeIds = currentPlaylist.activeItemIds || [];
+          if (evt.oldIndex === evt.newIndex) return;
+          const activeIds = (currentPlaylist.activeItemIds || []).map(id => String(id));
           const [moved] = activeIds.splice(evt.oldIndex, 1);
           activeIds.splice(evt.newIndex, 0, moved);
           currentPlaylist.activeItemIds = activeIds;
-          _renderPlaylistOnly(); // 전체 재렌더 불필요, 순서만 반영
+          _renderPlaylistOnly();
           saveActiveItems();
         }
       });
@@ -8738,10 +8733,15 @@ app.get('/admin/:adminCode', async (c) => {
           throw new Error('삭제 실패');
         }
         
-        // 서버에서 최신 데이터 다시 가져오기
+        // 서버에서 최신 데이터 다시 가져오기 (activeItemIds에서도 해당 항목 제거)
         const playlistRes = await fetch(API_BASE + '/playlists/' + currentPlaylist.id);
         const data = await playlistRes.json();
+        // activeItemIds에서 삭제된 항목 제거
+        const prevActiveIds = (currentPlaylist.activeItemIds || [])
+          .map(id => String(id))
+          .filter(id => id !== String(itemId));
         currentPlaylist = data.playlist;
+        currentPlaylist.activeItemIds = prevActiveIds;
         
         // 공용 영상 캐시도 새로 로드
         masterItemsCache = null;
