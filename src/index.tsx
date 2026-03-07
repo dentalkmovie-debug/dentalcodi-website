@@ -4309,16 +4309,16 @@ app.get('/admin/:adminCode', async (c) => {
 </head>
 <body class="bg-white">
   <div id="app">
-    <!-- 로딩 -->
-    <div id="loading" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+    <!-- 로딩 (기본 숨김) -->
+    <div id="loading" style="display:none" class="fixed inset-0 bg-white flex items-center justify-center z-50">
       <div class="text-center">
         <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
         <p class="text-gray-600">로딩 중...</p>
       </div>
     </div>
     
-    <!-- 메인 대시보드 -->
-    <div id="dashboard" class="hidden">
+    <!-- 메인 대시보드 (기본 표시) -->
+    <div id="dashboard">
       <!-- 헤더 -->
       <header class="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
@@ -5787,8 +5787,10 @@ app.get('/admin/:adminCode', async (c) => {
     
     function init() {
       // 초기 데이터로 즉시 렌더링 (API 호출 없이)
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('dashboard').classList.remove('hidden');
+      const loadingDiv = document.getElementById('loading');
+      const dashboardDiv = document.getElementById('dashboard');
+      if (loadingDiv) loadingDiv.style.display = 'none';
+      // dashboard는 이미 표시 상태이므로 추가 처리 불필요
 
       if (INITIAL_DATA.isOwnerAdmin) {
         document.getElementById('clinic-name-text').textContent = '관리자';
@@ -5816,8 +5818,8 @@ app.get('/admin/:adminCode', async (c) => {
         console.error('Admin init error:', e);
         const loadingEl = document.getElementById('loading');
         const dashboardEl = document.getElementById('dashboard');
-        if (loadingEl) loadingEl.classList.add('hidden');
-        if (dashboardEl) dashboardEl.classList.remove('hidden');
+        if (loadingEl) loadingEl.style.display = 'none';
+        // dashboard는 이미 표시 상태
       }
     }
     if (document.readyState === 'loading') {
@@ -9821,7 +9823,7 @@ app.get('/admin/:adminCode', async (c) => {
         if (window.parent && window.parent !== window) {
           const appEl = document.getElementById('app');
           const dashboardEl = document.getElementById('dashboard');
-          const targetEl = (dashboardEl && !dashboardEl.classList.contains('hidden')) ? dashboardEl : appEl;
+          const targetEl = (dashboardEl && dashboardEl.style.display !== 'none') ? dashboardEl : appEl;
           const rect = targetEl ? targetEl.getBoundingClientRect() : document.body.getBoundingClientRect();
           const height = Math.ceil(rect.top + rect.height + window.scrollY);
           if (Math.abs(height - lastSentHeight) > 5) {
