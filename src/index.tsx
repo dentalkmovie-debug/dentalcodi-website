@@ -4193,17 +4193,18 @@ app.get('/admin/:adminCode', async (c) => {
       emailParam = normalizeEmail(user.imweb_email)
     }
 
-    if (!emailParam) {
+    // 이메일이 없어도 imweb_member_id가 있는 계정은 허용 (아임웹 위젯 자동 로그인)
+    if (!emailParam && !user.imweb_member_id) {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일 정보가 없습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
-    // email이 DB와 다르면 차단
-    if (user.imweb_email && normalizeEmail(user.imweb_email) !== emailParam) {
+    // email이 있을 때만 DB 값과 비교 (없으면 member_id 기반으로 허용)
+    if (emailParam && user.imweb_email && normalizeEmail(user.imweb_email) !== emailParam) {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일이 일치하지 않습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
-    // email이 없으면 저장
-    if (!user.imweb_email) {
+    // email이 있고 DB에 없으면 저장 (단, ADMIN_EMAILS는 저장하지 않음)
+    if (emailParam && !user.imweb_email && !ADMIN_EMAILS.includes(emailParam)) {
       await c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
         .bind(emailParam, user.id).run()
     }
