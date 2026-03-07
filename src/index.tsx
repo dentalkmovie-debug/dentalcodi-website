@@ -134,15 +134,16 @@ async function getOrCreateUserByMemberCode(db: D1Database, memberCode: string, m
     'SELECT * FROM users WHERE imweb_member_id = ?'
   ).bind(memberCode).first()
 
-  // 레거시 데이터 보정: member_id가 비어있는 경우에만 이메일로 매칭
+  // 레거시 데이터 보정: member_id가 없는 계정만 이메일로 매칭 (다른 member_id가 있는 계정과 혼용 방지)
   if (!user && normalizedEmail) {
     const emailUser = await db.prepare(
-      'SELECT * FROM users WHERE lower(imweb_email) = ?'
-    ).bind(normalizedEmail).first() as any
+      'SELECT * FROM users WHERE lower(imweb_email) = ? AND (imweb_member_id IS NULL OR imweb_member_id = ?)'
+    ).bind(normalizedEmail, memberCode).first() as any
 
-    if (emailUser && (!emailUser.imweb_member_id || emailUser.imweb_member_id === memberCode)) {
+    if (emailUser) {
       user = emailUser
       if (!emailUser.imweb_member_id) {
+        // member_id 없는 레거시 계정에 member_id 연결
         await db.prepare(
           'UPDATE users SET imweb_member_id = ? WHERE id = ?'
         ).bind(memberCode, emailUser.id).run()
@@ -195,10 +196,13 @@ async function getOrCreateUserByMemberCode(db: D1Database, memberCode: string, m
     }
 
     if (normalizedEmail && (user as any).imweb_email !== normalizedEmail) {
-      await db.prepare(`
-        UPDATE users SET imweb_email = ? WHERE id = ?
-      `).bind(normalizedEmail, (user as any).id).run()
-      updated = true
+      // ADMIN_EMAILS는 회원 이메일로 저장하지 않음 (API 계정 이메일이 잘못 반환될 수 있음)
+      if (!ADMIN_EMAILS.includes(normalizedEmail)) {
+        await db.prepare(`
+          UPDATE users SET imweb_email = ? WHERE id = ?
+        `).bind(normalizedEmail, (user as any).id).run()
+        updated = true
+      }
     }
 
     if (memberCode && (user as any).imweb_member_id !== memberCode) {
@@ -2303,11 +2307,14 @@ app.get('/embed/:memberCode', async (c) => {
   let resolvedEmail = normalizedEmail
   if (!resolvedEmail && imwebApiConfigured) {
     // API에서 이미 registeredEmail을 가져왔으면 사용
-    if (registeredEmail) resolvedEmail = registeredEmail
+    // 단, ADMIN_EMAILS에 해당하는 경우 API 계정 이메일이 잘못 반환된 것이므로 사용하지 않음
+    if (registeredEmail && !ADMIN_EMAILS.includes(registeredEmail)) {
+      resolvedEmail = registeredEmail
+    }
   }
 
-  if (!imwebApiConfigured && !resolvedEmail) {
-    // API 미설정 + 이메일 없으면 member_code만으로 DB 조회
+  if (!resolvedEmail) {
+    // 이메일 없으면 member_code만으로 DB 조회 (API 설정 여부 무관)
     const dbUser = await c.env.DB.prepare(
       'SELECT * FROM users WHERE imweb_member_id = ?'
     ).bind(memberCode).first() as any
@@ -2340,11 +2347,14 @@ app.get('/embed/:memberCode', async (c) => {
     return c.html('<h1>오류가 발생했습니다.</h1>')
   }
   
-  const adminCode = user.admin_code
+  const adminCode = (user as any).admin_code
   const finalEmail = resolvedEmail || (user as any).imweb_email || ''
 
   // /login 거치지 않고 바로 관리자 페이지로 이동
-  const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isAdminEmail(finalEmail)
+  // is_admin 플래그: URL 파라미터로 명시된 경우 OR master_admin 계정인 경우만
+  // 이메일 기반 admin 체크는 제거 (API 이메일이 admin 이메일과 겹칠 수 있음)
+  const isMasterAdmin = adminCode === 'master_admin'
+  const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
   const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
   if (finalEmail) adminUrl.searchParams.set('email', finalEmail)
   if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
