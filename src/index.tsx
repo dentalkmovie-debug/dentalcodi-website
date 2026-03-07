@@ -3853,7 +3853,7 @@ app.get('/embed-old/:memberCode', async (c) => {
     }
     
     function closeNoticeModal() {
-      document.getElementById('notice-modal').classList.add('hidden');
+      document.getElementById('notice-modal').style.display = 'none';
     }
     
     // 공지 저장
@@ -4039,21 +4039,21 @@ app.get('/embed-old/:memberCode', async (c) => {
     
     // 모달 닫기
     function closeEditModal() {
-      document.getElementById('edit-playlist-modal').classList.add('hidden');
+      document.getElementById('edit-playlist-modal').style.display = 'none';
       loadPlaylists();
     }
     
     function closePreviewModal() {
-      document.getElementById('preview-modal').classList.add('hidden');
+      document.getElementById('preview-modal').style.display = 'none';
       document.getElementById('preview-iframe').src = '';
     }
     
     function closeQrModal() {
-      document.getElementById('qr-modal').classList.add('hidden');
+      document.getElementById('qr-modal').style.display = 'none';
     }
     
     function closeClinicNameModal() {
-      document.getElementById('clinic-name-modal').classList.add('hidden');
+      document.getElementById('clinic-name-modal').style.display = 'none';
     }
     
     // 미리보기
@@ -4483,7 +4483,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- TV 연결 방법 가이드 모달 -->
-  <div id="tv-guide-modal" class="fixed inset-0 hidden z-50">
+  <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
@@ -4539,7 +4539,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- TV 설치 방법 모달 (통합) -->
-  <div id="script-download-modal" class="fixed inset-0 hidden z-50">
+  <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col">
@@ -4637,7 +4637,7 @@ app.get('/admin/:adminCode', async (c) => {
        ========================================================= -->
   
   <!-- 바로가기 생성 가이드 모달 -->
-  <div id="shortcut-guide-modal" class="fixed inset-0 hidden z-50">
+  <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
@@ -4711,7 +4711,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 자동 실행 가이드 모달 -->
-  <div id="autorun-guide-modal" class="fixed inset-0 hidden z-50">
+  <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
@@ -4758,7 +4758,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 대기실/체어 추가 모달 -->
-  <div id="create-playlist-modal" class="fixed inset-0 hidden z-50">
+  <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
@@ -4889,7 +4889,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 대기실 설치 가이드 모달 (단축 URL) -->
-  <div id="guide-url-modal" class="fixed inset-0 hidden z-50">
+  <div id="guide-url-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('guide-url-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
@@ -4969,7 +4969,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- USB 가이드 모달 제거: URL 직접 입력만 사용 -->
   
   <!-- 플레이리스트 편집 모달 -->
-  <div id="edit-playlist-modal" class="fixed inset-0 hidden z-50">
+  <div id="edit-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('edit-playlist-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden pointer-events-auto flex flex-col">
@@ -5292,7 +5292,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 미리보기 모달 -->
-  <div id="preview-modal" class="fixed inset-0 hidden z-50">
+  <div id="preview-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('preview-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl pointer-events-auto">
@@ -5324,7 +5324,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 공지사항 생성/편집 모달 (내용만 입력, 스타일은 공통 설정) -->
-  <div id="notice-modal" class="fixed inset-0 hidden z-50">
+  <div id="notice-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('notice-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
@@ -5365,7 +5365,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- QR 코드 모달 -->
-  <div id="qr-modal" class="fixed inset-0 hidden z-50">
+  <div id="qr-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('qr-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
@@ -5387,7 +5387,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 치과명 편집 모달 -->
-  <div id="clinic-name-modal" class="fixed inset-0 hidden z-50">
+  <div id="clinic-name-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('clinic-name-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
@@ -9764,14 +9764,16 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     function openModal(id) {
-      document.getElementById(id).classList.remove('hidden');
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'flex';
       document.body.classList.add('modal-open');
     }
 
     function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
       // body 스크롤 잠금 해제 - 열린 모달이 없을 때만
-      const openModals = document.querySelectorAll('.fixed.inset-0:not(.hidden):not(#loading)');
+      const openModals = document.querySelectorAll('.fixed.inset-0[style*="flex"]:not(#loading)');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
       }
@@ -15719,7 +15721,7 @@ app.get('/master', (c) => {
     }
     
     function closeAddClinicModal() {
-      document.getElementById('add-clinic-modal').classList.add('hidden');
+      document.getElementById('add-clinic-modal').style.display = 'none';
     }
     
     // 구독 설정 모달
@@ -15747,7 +15749,7 @@ app.get('/master', (c) => {
     }
     
     function closeSubscriptionModal() {
-      document.getElementById('subscription-modal').classList.add('hidden');
+      document.getElementById('subscription-modal').style.display = 'none';
     }
     
     // 플랜 변경 시 UI 업데이트
