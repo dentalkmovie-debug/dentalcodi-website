@@ -9772,10 +9772,6 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
-      // 현재 body 스크롤 위치 저장
-      const scrollY = window.scrollY || window.pageYOffset || 0;
-      
-      // 모달을 현재 보이는 뷰포트 위치에 고정
       el.style.display = 'flex';
       el.style.position = 'fixed';
       el.style.top = '0';
@@ -9784,19 +9780,12 @@ app.get('/admin/:adminCode', async (c) => {
       el.style.bottom = '0';
       el.style.zIndex = '9999';
       
-      // body 스크롤 잠금 (스크롤 위치 유지)
-      document.body.style.position = 'fixed';
-      document.body.style.top = '-' + scrollY + 'px';
-      document.body.style.width = '100%';
-      document.body.style.overflowY = 'scroll';
-      document.body.dataset.scrollY = String(scrollY);
       document.body.classList.add('modal-open');
       
-      // iframe 환경: postMessage로 부모에게 iframe을 뷰포트 상단으로 스크롤 요청
+      // iframe 환경: postMessage로 부모에게 iframe 상단으로 스크롤 요청
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          window.parent.postMessage({ type: 'modalOpen' }, '*');
         }
       } catch(e) {}
     }
@@ -9804,18 +9793,10 @@ app.get('/admin/:adminCode', async (c) => {
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
-      // body 스크롤 잠금 해제 - 열린 모달이 없을 때만
-      const openModals = document.querySelectorAll('[style*="display: flex"][style*="position: fixed"][style*="z-index: 9999"]');
+      // 열린 모달이 없을 때만 modal-open 해제
+      const openModals = document.querySelectorAll('[style*="z-index: 9999"][style*="display: flex"]');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
-        // body position:fixed 해제 + 스크롤 위치 복구
-        const savedScrollY = parseInt(document.body.dataset.scrollY || '0', 10);
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        document.body.style.overflowY = '';
-        window.scrollTo(0, savedScrollY);
-      }
       }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
