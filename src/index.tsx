@@ -12643,18 +12643,28 @@ app.get('/', (c) => {
     
     <div class="bg-blue-50 rounded-xl p-6 text-left mb-4">
       <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-code mr-2 text-blue-500"></i>아임웹 위젯 코드 (아임웹 로그인 자동 연동)</h2>
-      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0"&gt;&lt;/iframe&gt;
+      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
 &lt;script&gt;
 (function() {
   var mc = '{{ member_code }}';
   var em = '{{ user_email }}';
+  var host = 'https://dental-tv.pages.dev';
+  var frame = document.getElementById('dental-tv-frame');
   if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
-    document.getElementById('dental-tv-frame').src =
-      'https://dental-tv.pages.dev/embed/' + encodeURIComponent(mc) + '?email=' + encodeURIComponent(em);
+    // 로그인한 일반 회원: 해당 계정 관리자 페이지로 자동 이동
+    frame.src = host + '/embed/' + encodeURIComponent(mc) + '?email=' + encodeURIComponent(em);
+  } else {
+    // 비로그인 또는 관리자 계정: 로그인 안내 페이지
+    frame.src = host + '/not-logged-in';
   }
+  window.addEventListener('message', function(e) {
+    if (e.data &amp;&amp; e.data.type === 'setHeight') {
+      frame.style.height = (e.data.height + 30) + 'px';
+    }
+  });
 })();
 &lt;/script&gt;</pre>
-      <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다</p>
+      <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
     </div>
     
     <div class="bg-purple-50 rounded-xl p-6 text-left mb-4">
@@ -12671,6 +12681,38 @@ app.get('/', (c) => {
     <a href="${c.req.url.replace(/\/$/, '')}/master" class="inline-block bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition">
       <i class="fas fa-crown mr-2"></i>마스터 관리자 바로가기
     </a>
+  </div>
+</body>
+</html>
+  `)
+})
+
+// ============================================
+// 비로그인/관리자 계정 안내 페이지
+// ============================================
+
+app.get('/not-logged-in', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 필요</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+    <div class="text-5xl mb-4">📺</div>
+    <h1 class="text-xl font-bold text-gray-800 mb-3">치과 대기실 TV</h1>
+    <p class="text-gray-500 mb-6 text-sm leading-relaxed">
+      이 페이지는 <strong>아임웹 회원 로그인</strong> 후 이용하실 수 있습니다.<br>
+      상단 메뉴에서 로그인 후 다시 방문해 주세요.
+    </p>
+    <div class="bg-blue-50 rounded-xl p-4 text-left text-xs text-blue-700">
+      <p class="font-semibold mb-1">💡 안내</p>
+      <p>아임웹 일반 회원 계정으로 로그인하시면<br>본인의 치과 TV 관리 화면이 자동으로 표시됩니다.</p>
+    </div>
   </div>
 </body>
 </html>
