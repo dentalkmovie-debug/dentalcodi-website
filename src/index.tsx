@@ -175,12 +175,23 @@ async function getOrCreateUserByMemberCode(db: D1Database, memberCode: string, m
     }
   } else {
     let updated = false
-    if (memberName && memberName.trim() && (user as any).clinic_name !== memberName.trim()) {
-      // 아임웹 가입 치과명으로 갱신
-      await db.prepare(`
-        UPDATE users SET clinic_name = ? WHERE id = ?
-      `).bind(memberName.trim(), (user as any).id).run()
-      updated = true
+    // 기본값/임시값 목록: 이 이름들은 clinic_name을 덮어쓰지 않음
+    const defaultNames = ['관리자', '내 치과', '{{ user_name }}', 'Admin', 'admin']
+    const currentClinicName = (user as any).clinic_name || ''
+    const isCurrentDefault = !currentClinicName || defaultNames.some(n => currentClinicName === n)
+    const isNewNameDefault = !memberName || defaultNames.some(n => memberName.trim() === n)
+
+    if (memberName && memberName.trim() && currentClinicName !== memberName.trim()) {
+      // 현재 clinic_name이 기본값이 아닌 경우(사용자가 직접 설정), 새 이름이 기본값이면 덮어쓰지 않음
+      if (!isCurrentDefault && isNewNameDefault) {
+        // 사용자가 직접 설정한 이름 유지, 덮어쓰지 않음
+      } else {
+        // 아임웹 가입 치과명으로 갱신
+        await db.prepare(`
+          UPDATE users SET clinic_name = ? WHERE id = ?
+        `).bind(memberName.trim(), (user as any).id).run()
+        updated = true
+      }
     }
 
     if (normalizedEmail && (user as any).imweb_email !== normalizedEmail) {
@@ -754,15 +765,12 @@ app.get('/master/links', async (c) => {
     }
 
     function buildLink(member) {
-      const params = new URLSearchParams();
       const memberCode = member.member_code || member.memberCode || member.uid || member.id || '';
       const email = member.email || '';
-      const name = member.name || member.clinic_name || '';
-      if (memberCode) params.set('memberCode', memberCode);
-      if (email) params.set('email', email);
-      if (name) params.set('name', name);
-      const query = params.toString();
-      return BASE_URL + '/login' + (query ? '?' + query : '');
+      if (memberCode && email) {
+        return BASE_URL + '/embed/' + encodeURIComponent(memberCode) + '?email=' + encodeURIComponent(email);
+      }
+      return BASE_URL + '/login';
     }
 
     loadButton.addEventListener('click', async () => {
@@ -12634,14 +12642,19 @@ app.get('/', (c) => {
     <p class="text-gray-600 mb-8">관리 시스템</p>
     
     <div class="bg-blue-50 rounded-xl p-6 text-left mb-4">
-      <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-code mr-2 text-blue-500"></i>치과용 위젯 코드</h2>
-      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe 
-  src="${c.req.url.replace(/\/$/, '')}/admin/YOUR_CODE"
-  width="100%" 
-  height="800"
-  frameborder="0"
-&gt;&lt;/iframe&gt;</pre>
-      <p class="text-xs text-gray-500 mt-2">* YOUR_CODE를 고유 관리자 코드로 변경하세요</p>
+      <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-code mr-2 text-blue-500"></i>아임웹 위젯 코드 (아임웹 로그인 자동 연동)</h2>
+      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0"&gt;&lt;/iframe&gt;
+&lt;script&gt;
+(function() {
+  var mc = '{{ member_code }}';
+  var em = '{{ user_email }}';
+  if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
+    document.getElementById('dental-tv-frame').src =
+      'https://dental-tv.pages.dev/embed/' + encodeURIComponent(mc) + '?email=' + encodeURIComponent(em);
+  }
+})();
+&lt;/script&gt;</pre>
+      <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다</p>
     </div>
     
     <div class="bg-purple-50 rounded-xl p-6 text-left mb-4">
@@ -15699,11 +15712,12 @@ app.get('/master', (c) => {
     }
 
     function buildImwebLoginLink(member) {
-      const params = new URLSearchParams();
-      if (member.member_code) params.set('memberCode', member.member_code);
-      if (member.email) params.set('email', member.email);
-      if (member.name) params.set('name', member.name);
-      return '${baseUrl}/login?' + params.toString();
+      const memberCode = member.member_code || member.memberCode || member.uid || member.id || '';
+      const email = member.email || '';
+      if (memberCode && email) {
+        return '${baseUrl}/embed/' + encodeURIComponent(memberCode) + '?email=' + encodeURIComponent(email);
+      }
+      return '${baseUrl}/login';
     }
 
     async function loadImwebLinks() {
