@@ -3019,7 +3019,7 @@ app.get('/embed-old/:memberCode', async (c) => {
       currentPlaylist = null;
       
       // 모달 열고 로딩 표시
-      document.getElementById('edit-playlist-modal').classList.remove('hidden');
+      openModal('edit-playlist-modal');
       document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
       resetPlaylistEditorScroll();
       playlistSearchQuery = '';
@@ -3841,7 +3841,7 @@ app.get('/embed-old/:memberCode', async (c) => {
       document.getElementById('notice-modal-title').textContent = notice ? '공지 수정' : '새 공지사항';
       document.getElementById('notice-content').value = notice ? notice.content : '';
       document.getElementById('notice-urgent').checked = notice ? notice.is_urgent : false;
-      document.getElementById('notice-modal').classList.remove('hidden');
+      openModal('notice-modal');
     }
     
     function closeNoticeModal() {
@@ -4051,7 +4051,7 @@ app.get('/embed-old/:memberCode', async (c) => {
     // 미리보기
     function openQuickPreview(shortCode) {
       document.getElementById('preview-iframe').src = '/tv/' + shortCode + '?preview=1';
-      document.getElementById('preview-modal').classList.remove('hidden');
+      openModal('preview-modal');
     }
     
     // TV 미러링 열기 (팝업 차단 방지를 위해 동기적으로 창 열기)
@@ -4112,7 +4112,7 @@ app.get('/embed-old/:memberCode', async (c) => {
     // 치과명 변경
     function editClinicName() {
       document.getElementById('edit-clinic-name').value = document.getElementById('clinic-name-text').textContent;
-      document.getElementById('clinic-name-modal').classList.remove('hidden');
+      openModal('clinic-name-modal');
     }
     
     async function saveClinicName(e) {
@@ -4267,7 +4267,9 @@ app.get('/admin/:adminCode', async (c) => {
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    html, body { width: 100%; overflow-x: hidden; overflow-y: scroll; }
+    html, body { width: 100%; overflow-x: hidden; overflow-y: auto; }
+    /* 모달 열릴 때 body 스크롤 방지 */
+    body.modal-open { overflow: hidden; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -5030,7 +5032,7 @@ app.get('/admin/:adminCode', async (c) => {
             </div>
             
             <!-- 라이브러리 목록 -->
-            <div id="library-scroll-container" class="p-4" style="height: 360px; overflow-y: auto;">
+            <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto">
               <!-- 공용 영상 -->
               <div id="library-master-section" class="mb-4 hidden">
                 <div class="flex items-center gap-2 mb-2 text-sm">
@@ -6758,7 +6760,7 @@ app.get('/admin/:adminCode', async (c) => {
         } else {
           document.getElementById('guide-short-url').textContent = location.host + '/' + shortCode;
         }
-        document.getElementById('guide-url-modal').classList.remove('hidden');
+        openModal('guide-url-modal');
       }
     }
     
@@ -6866,7 +6868,7 @@ app.get('/admin/:adminCode', async (c) => {
       selectedTempVideoItem = null;
       
       // 모달 즉시 열기
-      document.getElementById('temp-video-modal').classList.remove('hidden');
+      openModal('temp-video-modal');
       
       // 재생목록 탭으로 초기화
       switchTempVideoTab('shared');
@@ -7236,7 +7238,7 @@ app.get('/admin/:adminCode', async (c) => {
       document.getElementById('create-step-chair').classList.add('hidden');
       document.getElementById('new-waiting-name').value = '';
       document.getElementById('new-chair-name').value = '';
-      document.getElementById('create-playlist-modal').classList.remove('hidden');
+      openModal('create-playlist-modal');
     }
     
     function selectCreateType(type) {
@@ -7278,13 +7280,7 @@ app.get('/admin/:adminCode', async (c) => {
           newlyCreatedPlaylist = data.playlist;
           await loadPlaylists();
           
-          // 초기 설정 섹션 자동 열기
-          const content = document.getElementById('export-section-content');
-          if (content && content.classList.contains('hidden')) {
-            toggleExportSection();
-          }
-          
-          // URL 직접 입력 가이드 모달 표시
+          // URL 직접 입력 가이드 모달 표시 (초기설정 탭은 자동으로 열지 않음)
           showUrlGuide(data.playlist);
         } else {
           showToast(data.error || '생성 실패', 'error');
@@ -7319,13 +7315,7 @@ app.get('/admin/:adminCode', async (c) => {
         if (data.success) {
           closeModal('create-playlist-modal');
           await loadPlaylists();
-          showToast('✅ ' + name + ' 추가 완료! 내보내기에서 스크립트를 다운로드하세요.');
-          
-          // 내보내기 섹션 자동 열기
-          const content = document.getElementById('export-section-content');
-          if (content && content.classList.contains('hidden')) {
-            toggleExportSection();
-          }
+          showToast('✅ ' + name + ' 추가 완료! 초기 설정 탭에서 스크립트를 다운로드하세요.');
         } else {
           showToast(data.error || '생성 실패', 'error');
         }
@@ -7338,7 +7328,7 @@ app.get('/admin/:adminCode', async (c) => {
     function showUrlGuide(playlist) {
       newlyCreatedPlaylist = playlist;
       document.getElementById('guide-short-url').textContent = location.host + '/' + playlist.short_code;
-      document.getElementById('guide-url-modal').classList.remove('hidden');
+      openModal('guide-url-modal');
     }
     
     // USB 가이드 제거: URL 직접 입력만 사용
@@ -7407,7 +7397,7 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     function showTvGuideModal() {
-      document.getElementById('tv-guide-modal').classList.remove('hidden');
+      openModal('tv-guide-modal');
     }
     
     // 기존 createPlaylist 함수 (이전 버전 호환용)
@@ -7479,7 +7469,7 @@ app.get('/admin/:adminCode', async (c) => {
       currentPlaylist = null;
       
       // 즉시 모달 열기
-      document.getElementById('edit-playlist-modal').classList.remove('hidden');
+      openModal('edit-playlist-modal');
       document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
       resetPlaylistEditorScroll();
       playlistSearchQuery = '';
@@ -8888,7 +8878,7 @@ app.get('/admin/:adminCode', async (c) => {
         '</div>'
       ).join('');
       
-      document.getElementById('shortcut-guide-modal').classList.remove('hidden');
+      openModal('shortcut-guide-modal');
     }
     
     function downloadBookmark(name, url, shortCode, variant = 'universal') {
@@ -9052,7 +9042,7 @@ app.get('/admin/:adminCode', async (c) => {
     
     // 스크립트 다운로드 모달 표시 (설치 방법 안내용)
     function showScriptDownloadModal() {
-      document.getElementById('script-download-modal').classList.remove('hidden');
+      openModal('script-download-modal');
     }
     
     // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
@@ -9147,7 +9137,7 @@ app.get('/admin/:adminCode', async (c) => {
         '</div>';
       }).join('');
       
-      document.getElementById('individual-install-modal').classList.remove('hidden');
+      openModal('individual-install-modal');
     }
     
     // 개별 VBS 다운로드 (설명 포함)
@@ -9401,23 +9391,23 @@ app.get('/admin/:adminCode', async (c) => {
     // 바로가기 생성 안내
     function showShortcutGuide() {
       closeModal('script-download-modal');
-      document.getElementById('shortcut-guide-modal').classList.remove('hidden');
+      openModal('shortcut-guide-modal');
     }
     
     // 자동 실행 가이드 모달
     function showAutoRunGuide() {
-      document.getElementById('autorun-guide-modal').classList.remove('hidden');
+      openModal('autorun-guide-modal');
     }
     
     function openPreviewModal() {
       const shortCode = currentPlaylist.short_code;
       document.getElementById('preview-iframe').src = '/tv/' + shortCode + '?preview=1';
-      document.getElementById('preview-modal').classList.remove('hidden');
+      openModal('preview-modal');
     }
     
     function openQuickPreview(shortCode) {
       document.getElementById('preview-iframe').src = '/tv/' + shortCode + '?preview=1';
-      document.getElementById('preview-modal').classList.remove('hidden');
+      openModal('preview-modal');
     }
     
     // TV 미러링 열기 (팝업 차단 방지를 위해 동기적으로 창 열기)
@@ -9439,7 +9429,7 @@ app.get('/admin/:adminCode', async (c) => {
       const qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=250x250&chl=' + encodeURIComponent(url);
       document.getElementById('qr-code-container').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" class="rounded-lg shadow-md">';
       document.getElementById('qr-url-text').textContent = url;
-      document.getElementById('qr-modal').classList.remove('hidden');
+      openModal('qr-modal');
     }
     
     function sendToTv() {
@@ -9633,7 +9623,7 @@ app.get('/admin/:adminCode', async (c) => {
       document.getElementById('notice-id').value = '';
       document.getElementById('notice-content').value = '';
       document.getElementById('notice-urgent').checked = false;
-      document.getElementById('notice-modal').classList.remove('hidden');
+      openModal('notice-modal');
     }
     
     function editNotice(id) {
@@ -9644,7 +9634,7 @@ app.get('/admin/:adminCode', async (c) => {
       document.getElementById('notice-id').value = notice.id;
       document.getElementById('notice-content').value = notice.content;
       document.getElementById('notice-urgent').checked = notice.is_urgent === 1;
-      document.getElementById('notice-modal').classList.remove('hidden');
+      openModal('notice-modal');
     }
     
     async function toggleUrgent(id, isUrgent) {
@@ -9722,7 +9712,7 @@ app.get('/admin/:adminCode', async (c) => {
     
     function editClinicName() {
       document.getElementById('edit-clinic-name').value = clinicName;
-      document.getElementById('clinic-name-modal').classList.remove('hidden');
+      openModal('clinic-name-modal');
     }
     
     async function saveClinicName(e) {
@@ -9745,8 +9735,18 @@ app.get('/admin/:adminCode', async (c) => {
       }
     }
     
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+      document.body.classList.add('modal-open');
+    }
+
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
+      // body 스크롤 잠금 해제 - 열린 모달이 없을 때만
+      const openModals = document.querySelectorAll('.fixed.inset-0:not(.hidden):not(#loading)');
+      if (openModals.length === 0) {
+        document.body.classList.remove('modal-open');
+      }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
       }
@@ -9758,13 +9758,6 @@ app.get('/admin/:adminCode', async (c) => {
           masterItemsRefreshTimer = null;
         }
         loadPlaylists();
-      }
-      // TV 설치/가이드 모달 확인 시 초기설정 접기
-      if (id === 'guide-url-modal' || id === 'guide-usb-modal' || id === 'tv-guide-modal') {
-        const content = document.getElementById('export-section-content');
-        if (content && !content.classList.contains('hidden')) {
-          toggleExportSection();
-        }
       }
     }
     
@@ -15692,7 +15685,7 @@ app.get('/master', (c) => {
     
     // 새 치과 등록 모달
     function openAddClinicModal() {
-      document.getElementById('add-clinic-modal').classList.remove('hidden');
+      openModal('add-clinic-modal');
       document.getElementById('new-clinic-name').value = '';
       document.getElementById('new-clinic-email').value = '';
     }
@@ -15703,7 +15696,7 @@ app.get('/master', (c) => {
     
     // 구독 설정 모달
     function openSubscriptionModal(adminCode, clinicName, currentEndDate, currentPlan) {
-      document.getElementById('subscription-modal').classList.remove('hidden');
+      openModal('subscription-modal');
       document.getElementById('sub-admin-code').value = adminCode;
       document.getElementById('sub-clinic-name').textContent = '치과: ' + clinicName;
       
