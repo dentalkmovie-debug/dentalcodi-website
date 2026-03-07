@@ -1123,7 +1123,7 @@ app.get('/api/:adminCode/playlists', async (c) => {
       (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
     FROM playlists p
     WHERE p.user_id = ?
-    ORDER BY COALESCE(p.sort_order, 999), p.created_at DESC
+    ORDER BY COALESCE(p.sort_order, 999), p.created_at ASC
   `).bind(user.id).all()
   
   // 플레이리스트가 없으면 기본 플레이리스트 자동 생성
@@ -1141,7 +1141,7 @@ app.get('/api/:adminCode/playlists', async (c) => {
         (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
       FROM playlists p
       WHERE p.user_id = ?
-      ORDER BY COALESCE(p.sort_order, 999), p.created_at DESC
+      ORDER BY COALESCE(p.sort_order, 999), p.created_at ASC
     `).bind(user.id).all()
   }
   
@@ -1168,10 +1168,16 @@ app.post('/api/:adminCode/playlists', async (c) => {
   const shortCode = generateRandomCode(5)
   const tvCode = String(Math.floor(1000 + Math.random() * 9000))
   
+  // 새 플레이리스트는 현재 최대 sort_order + 1로 맨 뒤에 추가
+  const maxOrder = await c.env.DB.prepare(`
+    SELECT COALESCE(MAX(sort_order), -1) as max_order FROM playlists WHERE user_id = ?
+  `).bind(user.id).first() as { max_order: number }
+  const newSortOrder = (maxOrder?.max_order ?? -1) + 1
+  
   const result = await c.env.DB.prepare(`
-    INSERT INTO playlists (user_id, name, short_code, tv_code)
-    VALUES (?, ?, ?, ?)
-  `).bind(user.id, name, shortCode, tvCode).run()
+    INSERT INTO playlists (user_id, name, short_code, tv_code, sort_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(user.id, name, shortCode, tvCode, newSortOrder).run()
   
   return c.json({ 
     success: true,
