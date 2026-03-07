@@ -6266,7 +6266,7 @@ app.get('/admin/:adminCode', async (c) => {
                     <h3 class="font-bold text-gray-800">
                       \${p.name}
                       \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                      \${!p.external_short_url ? '<span class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">📺 TV 설정 필요</span>' : ''}
+                      \${!p.external_short_url ? '<span class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">TV 설정 필요</span>' : ''}
                     </h3>
                     <p class="text-xs text-gray-500">
                       <span class="text-teal-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -6329,7 +6329,7 @@ app.get('/admin/:adminCode', async (c) => {
                     <h3 class="font-bold text-gray-800">
                       \${p.name}
                       \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                      \${!p.last_active_at ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">🖥️ 체어 설치 필요</span>' : ''}
+                      \${!p.last_active_at ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">체어 설치 필요</span>' : ''}
                     </h3>
                     <p class="text-xs text-gray-500">
                       <span class="text-indigo-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
