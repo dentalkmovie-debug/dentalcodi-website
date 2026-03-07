@@ -12646,17 +12646,43 @@ app.get('/', (c) => {
       <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
 &lt;script&gt;
 (function() {
-  var mc = '{{ member_code }}';
-  var em = '{{ user_email }}';
   var host = 'https://dental-tv.pages.dev';
   var frame = document.getElementById('dental-tv-frame');
-  if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
-    // 로그인한 일반 회원: 해당 계정 관리자 페이지로 자동 이동
-    frame.src = host + '/embed/' + encodeURIComponent(mc) + '?email=' + encodeURIComponent(em);
-  } else {
-    // 비로그인 또는 관리자 계정: 로그인 안내 페이지
-    frame.src = host + '/not-logged-in';
+
+  function getMemberInfo() {
+    // 방법1: 아임웹 페이지 정보 객체 (JavaScript)
+    try {
+      var info = window._imweb_page_info;
+      if (info &amp;&amp; info.member_code &amp;&amp; info.member_email) {
+        return { mc: info.member_code, em: info.member_email };
+      }
+    } catch(e) {}
+
+    // 방법2: 아임웹 템플릿 변수 (코드 위젯용)
+    var mc = '{{ member_code }}';
+    var em = '{{ user_email }}';
+    if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
+      return { mc: mc, em: em };
+    }
+    return null;
   }
+
+  function init() {
+    var info = getMemberInfo();
+    if (info &amp;&amp; info.mc &amp;&amp; info.em) {
+      frame.src = host + '/embed/' + encodeURIComponent(info.mc) + '?email=' + encodeURIComponent(info.em);
+    } else {
+      frame.src = host + '/not-logged-in';
+    }
+  }
+
+  // 페이지 로드 후 실행 (아임웹 객체가 준비될 때까지 대기)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    setTimeout(init, 500);
+  }
+
   window.addEventListener('message', function(e) {
     if (e.data &amp;&amp; e.data.type === 'setHeight') {
       frame.style.height = (e.data.height + 30) + 'px';
