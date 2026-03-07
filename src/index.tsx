@@ -2348,7 +2348,9 @@ app.get('/embed/:memberCode', async (c) => {
   }
   
   const adminCode = (user as any).admin_code
-  const finalEmail = resolvedEmail || (user as any).imweb_email || ''
+  // ADMIN_EMAILS에 해당하는 이메일은 URL에 포함하지 않음 (API 계정 이메일 오염 방지)
+  const rawFinalEmail = resolvedEmail || (user as any).imweb_email || ''
+  const finalEmail = ADMIN_EMAILS.includes(rawFinalEmail) ? '' : rawFinalEmail
 
   // /login 거치지 않고 바로 관리자 페이지로 이동
   // is_admin 플래그: URL 파라미터로 명시된 경우 OR master_admin 계정인 경우만
