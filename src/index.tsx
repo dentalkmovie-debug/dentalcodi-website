@@ -6447,7 +6447,7 @@ app.get('/admin/:adminCode', async (c) => {
                       복사
                     </button>
                     \${!p.external_short_url ? \`
-                    <button onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
+                    <button id="btn-shorten-\${p.id}" onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
                       class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded text-sm">
                       단축 URL 생성
                     </button>
@@ -7377,15 +7377,18 @@ app.get('/admin/:adminCode', async (c) => {
           const guideEl = document.getElementById('guide-short-url');
           if (guideEl) guideEl.textContent = shortUrlDisplay;
           
-          // 클립보드에 복사
-          await navigator.clipboard.writeText(data.shortUrl);
-          
-          showToast('✅ 단축 URL 생성 완료!\\n' + shortUrlDisplay + '\\n(클립보드에 복사됨)', 'success', 5000);
+          // 클립보드에 복사 (iframe 환경에서 실패해도 무시)
+          try {
+            await navigator.clipboard.writeText(data.shortUrl);
+            showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay + ' (클립보드 복사됨)', 'success', 5000);
+          } catch (clipErr) {
+            showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
+          }
         } else {
           showToast(data.error || '단축 URL 생성 실패', 'error');
         }
       } catch (e) {
-        showToast('단축 URL 생성 실패', 'error');
+        showToast('단축 URL 생성 실패: ' + e.message, 'error');
       }
     }
     
@@ -9010,6 +9013,14 @@ app.get('/admin/:adminCode', async (c) => {
       if (guideUrlEl && newlyCreatedPlaylist && newlyCreatedPlaylist.id == playlistId) {
         guideUrlEl.textContent = shortUrlDisplay;
       }
+      
+      // 4. 'TV 설정 필요' 배지 제거
+      const badgeEl = document.getElementById('badge-setup-' + playlistId);
+      if (badgeEl) badgeEl.remove();
+      
+      // 5. '단축 URL 생성' 버튼 제거
+      const btnShortenEl = document.getElementById('btn-shorten-' + playlistId);
+      if (btnShortenEl) btnShortenEl.remove();
     }
     
     // 초기 설정 섹션 URL 복사
