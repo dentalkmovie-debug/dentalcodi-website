@@ -7284,7 +7284,7 @@ app.get('/admin/:adminCode', async (c) => {
 
       // 프론트엔드 중복 체크
       if (playlists && playlists.some(p => p.name === name)) {
-        showToast('\'' + name + '\' 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
+        showToast('"' + name + '" 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
         return;
       }
       
@@ -7327,7 +7327,7 @@ app.get('/admin/:adminCode', async (c) => {
 
       // 프론트엔드 중복 체크
       if (playlists && playlists.some(p => p.name === name)) {
-        showToast('\'' + name + '\' 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
+        showToast('"' + name + '" 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
         return;
       }
       
