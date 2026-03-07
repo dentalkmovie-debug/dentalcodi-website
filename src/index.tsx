@@ -2260,9 +2260,7 @@ app.get('/embed/:memberCode', async (c) => {
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
 
   const normalizedEmail = normalizeEmail(memberEmail)
-  if (!normalizedEmail) {
-    return c.html('<h1>이메일 정보가 없습니다. 아임웹 로그인 후 다시 시도해주세요.</h1>')
-  }
+  // 이메일 없어도 member_code만으로 진행 (아임웹에서 이메일을 제공 안 할 수 있음)
 
   // 아임웹 회원 이메일/회원코드 일치 검증
   let imwebApiConfigured = false
@@ -2301,42 +2299,54 @@ app.get('/embed/:memberCode', async (c) => {
     console.error('Imweb API error (embed):', e)
   }
 
-  if (!imwebApiConfigured) {
-    return c.html('<h1>아임웹 인증 설정이 필요합니다. 관리자에게 문의하세요.</h1>')
+  // 아임웹 API로 이메일 조회 (이메일이 없는 경우)
+  let resolvedEmail = normalizedEmail
+  if (!resolvedEmail && imwebApiConfigured) {
+    // API에서 이미 registeredEmail을 가져왔으면 사용
+    if (registeredEmail) resolvedEmail = registeredEmail
   }
 
-  if (!imwebMemberValid) {
-    // 아임웹에서 찾지 못해도 DB에 등록된 계정이면 허용 (레거시 계정 지원)
+  if (!imwebApiConfigured && !resolvedEmail) {
+    // API 미설정 + 이메일 없으면 member_code만으로 DB 조회
+    const dbUser = await c.env.DB.prepare(
+      'SELECT * FROM users WHERE imweb_member_id = ?'
+    ).bind(memberCode).first() as any
+    if (dbUser) {
+      resolvedEmail = dbUser.imweb_email || ''
+    }
+  }
+
+  if (!imwebMemberValid && resolvedEmail) {
+    // 이메일이 있는데 아임웹 검증 실패 → DB에서 확인
     const dbUser = await c.env.DB.prepare(
       'SELECT * FROM users WHERE lower(imweb_email) = ? OR imweb_member_id = ?'
-    ).bind(normalizedEmail, memberCode).first() as any
-
-    if (!dbUser) {
+    ).bind(resolvedEmail, memberCode).first() as any
+    if (!dbUser && imwebApiConfigured) {
       return c.html(`
         <div style="font-family: sans-serif; padding: 24px;">
           <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 12px;">가입된 이메일과 계정이 일치하지 않습니다.</h1>
           <p style="margin: 4px 0;">등록 이메일: <strong>${registeredEmail || '확인 불가'}</strong></p>
-          <p style="margin: 4px 0;">입력 이메일: <strong>${normalizedEmail}</strong></p>
+          <p style="margin: 4px 0;">입력 이메일: <strong>${resolvedEmail}</strong></p>
         </div>
       `)
     }
-    // DB에 있는 계정이면 계속 진행
   }
 
   const finalMemberName = apiMemberName || memberName
-  // 회원 코드로 사용자 조회/생성
-  const user = await getOrCreateUserByMemberCode(c.env.DB, memberCode, finalMemberName, normalizedEmail)
+  // 회원 코드로 사용자 조회/생성 (이메일 없어도 허용)
+  const user = await getOrCreateUserByMemberCode(c.env.DB, memberCode, finalMemberName, resolvedEmail)
   
   if (!user) {
     return c.html('<h1>오류가 발생했습니다.</h1>')
   }
   
   const adminCode = user.admin_code
+  const finalEmail = resolvedEmail || (user as any).imweb_email || ''
 
   // /login 거치지 않고 바로 관리자 페이지로 이동
-  const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isAdminEmail(normalizedEmail)
+  const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isAdminEmail(finalEmail)
   const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
-  adminUrl.searchParams.set('email', normalizedEmail)
+  if (finalEmail) adminUrl.searchParams.set('email', finalEmail)
   if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
   return c.redirect(adminUrl.toString())
 })
@@ -12650,57 +12660,33 @@ app.get('/', (c) => {
   var frame = document.getElementById('dental-tv-frame');
   var launched = false;
 
-  function getMemberInfo() {
-    // 방법1: 아임웹 전역 객체 window.__IMWEB__.member
-    try {
-      var m = window.__IMWEB__ &amp;&amp; window.__IMWEB__.member;
-      if (m &amp;&amp; (m.code || m.id) &amp;&amp; m.email) {
-        return { mc: String(m.code || m.id), em: m.email };
-      }
-    } catch(e) {}
-    // 방법2: window._imweb_page_info
-    try {
-      var info = window._imweb_page_info;
-      if (info &amp;&amp; info.member_code &amp;&amp; (info.member_email || info.email)) {
-        return { mc: info.member_code, em: info.member_email || info.email };
-      }
-    } catch(e) {}
-    // 방법3: 아임웹 템플릿 변수 치환값
-    var mc = '{{ member_code }}';
-    var em = '{{ user_email }}';
-    if (mc &amp;&amp; mc.indexOf('{{') === -1 &amp;&amp; em &amp;&amp; em.indexOf('{{') === -1) {
-      return { mc: mc, em: em };
-    }
+  function getMemberCode() {
+    // 방법1: window.__IMWEB__.member
+    try { var m = window.__IMWEB__ &amp;&amp; window.__IMWEB__.member; if (m &amp;&amp; (m.code||m.id)) return { mc: String(m.code||m.id), em: m.email||'' }; } catch(e){}
+    // 방법2: window.__bs_imweb (아임웹 SDK)
+    try { var b = window.__bs_imweb; if (b &amp;&amp; b.member_code) return { mc: b.member_code, em: b.email||'' }; } catch(e){}
+    // 방법3: window._imweb_page_info
+    try { var i = window._imweb_page_info; if (i &amp;&amp; i.member_code) return { mc: i.member_code, em: i.member_email||i.email||'' }; } catch(e){}
+    // 방법4: 아임웹 템플릿 변수
+    var mc='{{ member_code }}', em='{{ user_email }}';
+    if (mc &amp;&amp; mc.indexOf('{{')===-1) return { mc:mc, em:(em &amp;&amp; em.indexOf('{{')===-1)?em:'' };
     return null;
   }
 
   function launch() {
     if (launched) return;
-    var info = getMemberInfo();
-    if (info &amp;&amp; info.mc &amp;&amp; info.em) {
+    var info = getMemberCode();
+    if (info &amp;&amp; info.mc) {
       launched = true;
-      frame.src = host + '/embed/' + encodeURIComponent(info.mc) + '?email=' + encodeURIComponent(info.em);
+      var url = host + '/embed/' + encodeURIComponent(info.mc);
+      if (info.em) url += '?email=' + encodeURIComponent(info.em);
+      frame.src = url;
     }
   }
 
-  // 폴링: 최대 5초간 100ms마다 시도 (아임웹 객체 준비 대기)
-  var attempts = 0;
-  var poll = setInterval(function() {
-    attempts++;
-    launch();
-    if (launched || attempts >= 50) {
-      clearInterval(poll);
-      if (!launched) {
-        frame.src = host + '/not-logged-in';
-      }
-    }
-  }, 100);
-
-  window.addEventListener('message', function(e) {
-    if (e.data &amp;&amp; e.data.type === 'setHeight') {
-      frame.style.height = (e.data.height + 30) + 'px';
-    }
-  });
+  // 최대 5초간 100ms마다 폴링
+  var n=0, t=setInterval(function(){ launch(); if(launched||++n&gt;=50){ clearInterval(t); if(!launched) frame.src=host+'/not-logged-in'; }}, 100);
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; });
 })();
 &lt;/script&gt;</pre>
       <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
