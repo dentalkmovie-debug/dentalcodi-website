@@ -5808,7 +5808,8 @@ app.get('/admin/:adminCode', async (c) => {
       setupAutoHeight();
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    // DOMContentLoaded 또는 즉시 실행 (이미 fired된 경우 대비)
+    function runInit() {
       try {
         init();
       } catch (e) {
@@ -5818,7 +5819,12 @@ app.get('/admin/:adminCode', async (c) => {
         if (loadingEl) loadingEl.classList.add('hidden');
         if (dashboardEl) dashboardEl.classList.remove('hidden');
       }
-    });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', runInit);
+    } else {
+      runInit();
+    }
     
     // 공용자료 로드 (관리자 페이지용)
     async function loadMasterItemsForAdmin() {
