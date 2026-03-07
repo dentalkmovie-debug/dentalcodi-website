@@ -2019,6 +2019,47 @@ app.get('/api/:adminCode/settings', async (c) => {
 })
 
 // ============================================
+// TV → 관리자 페이지 직접 이동용 토큰 발급 API
+// shortCode로 해당 플레이리스트 계정의 세션 토큰을 발급해 관리자 URL 반환
+// localStorage 우회 목적 (동시접속 차단 없이 TV 계정으로 바로 이동)
+app.post('/api/tv-admin-token/:shortCode', async (c) => {
+  const shortCode = c.req.param('shortCode')
+
+  const playlist = await c.env.DB.prepare(`
+    SELECT p.id, u.id as user_id, u.admin_code, u.imweb_email, u.is_active, u.suspended_reason
+    FROM playlists p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.short_code = ? AND p.is_active = 1
+  `).bind(shortCode).first() as any
+
+  if (!playlist) {
+    return c.json({ success: false, error: '플레이리스트를 찾을 수 없습니다.' }, 404)
+  }
+
+  if (playlist.is_active === 0) {
+    return c.json({ success: false, error: '정지된 계정입니다.' }, 403)
+  }
+
+  // 세션 발급 (기존 세션 삭제 없이 추가 - 동시접속 허용)
+  const sessionToken = crypto.randomUUID()
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+  await c.env.DB.prepare(`
+    INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)
+  `).bind(sessionToken, playlist.user_id, expiresAt).run()
+
+  const baseUrl = new URL(c.req.url).origin
+  const adminUrl = new URL(baseUrl + '/admin/' + playlist.admin_code)
+  adminUrl.searchParams.set('session', sessionToken)
+  if (playlist.imweb_email) adminUrl.searchParams.set('email', playlist.imweb_email)
+
+  return c.json({
+    success: true,
+    adminUrl: adminUrl.toString(),
+    adminCode: playlist.admin_code,
+    email: playlist.imweb_email || ''
+  })
+})
+
 // TV 미러링 페이지 API
 // ============================================
 
@@ -12549,34 +12590,32 @@ app.get('/tv/:shortCode', async (c) => {
       enterFullscreen();
     });
 
-    // 관리자 버튼 이벤트 - tvAdminCode/tvAdminEmail을 사용해 올바른 계정으로 이동
-    document.getElementById('btn-admin').addEventListener('click', (e) => {
+    // 관리자 버튼 이벤트 - 서버에서 이 TV 계정의 세션 토큰을 발급받아 직접 이동
+    // localStorage 완전 우회 → 어떤 계정으로 로그인되어 있어도 이 TV의 계정으로 이동
+    document.getElementById('btn-admin').addEventListener('click', async (e) => {
       e.stopPropagation();
-      const adminCode = tvAdminCode;
-      const adminEmail = tvAdminEmail;
-      if (!adminCode) {
-        alert('관리자 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
-        return;
-      }
-      // localStorage에 저장된 계정과 이 TV의 계정이 다를 경우 localStorage를 이 TV의 계정으로 갱신
-      const savedAdminCode = localStorage.getItem('dental_tv_admin_code');
-      const savedEmail = localStorage.getItem('dental_tv_email');
-      const savedSession = localStorage.getItem('dental_tv_session');
-      if (savedAdminCode !== adminCode || (adminEmail && savedEmail !== adminEmail)) {
-        // 이 TV의 실제 계정으로 localStorage 덮어쓰기 (세션은 일단 초기화)
-        localStorage.setItem('dental_tv_admin_code', adminCode);
-        if (adminEmail) localStorage.setItem('dental_tv_email', adminEmail);
-        localStorage.removeItem('dental_tv_session');
-        // 세션이 없으므로 로그인 페이지로 이동 (email 파라미터로 자동 로그인 유도)
-        const loginUrl = new URL(location.origin + '/login');
-        if (adminEmail) loginUrl.searchParams.set('email', adminEmail);
-        window.open(loginUrl.toString(), '_blank');
-      } else {
-        // 같은 계정이면 바로 관리자 페이지로 이동 (세션 포함)
-        const adminUrl = new URL(location.origin + '/admin/' + adminCode);
-        if (adminEmail) adminUrl.searchParams.set('email', adminEmail);
-        if (savedSession) adminUrl.searchParams.set('session', savedSession);
-        window.open(adminUrl.toString(), '_blank');
+      const btn = document.getElementById('btn-admin');
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/tv-admin-token/' + SHORT_CODE, { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.adminUrl) {
+          // localStorage도 이 TV 계정으로 업데이트 (이후 로그인 페이지 자동로그인 맞춤)
+          if (data.adminCode) localStorage.setItem('dental_tv_admin_code', data.adminCode);
+          if (data.email) localStorage.setItem('dental_tv_email', data.email);
+          localStorage.removeItem('dental_tv_session');
+          // 현재 창(탭)에서 바로 이동 - 새 창 X (새 창은 localStorage 공유로 문제 발생)
+          window.location.href = data.adminUrl;
+        } else {
+          alert('관리자 페이지 이동 실패: ' + (data.error || '알 수 없는 오류'));
+          btn.textContent = '관리';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('서버 연결 오류');
+        btn.textContent = '관리';
+        btn.disabled = false;
       }
     });
 
@@ -12697,11 +12736,15 @@ app.get('/login', (c) => {
       const savedSession = localStorage.getItem('dental_tv_session');
       const urlEmail = new URLSearchParams(window.location.search).get('email');
 
+      // URL email이 있는데 저장된 email과 다르면 → localStorage 완전 초기화 (다른 계정 자동로그인 방지)
+      if (urlEmail && savedEmail && savedEmail.toLowerCase() !== urlEmail.toLowerCase()) {
+        localStorage.removeItem('dental_tv_admin_code');
+        localStorage.removeItem('dental_tv_email');
+        localStorage.removeItem('dental_tv_session');
+        return;
+      }
+
       if (savedAdminCode && savedEmail && savedSession) {
-        if (urlEmail && savedEmail.toLowerCase() !== urlEmail.toLowerCase()) {
-          // 다른 계정으로 접속 시 자동 로그인 차단
-          return;
-        }
         const url = new URL('${baseUrl}/admin/' + savedAdminCode);
         url.searchParams.set('session', savedSession);
         url.searchParams.set('email', savedEmail);
