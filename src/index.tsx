@@ -2816,9 +2816,14 @@ app.get('/embed-old/:memberCode', async (c) => {
     }
 
     // 임베드용 높이 자동 전송
+    // 모달 열림 상태 플래그 (postParentHeight가 모달 높이를 덮어쓰지 않도록)
+    let modalHeightLocked = false;
+    
     function postParentHeight() {
       try {
         if (window.parent && window.parent !== window) {
+          // 모달이 열려있으면 viewport 높이 유지 (콘텐츠 높이로 덮어쓰기 방지)
+          if (modalHeightLocked) return;
           const height = document.body.scrollHeight;
           window.parent.postMessage({ type: 'setHeight', height }, '*');
         }
@@ -9772,28 +9777,47 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
-      // scrollY: iframe 내부 body가 스크롤된 거리
-      const scrollY = window.scrollY || window.pageYOffset || 0;
-      const vh = window.innerHeight;
-      
-      // fixed 대신 absolute + top=scrollY 로 현재 보이는 화면에 정확히 붙임
+      // 모달: fixed top:0 으로 iframe 최상단에 표시
       el.style.display = 'flex';
-      el.style.position = 'absolute';
-      el.style.top = scrollY + 'px';
+      el.style.position = 'fixed';
+      el.style.top = '0';
       el.style.left = '0';
       el.style.right = '0';
-      el.style.height = vh + 'px';
-      el.style.bottom = 'auto';
+      el.style.bottom = '0';
+      el.style.height = '';
       el.style.zIndex = '9999';
       
       document.body.classList.add('modal-open');
+      
+      // imweb/iframe 환경에서 모달이 보이도록 처리
+      try {
+        const isInIframe = window.parent && window.parent !== window;
+        if (isInIframe) {
+          const vh = window.innerHeight || window.screen.height || 600;
+          
+          // MutationObserver가 높이를 덮어쓰지 못하도록 잠금
+          modalHeightLocked = true;
+          
+          // iframe 높이를 viewport 높이로 축소 → 부모가 iframe 전체를 화면 안에 표시
+          window.parent.postMessage({ type: 'setHeight', height: vh }, '*');
+          
+          // 부모 페이지를 iframe 위치로 스크롤
+          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          
+          // 동일 출처인 경우 직접 접근
+          try { window.top.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_) {}
+          try {
+            const frame = window.frameElement;
+            if (frame) frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch(_) {}
+        }
+      } catch(e) {}
     }
 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
         el.style.display = 'none';
-        // absolute 방식으로 설정된 속성 초기화
         el.style.position = '';
         el.style.top = '';
         el.style.height = '';
@@ -9803,6 +9827,15 @@ app.get('/admin/:adminCode', async (c) => {
       const openModals = document.querySelectorAll('[style*="z-index: 9999"][style*="display: flex"]');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
+        // iframe 높이 원상 복구 (모달 닫힌 후 콘텐츠 높이로 되돌림)
+        try {
+          if (window.parent && window.parent !== window) {
+            modalHeightLocked = false;
+            setTimeout(() => {
+              if (typeof postParentHeight === 'function') postParentHeight();
+            }, 100);
+          }
+        } catch(e) {}
       }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
