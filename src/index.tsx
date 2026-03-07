@@ -9772,27 +9772,33 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
+      // scrollY: iframe 내부 body가 스크롤된 거리
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const vh = window.innerHeight;
+      
+      // fixed 대신 absolute + top=scrollY 로 현재 보이는 화면에 정확히 붙임
       el.style.display = 'flex';
-      el.style.position = 'fixed';
-      el.style.top = '0';
+      el.style.position = 'absolute';
+      el.style.top = scrollY + 'px';
       el.style.left = '0';
       el.style.right = '0';
-      el.style.bottom = '0';
+      el.style.height = vh + 'px';
+      el.style.bottom = 'auto';
       el.style.zIndex = '9999';
       
       document.body.classList.add('modal-open');
-      
-      // iframe 환경: postMessage로 부모에게 iframe 상단으로 스크롤 요청
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
-        }
-      } catch(e) {}
     }
 
     function closeModal(id) {
       const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
+      if (el) {
+        el.style.display = 'none';
+        // absolute 방식으로 설정된 속성 초기화
+        el.style.position = '';
+        el.style.top = '';
+        el.style.height = '';
+        el.style.bottom = '';
+      }
       // 열린 모달이 없을 때만 modal-open 해제
       const openModals = document.querySelectorAll('[style*="z-index: 9999"][style*="display: flex"]');
       if (openModals.length === 0) {
