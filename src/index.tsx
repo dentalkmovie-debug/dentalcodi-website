@@ -4264,7 +4264,7 @@ app.get('/admin/:adminCode', async (c) => {
   <style>
     html, body { width: 100%; overflow-x: hidden; overflow-y: auto; }
     /* 모달 열릴 때 body 스크롤 방지 */
-    body.modal-open { overflow: hidden; }
+    /* body.modal-open: overflow not hidden - modal is fixed, backdrop blocks interaction */
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -4472,7 +4472,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <div class="p-5 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
@@ -4528,7 +4528,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-hidden flex flex-col">
         <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex-shrink-0">
           <div class="flex justify-between items-center">
@@ -4626,7 +4626,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 바로가기 생성 가이드 모달 -->
   <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <div class="p-5 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
@@ -4700,7 +4700,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 자동 실행 가이드 모달 -->
   <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <div class="p-5 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl">
           <div class="flex justify-between items-center">
@@ -4747,7 +4747,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실/체어 추가 모달 -->
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
@@ -4878,7 +4878,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실 설치 가이드 모달 (단축 URL) -->
   <div id="guide-url-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('guide-url-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-12 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>단축 URL로 TV 연결하기</h3>
@@ -9772,12 +9772,18 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'flex';
       document.body.classList.add('modal-open');
-      // 모달이 항상 보이도록 페이지 최상단으로 스크롤
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      // iframe 환경에서도 부모 프레임 스크롤 처리
+      
+      // iframe 환경: 모달이 보이도록 부모 프레임 스크롤 조정
       try {
         if (window.parent && window.parent !== window) {
-          window.parent.scrollTo({ top: 0, behavior: 'instant' });
+          // iframe의 현재 페이지 내 위치를 구해서 부모가 그 위치로 스크롤
+          const frameEl = window.frameElement;
+          if (frameEl) {
+            const frameRect = frameEl.getBoundingClientRect();
+            const parentScrollY = window.parent.scrollY || window.parent.pageYOffset || 0;
+            // iframe 상단이 부모 뷰포트 상단에 오도록 스크롤
+            window.parent.scrollTo({ top: parentScrollY + frameRect.top - 10, behavior: 'smooth' });
+          }
         }
       } catch(e) {}
     }
