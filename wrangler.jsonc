@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dental-tv",
+  "compatibility_date": "2026-01-27",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dental-tv-db",
+      "database_id": "4aa73c0f-dc84-45c7-a8b5-94755cf9b89e"
+    }
+  ],
+  "vars": {
+    "IMWEB_SITE_CODE": ""
+  }
+}
