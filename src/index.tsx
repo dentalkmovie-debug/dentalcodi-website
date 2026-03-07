@@ -12663,13 +12663,34 @@ app.get('/', (c) => {
   function getMemberCode() {
     // 방법1: window.__IMWEB__.member
     try { var m = window.__IMWEB__ &amp;&amp; window.__IMWEB__.member; if (m &amp;&amp; (m.code||m.id)) return { mc: String(m.code||m.id), em: m.email||'' }; } catch(e){}
-    // 방법2: window.__bs_imweb (아임웹 SDK)
-    try { var b = window.__bs_imweb; if (b &amp;&amp; b.member_code) return { mc: b.member_code, em: b.email||'' }; } catch(e){}
+
+    // 방법2: __bs_imweb 쿠키에서 JWT 파싱 (아임웹 DVUE SDK)
+    try {
+      var cookies = document.cookie.split('; ');
+      for (var i=0; i&lt;cookies.length; i++) {
+        if (cookies[i].startsWith('__bs_imweb=')) {
+          var data = JSON.parse(decodeURIComponent(cookies[i].substring('__bs_imweb='.length)));
+          if (data.sdk_jwt) {
+            var parts = data.sdk_jwt.split('.');
+            if (parts.length === 3) {
+              var p = JSON.parse(atob(parts[1]));
+              var mc = p.sub || p.member_code || p.mc || '';
+              if (mc &amp;&amp; mc.startsWith('m')) return { mc: mc, em: p.email||'' };
+            }
+          }
+          // browser_session_id 패턴 매칭
+          var match = JSON.stringify(data).match(/m\d{8,}[a-f0-9]+/);
+          if (match) return { mc: match[0], em: '' };
+        }
+      }
+    } catch(e){}
+
     // 방법3: window._imweb_page_info
-    try { var i = window._imweb_page_info; if (i &amp;&amp; i.member_code) return { mc: i.member_code, em: i.member_email||i.email||'' }; } catch(e){}
+    try { var info = window._imweb_page_info; if (info &amp;&amp; info.member_code) return { mc: info.member_code, em: info.member_email||info.email||'' }; } catch(e){}
+
     // 방법4: 아임웹 템플릿 변수
     var mc='{{ member_code }}', em='{{ user_email }}';
-    if (mc &amp;&amp; mc.indexOf('{{')===-1) return { mc:mc, em:(em &amp;&amp; em.indexOf('{{')===-1)?em:'' };
+    if (mc &amp;&amp; mc.indexOf('{{') === -1) return { mc:mc, em:(em &amp;&amp; em.indexOf('{{') === -1)?em:'' };
     return null;
   }
 
