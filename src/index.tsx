@@ -13289,7 +13289,38 @@ app.post('/api/login', async (c) => {
     })
   }
 
+  // 아임웹 API에서 찾지 못해도, DB에 이미 등록된 계정이면 허용 (레거시 계정 지원)
   if (!imwebMemberExists) {
+    const existingUser = await c.env.DB.prepare(
+      'SELECT * FROM users WHERE lower(imweb_email) = ?'
+    ).bind(normalizedEmail).first() as any
+
+    if (existingUser) {
+      // DB에 이미 등록된 계정 → 아임웹 검증 없이 통과
+      if (existingUser.is_active === 0) {
+        return c.json({
+          success: false,
+          errorType: 'suspended',
+          error: '계정이 정지되었습니다.',
+          reason: existingUser.suspended_reason || '관리자에 의해 정지됨'
+        })
+      }
+      if (existingUser.subscription_plan !== 'unlimited' && existingUser.subscription_end) {
+        const endDate = new Date(existingUser.subscription_end)
+        const today = new Date(); today.setHours(0, 0, 0, 0)
+        if (endDate < today) {
+          return c.json({
+            success: false,
+            error: '구독 기간이 만료되었습니다.',
+            expired: true,
+            expiredDate: existingUser.subscription_end,
+            message: '서비스를 계속 이용하시려면 구독을 연장해주세요.'
+          })
+        }
+      }
+      return c.json({ success: true, adminCode: existingUser.admin_code, email: normalizedEmail })
+    }
+
     return c.json({ 
       success: false, 
       errorType: 'not_registered',
