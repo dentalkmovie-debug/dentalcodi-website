@@ -8280,34 +8280,41 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     // 라이브러리에서 플레이리스트로 아이템 추가
+    let _addingToPlaylist = false; // 동시 클릭 방지 플래그
     async function addToPlaylistFromLibrary(itemId) {
-      console.log('[Playlist] Adding item:', itemId);
-      const allItems = [...(masterItemsCache || []), ...(currentPlaylist.items || [])];
-      const item = allItems.find(i => String(i.id) === String(itemId));
-      if (!item) {
-        console.log('[Playlist] Item not found:', itemId);
-        return;
-      }
+      if (_addingToPlaylist) return; // 이미 처리 중이면 무시
+      _addingToPlaylist = true;
+      try {
+        console.log('[Playlist] Adding item:', itemId);
+        const allItems = [...(masterItemsCache || []), ...(currentPlaylist.items || [])];
+        const item = allItems.find(i => String(i.id) === String(itemId));
+        if (!item) {
+          console.log('[Playlist] Item not found:', itemId);
+          return;
+        }
 
-      const normalizedId = Number(item.id);
-      const finalId = Number.isNaN(normalizedId) ? item.id : normalizedId;
-      
-      // activeItemIds 초기화: 서버 값이 없으면 빈 배열로 유지
-      if (!Array.isArray(currentPlaylist.activeItemIds)) {
-        currentPlaylist.activeItemIds = [];
+        const normalizedId = Number(item.id);
+        const finalId = Number.isNaN(normalizedId) ? item.id : normalizedId;
+        
+        // activeItemIds 초기화: 서버 값이 없으면 빈 배열로 유지
+        if (!Array.isArray(currentPlaylist.activeItemIds)) {
+          currentPlaylist.activeItemIds = [];
+        }
+        
+        // 이미 플레이리스트에 있는지 확인
+        if (currentPlaylist.activeItemIds.some(id => String(id) === String(finalId))) {
+          showToast('이미 재생목록에 있습니다.');
+          return;
+        }
+        
+        currentPlaylist.activeItemIds.push(finalId);
+        console.log('[Playlist] New activeItemIds:', currentPlaylist.activeItemIds);
+        renderLibraryAndPlaylist();
+        await saveActiveItems();
+        showToast('재생목록에 추가되었습니다.');
+      } finally {
+        _addingToPlaylist = false;
       }
-      
-      // 이미 플레이리스트에 있는지 확인
-      if (currentPlaylist.activeItemIds.some(id => String(id) === String(finalId))) {
-        showToast('이미 재생목록에 있습니다.');
-        return;
-      }
-      
-      currentPlaylist.activeItemIds.push(finalId);
-      console.log('[Playlist] New activeItemIds:', currentPlaylist.activeItemIds);
-      renderLibraryAndPlaylist();
-      await saveActiveItems();
-      showToast('재생목록에 추가되었습니다.');
     }
     
     // 플레이리스트에서 아이템 제거 (라이브러리에는 유지, 서버에 저장)
@@ -8404,12 +8411,19 @@ app.get('/admin/:adminCode', async (c) => {
       console.log('[Playlist] Loaded activeItemIds:', currentPlaylist.activeItemIds);
     }
     
-    // 라이브러리 + 플레이리스트 렌더링
+    let _renderingLibrary = false; // 렌더 중복 방지
     async function renderLibraryAndPlaylist() {
       if (!currentPlaylist) {
         console.warn('[Playlist] renderLibraryAndPlaylist skipped: currentPlaylist is null');
         return;
       }
+
+      // 이미 렌더 중이면 플레이리스트 부분만 즉시 동기 업데이트
+      if (_renderingLibrary) {
+        _renderPlaylistOnly();
+        return;
+      }
+      _renderingLibrary = true;
 
       const libraryMasterList = document.getElementById('library-master-list');
       const libraryUserList = document.getElementById('library-user-list');
@@ -8519,6 +8533,7 @@ app.get('/admin/:adminCode', async (c) => {
       
       if (playlistItems.length === 0) {
         playlistContainer.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">왼쪽 라이브러리에서 영상을 클릭하여 추가하세요</div>';
+        _renderingLibrary = false;
         return;
       }
       
@@ -8548,6 +8563,51 @@ app.get('/admin/:adminCode', async (c) => {
       \`).join('');
       
       // Sortable 초기화 (플레이리스트 에디터 내 영상 순서)
+      initPlaylistItemsSortable();
+      _renderingLibrary = false;
+    }
+
+    // 플레이리스트 오른쪽 패널만 동기적으로 빠르게 업데이트 (렌더 중 추가 클릭 시)
+    function _renderPlaylistOnly() {
+      if (!currentPlaylist) return;
+      const playlistContainer = document.getElementById('playlist-items-container');
+      if (!playlistContainer) return;
+      const activeItemIds = Array.isArray(currentPlaylist.activeItemIds) ? currentPlaylist.activeItemIds : [];
+      const items = currentPlaylist.items || [];
+      const allItems = [...(masterItemsCache || []), ...items];
+      const playlistItems = activeItemIds
+        .map(id => allItems.find(item => String(item.id) === String(id)))
+        .filter(item => item);
+      const countEl = document.getElementById('playlist-count');
+      if (countEl) countEl.textContent = playlistItems.length + '개';
+      if (playlistItems.length === 0) {
+        playlistContainer.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">왼쪽 라이브러리에서 영상을 클릭하여 추가하세요</div>';
+        return;
+      }
+      playlistContainer.innerHTML = playlistItems.map((item, index) => \`
+        <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
+          <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+            <i class="fas fa-grip-vertical"></i>
+          </div>
+          <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+          <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+            \${item.item_type === 'image'
+              ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+              : item.thumbnail_url
+                ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
+                : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-gray-400"></i></div>\`
+            }
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
+          </div>
+          <button onclick="removeFromPlaylist(\${index})"
+                  class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      \`).join('');
       initPlaylistItemsSortable();
     }
     
