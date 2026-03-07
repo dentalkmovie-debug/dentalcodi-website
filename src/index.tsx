@@ -8280,61 +8280,46 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     // 라이브러리에서 플레이리스트로 아이템 추가
-    let _addingToPlaylist = false; // 동시 클릭 방지 플래그
-    async function addToPlaylistFromLibrary(itemId) {
-      if (_addingToPlaylist) return; // 이미 처리 중이면 무시
-      _addingToPlaylist = true;
-      try {
-        console.log('[Playlist] Adding item:', itemId);
-        const allItems = [...(masterItemsCache || []), ...(currentPlaylist.items || [])];
-        const item = allItems.find(i => String(i.id) === String(itemId));
-        if (!item) {
-          console.log('[Playlist] Item not found:', itemId);
-          return;
-        }
+    function addToPlaylistFromLibrary(itemId) {
+      const allItems = [...(masterItemsCache || []), ...(currentPlaylist.items || [])];
+      const item = allItems.find(i => String(i.id) === String(itemId));
+      if (!item) return;
 
-        const normalizedId = Number(item.id);
-        const finalId = Number.isNaN(normalizedId) ? item.id : normalizedId;
-        
-        // activeItemIds 초기화: 서버 값이 없으면 빈 배열로 유지
-        if (!Array.isArray(currentPlaylist.activeItemIds)) {
-          currentPlaylist.activeItemIds = [];
-        }
-        
-        // 이미 플레이리스트에 있는지 확인
-        if (currentPlaylist.activeItemIds.some(id => String(id) === String(finalId))) {
-          showToast('이미 재생목록에 있습니다.');
-          return;
-        }
-        
-        currentPlaylist.activeItemIds.push(finalId);
-        console.log('[Playlist] New activeItemIds:', currentPlaylist.activeItemIds);
-        renderLibraryAndPlaylist();
-        await saveActiveItems();
-        showToast('재생목록에 추가되었습니다.');
-      } finally {
-        _addingToPlaylist = false;
+      const normalizedId = Number(item.id);
+      const finalId = Number.isNaN(normalizedId) ? item.id : normalizedId;
+
+      if (!Array.isArray(currentPlaylist.activeItemIds)) currentPlaylist.activeItemIds = [];
+
+      if (currentPlaylist.activeItemIds.some(id => String(id) === String(finalId))) {
+        showToast('이미 재생목록에 있습니다.');
+        return;
       }
+
+      // 1) 상태 즉시 변경
+      currentPlaylist.activeItemIds.push(finalId);
+      // 2) UI 즉시 동기 렌더 (await 없음)
+      _renderPlaylistOnly();
+      _updateLibraryPlusButtons();
+      // 3) 서버 저장은 백그라운드 (UI 블로킹 없음)
+      saveActiveItems().then(ok => {
+        if (ok) showToast('재생목록에 추가되었습니다.');
+        else showToast('저장 실패', 'error');
+      });
     }
     
-    // 플레이리스트에서 아이템 제거 (라이브러리에는 유지, 서버에 저장)
-    async function removeFromPlaylist(index) {
-      if (!currentPlaylist.activeItemIds) return;
-      
-      const itemId = currentPlaylist.activeItemIds[index];
-      
-      // activeItemIds에서 제거 (공용/사용자 모두 제거 가능)
+    function removeFromPlaylist(index) {
+      if (!Array.isArray(currentPlaylist.activeItemIds)) return;
+
+      // 1) 상태 즉시 변경
       currentPlaylist.activeItemIds.splice(index, 1);
-      console.log('[Playlist] Removed item', itemId, ', new activeItemIds:', currentPlaylist.activeItemIds);
-      
-      renderLibraryAndPlaylist();
-      const saved = await saveActiveItems();
-      if (saved) {
-        await refreshCurrentPlaylist();
-        showToast('재생목록에서 제거되었습니다.');
-      } else {
-        showToast('저장 실패', 'error');
-      }
+      // 2) UI 즉시 동기 렌더
+      _renderPlaylistOnly();
+      _updateLibraryPlusButtons();
+      // 3) 서버 저장 백그라운드
+      saveActiveItems().then(ok => {
+        if (ok) showToast('재생목록에서 제거되었습니다.');
+        else showToast('저장 실패', 'error');
+      });
     }
     
     // 활성 아이템 목록 서버에 저장 (공용 영상 포함 모든 ID 저장)
@@ -8368,8 +8353,12 @@ app.get('/admin/:adminCode', async (c) => {
         const res = await fetch(API_BASE + '/playlists/' + currentPlaylist.id);
         if (!res.ok) return;
         const data = await res.json();
+        // activeItemIds는 로컬 상태 유지 (서버 응답으로 덮어쓰지 않음)
+        const localActiveIds = currentPlaylist.activeItemIds;
         currentPlaylist = data.playlist;
-        renderLibraryAndPlaylist();
+        currentPlaylist.activeItemIds = localActiveIds;
+        _renderPlaylistOnly();
+        _updateLibraryPlusButtons();
       } catch (e) {
         console.error('[Playlist] Refresh failed:', e);
       }
@@ -8411,19 +8400,9 @@ app.get('/admin/:adminCode', async (c) => {
       console.log('[Playlist] Loaded activeItemIds:', currentPlaylist.activeItemIds);
     }
     
-    let _renderingLibrary = false; // 렌더 중복 방지
+    // 라이브러리 전체 렌더 (공용영상 캐시 로드 포함) - 모달 열릴 때 1회만 호출
     async function renderLibraryAndPlaylist() {
-      if (!currentPlaylist) {
-        console.warn('[Playlist] renderLibraryAndPlaylist skipped: currentPlaylist is null');
-        return;
-      }
-
-      // 이미 렌더 중이면 플레이리스트 부분만 즉시 동기 업데이트
-      if (_renderingLibrary) {
-        _renderPlaylistOnly();
-        return;
-      }
-      _renderingLibrary = true;
+      if (!currentPlaylist) return;
 
       const libraryMasterList = document.getElementById('library-master-list');
       const libraryUserList = document.getElementById('library-user-list');
@@ -8533,7 +8512,6 @@ app.get('/admin/:adminCode', async (c) => {
       
       if (playlistItems.length === 0) {
         playlistContainer.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">왼쪽 라이브러리에서 영상을 클릭하여 추가하세요</div>';
-        _renderingLibrary = false;
         return;
       }
       
@@ -8564,10 +8542,11 @@ app.get('/admin/:adminCode', async (c) => {
       
       // Sortable 초기화 (플레이리스트 에디터 내 영상 순서)
       initPlaylistItemsSortable();
-      _renderingLibrary = false;
+      // 라이브러리 + 버튼 상태 초기화
+      _updateLibraryPlusButtons();
     }
 
-    // 플레이리스트 오른쪽 패널만 동기적으로 빠르게 업데이트 (렌더 중 추가 클릭 시)
+    // 플레이리스트 오른쪽만 동기 렌더 (추가/제거 시 즉시 호출)
     function _renderPlaylistOnly() {
       if (!currentPlaylist) return;
       const playlistContainer = document.getElementById('playlist-items-container');
@@ -8610,7 +8589,41 @@ app.get('/admin/:adminCode', async (c) => {
       \`).join('');
       initPlaylistItemsSortable();
     }
-    
+
+    // 라이브러리의 + 버튼/이미 추가된 항목 표시 업데이트
+    function _updateLibraryPlusButtons() {
+      if (!currentPlaylist) return;
+      const activeIds = (currentPlaylist.activeItemIds || []).map(id => String(id));
+      // 공용 영상 항목
+      document.querySelectorAll('[data-library-id][data-library-master="1"]').forEach(el => {
+        const id = String(el.getAttribute('data-library-id'));
+        const icon = el.querySelector('.fa-plus');
+        if (activeIds.includes(id)) {
+          el.style.opacity = '0.5';
+          el.style.pointerEvents = 'none';
+          if (icon) { icon.className = 'fas fa-check text-green-500'; }
+        } else {
+          el.style.opacity = '';
+          el.style.pointerEvents = '';
+          if (icon) { icon.className = 'fas fa-plus text-purple-400'; }
+        }
+      });
+      // 내 영상 항목
+      document.querySelectorAll('[data-library-id][data-library-master="0"]').forEach(el => {
+        const id = String(el.getAttribute('data-library-id'));
+        const btn = el.querySelector('button[onclick^="addToPlaylistFromLibrary"]');
+        if (btn) {
+          if (activeIds.includes(id)) {
+            btn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
+            btn.disabled = true;
+          } else {
+            btn.innerHTML = '<i class="fas fa-plus"></i>';
+            btn.disabled = false;
+          }
+        }
+      });
+    }
+
     // 영상 제목 수정 (ID로 아이템 찾아서 수정)
     async function editItemTitleById(itemId) {
       console.log('[EditTitle] itemId:', itemId, 'currentPlaylist:', currentPlaylist);
@@ -8664,7 +8677,7 @@ app.get('/admin/:adminCode', async (c) => {
           const [moved] = activeIds.splice(evt.oldIndex, 1);
           activeIds.splice(evt.newIndex, 0, moved);
           currentPlaylist.activeItemIds = activeIds;
-          renderLibraryAndPlaylist();
+          _renderPlaylistOnly(); // 전체 재렌더 불필요, 순서만 반영
           saveActiveItems();
         }
       });
