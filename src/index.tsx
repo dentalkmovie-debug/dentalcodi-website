@@ -4266,12 +4266,10 @@ app.get('/admin/:adminCode', async (c) => {
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    /* body를 scroll 없이 고정 → fixed 모달이 항상 실제 viewport 기준으로 표시됨 */
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-    /* #app이 실제 스크롤 컨테이너 - 100vh 고정으로 iframe 높이 변화에 무관하게 유지 */
-    #app { width: 100%; height: 100vh; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    /* 모달 열릴 때 #app 스크롤 잠금 */
-    #app.modal-open { overflow: hidden; }
+    /* body: 스크롤 가능 (imweb이 iframe 높이를 콘텐츠에 맞게 자동 조정) */
+    html, body { margin: 0; padding: 0; width: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
+    /* 모달 열릴 때 body 스크롤 잠금 */
+    body.modal-open { overflow: hidden; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -9779,29 +9777,49 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
-      // #app이 스크롤 컨테이너 → 모달을 #app 기준 absolute로 현재 보이는 위치에 표시
-      const appEl = document.getElementById('app');
+      // ── 방식: dashboard를 숨기고 모달을 인라인 풀스크린으로 표시 ──
+      // position:fixed 대신 일반 블록으로 전체 화면을 채움
+      // 이렇게 하면 imweb iframe 스크롤 문제와 무관하게 동작
       
-      // 모달을 #app 안으로 이동
-      if (appEl && el.parentElement !== appEl) {
-        appEl.appendChild(el);
+      // 1. 대시보드 숨김
+      const dashboard = document.getElementById('dashboard');
+      if (dashboard) dashboard.style.display = 'none';
+      
+      // 2. 모달을 body에 이동 (이미 거기 있으면 그대로)
+      if (el.parentElement !== document.body && el.parentElement !== document.getElementById('app')) {
+        document.body.appendChild(el);
       }
       
-      // #app의 현재 스크롤 위치
-      const scrollTop = appEl ? appEl.scrollTop : (window.scrollY || 0);
-      const viewH = appEl ? appEl.clientHeight : window.innerHeight;
-      
+      // 3. 모달을 풀스크린 블록으로 표시
       el.style.display = 'flex';
-      el.style.position = 'absolute';
-      el.style.top = scrollTop + 'px';
+      el.style.position = 'fixed';
+      el.style.top = '0';
       el.style.left = '0';
       el.style.right = '0';
-      el.style.bottom = 'auto';
-      el.style.height = viewH + 'px';
+      el.style.bottom = '0';
+      el.style.width = '100%';
+      el.style.height = '100vh';
+      el.style.minHeight = '100vh';
       el.style.zIndex = '9999';
+      el.style.overflowY = 'auto';
       
-      if (appEl) appEl.classList.add('modal-open');
+      // 4. 스크롤을 최상단으로
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
       document.body.classList.add('modal-open');
+      
+      // 5. imweb에 iframe 높이를 viewport 높이로 재설정 요청
+      try {
+        if (window.parent && window.parent !== window) {
+          modalHeightLocked = true;
+          window.parent.postMessage({ type: 'setHeight', height: window.innerHeight }, '*');
+          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          window.parent.postMessage({ action: 'scrollTo', top: 0 }, '*');
+          try { window.frameElement && window.frameElement.scrollIntoView({ block: 'start' }); } catch(e2) {}
+        }
+      } catch(e) {}
     }
 
     function closeModal(id) {
@@ -9810,13 +9828,21 @@ app.get('/admin/:adminCode', async (c) => {
         el.style.display = 'none';
         el.style.position = '';
         el.style.top = '';
-        el.style.height = '';
+        el.style.left = '';
+        el.style.right = '';
         el.style.bottom = '';
+        el.style.width = '';
+        el.style.height = '';
+        el.style.minHeight = '';
+        el.style.zIndex = '';
+        el.style.overflowY = '';
       }
-      const openModals = document.querySelectorAll('[style*="z-index: 9999"][style*="display: flex"]');
+      
+      // 대시보드 복원 (열린 모달이 없을 때)
+      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"]');
       if (openModals.length === 0) {
-        const appEl = document.getElementById('app');
-        if (appEl) appEl.classList.remove('modal-open');
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) dashboard.style.display = '';
         document.body.classList.remove('modal-open');
         // iframe 높이 원상 복구
         try {
