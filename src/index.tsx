@@ -4268,8 +4268,8 @@ app.get('/admin/:adminCode', async (c) => {
   <style>
     /* body를 scroll 없이 고정 → fixed 모달이 항상 실제 viewport 기준으로 표시됨 */
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-    /* #app이 실제 스크롤 컨테이너 */
-    #app { width: 100%; height: 100%; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* #app이 실제 스크롤 컨테이너 - 100vh 고정으로 iframe 높이 변화에 무관하게 유지 */
+    #app { width: 100%; height: 100vh; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     /* 모달 열릴 때 #app 스크롤 잠금 */
     #app.modal-open { overflow: hidden; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
