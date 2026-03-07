@@ -2822,14 +2822,13 @@ app.get('/embed-old/:memberCode', async (c) => {
     function postParentHeight() {
       try {
         if (window.parent && window.parent !== window) {
-          // 모달이 열려있으면 viewport 높이 유지 (콘텐츠 높이로 덮어쓰기 방지)
           if (modalHeightLocked) return;
-          const height = document.body.scrollHeight;
+          // #app의 실제 콘텐츠 높이를 전송
+          const appEl = document.getElementById('app');
+          const height = appEl ? appEl.scrollHeight : document.body.scrollHeight;
           window.parent.postMessage({ type: 'setHeight', height }, '*');
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
 
     function setupAutoHeight() {
@@ -4267,9 +4266,12 @@ app.get('/admin/:adminCode', async (c) => {
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    html, body { width: 100%; overflow-x: hidden; overflow-y: auto; }
-    /* 모달 열릴 때 body 스크롤 위치 고정 */
-    body.modal-open { overflow: hidden; }
+    /* body를 scroll 없이 고정 → fixed 모달이 항상 실제 viewport 기준으로 표시됨 */
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    /* #app이 실제 스크롤 컨테이너 */
+    #app { width: 100%; height: 100%; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* 모달 열릴 때 #app 스크롤 잠금 */
+    #app.modal-open { overflow: hidden; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -9777,7 +9779,7 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
-      // 모달: fixed top:0 으로 iframe 최상단에 표시
+      // fixed top:0: body가 scroll 없으므로 항상 실제 viewport 기준으로 표시
       el.style.display = 'flex';
       el.style.position = 'fixed';
       el.style.top = '0';
@@ -9787,31 +9789,10 @@ app.get('/admin/:adminCode', async (c) => {
       el.style.height = '';
       el.style.zIndex = '9999';
       
+      // body 대신 #app에 modal-open 클래스 적용
+      const appEl = document.getElementById('app');
+      if (appEl) appEl.classList.add('modal-open');
       document.body.classList.add('modal-open');
-      
-      // imweb/iframe 환경에서 모달이 보이도록 처리
-      try {
-        const isInIframe = window.parent && window.parent !== window;
-        if (isInIframe) {
-          const vh = window.innerHeight || window.screen.height || 600;
-          
-          // MutationObserver가 높이를 덮어쓰지 못하도록 잠금
-          modalHeightLocked = true;
-          
-          // iframe 높이를 viewport 높이로 축소 → 부모가 iframe 전체를 화면 안에 표시
-          window.parent.postMessage({ type: 'setHeight', height: vh }, '*');
-          
-          // 부모 페이지를 iframe 위치로 스크롤
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          
-          // 동일 출처인 경우 직접 접근
-          try { window.top.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_) {}
-          try {
-            const frame = window.frameElement;
-            if (frame) frame.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } catch(_) {}
-        }
-      } catch(e) {}
     }
 
     function closeModal(id) {
@@ -9823,24 +9804,22 @@ app.get('/admin/:adminCode', async (c) => {
         el.style.height = '';
         el.style.bottom = '';
       }
-      // 열린 모달이 없을 때만 modal-open 해제
       const openModals = document.querySelectorAll('[style*="z-index: 9999"][style*="display: flex"]');
       if (openModals.length === 0) {
+        const appEl = document.getElementById('app');
+        if (appEl) appEl.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
-        // iframe 높이 원상 복구 (모달 닫힌 후 콘텐츠 높이로 되돌림)
+        // iframe 높이 원상 복구
         try {
           if (window.parent && window.parent !== window) {
             modalHeightLocked = false;
-            setTimeout(() => {
-              if (typeof postParentHeight === 'function') postParentHeight();
-            }, 100);
+            setTimeout(() => { if (typeof postParentHeight === 'function') postParentHeight(); }, 100);
           }
         } catch(e) {}
       }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
       }
-      // 플레이리스트 에디터 닫을 때 목록 새로고침
       if (id === 'edit-playlist-modal') {
         currentPlaylist = null;
         if (masterItemsRefreshTimer) {
