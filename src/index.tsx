@@ -2325,16 +2325,12 @@ app.get('/embed/:memberCode', async (c) => {
   
   const adminCode = user.admin_code
 
-  // 로그인 페이지로 이동 (이메일 검증 후 admin으로 진입)
+  // /login 거치지 않고 바로 관리자 페이지로 이동
   const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isAdminEmail(normalizedEmail)
-  const query = new URLSearchParams({
-    memberCode: memberCode,
-    email: normalizedEmail,
-    name: finalMemberName,
-    adminCode: adminCode,
-    ...(isAdminFlag ? { is_admin: '1' } : {})
-  })
-  return c.redirect('/login?' + query.toString())
+  const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
+  adminUrl.searchParams.set('email', normalizedEmail)
+  if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
+  return c.redirect(adminUrl.toString())
 })
 
 // 아임웹 임베드용 - 이전 코드 (사용하지 않음)
