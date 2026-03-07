@@ -12675,16 +12675,20 @@ app.get('/login', (c) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>치과 TV 로그인</title>
   <script>
-    // URL email이 없고 localStorage에도 없으면 → 로그인 폼 표시 (자동 이동 없음)
-    // localStorage 자동 이동 제거: 다른 계정 페이지를 열었을 때 꼬이는 문제 방지
+    // /embed 경로에서 넘어온 경우: adminCode + email 이 URL에 모두 있으면 바로 관리자 페이지로 이동
     (function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlEmail = urlParams.get('email');
-      const urlMemberCode = urlParams.get('memberCode') || urlParams.get('member_code');
-      // URL에 email도 memberCode도 없으면 → 로그인 폼만 보여줌 (localStorage 무시)
-      if (!urlEmail && !urlMemberCode) {
-        return; // 수동 입력 대기
-      }
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlAdminCode = urlParams.get('adminCode');
+        const urlEmail = urlParams.get('email');
+        if (urlAdminCode && urlEmail) {
+          const adminUrl = new URL(window.location.origin + '/admin/' + urlAdminCode);
+          adminUrl.searchParams.set('email', urlEmail);
+          const isAdmin = urlParams.get('is_admin');
+          if (isAdmin) adminUrl.searchParams.set('is_admin', isAdmin);
+          window.location.replace(adminUrl.toString());
+        }
+      } catch(e) {}
     })();
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12957,6 +12961,14 @@ app.get('/login', (c) => {
 
       autoLoginTriggered = true;
 
+      // memberCode가 있으면 아임웹 API로 이메일 조회 후 로그인
+      // email만 있으면 아임웹 API 없이 바로 로그인 시도 (레거시 계정 지원)
+      if (!memberCode && urlEmail) {
+        lockEmail(urlEmail, '이메일: ' + urlEmail);
+        performLogin(urlEmail, '', urlEmail, true);
+        return;
+      }
+
       fetch(BASE_URL + '/api/imweb/member?' + query)
         .then(res => res.json())
         .then(async data => {
@@ -12964,11 +12976,23 @@ app.get('/login', (c) => {
             lockEmail(data.email, '등록된 이메일: ' + data.email);
             await performLogin(data.email, memberCode, urlEmail || data.email, true);
           } else {
-            blockAccess('등록 이메일을 확인할 수 없습니다.');
+            // 아임웹 API 실패해도 email이 있으면 직접 로그인 시도
+            if (urlEmail) {
+              lockEmail(urlEmail, '이메일: ' + urlEmail);
+              await performLogin(urlEmail, memberCode, urlEmail, true);
+            } else {
+              blockAccess('등록 이메일을 확인할 수 없습니다.');
+            }
           }
         })
         .catch(() => {
-          blockAccess('등록 이메일 조회 실패');
+          // API 오류 시에도 email이 있으면 직접 로그인
+          if (urlEmail) {
+            lockEmail(urlEmail, '이메일: ' + urlEmail);
+            performLogin(urlEmail, memberCode, urlEmail, true);
+          } else {
+            blockAccess('등록 이메일 조회 실패');
+          }
         });
     })();
 
