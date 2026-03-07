@@ -6401,7 +6401,7 @@ app.get('/admin/:adminCode', async (c) => {
             </span>
             <i id="export-toggle-icon" class="fas fa-chevron-down text-gray-400"></i>
           </button>
-          <div id="export-section-content" class="hidden bg-gray-50 p-4">
+          <div id="export-section-content" style="display:none" class="bg-gray-50 p-4">
             
             <!-- 체어 설정 -->
             <div class="mb-4">
@@ -6553,12 +6553,18 @@ app.get('/admin/:adminCode', async (c) => {
     function toggleExportSection() {
       const content = document.getElementById('export-section-content');
       const icon = document.getElementById('export-toggle-icon');
-      if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
+      const isHidden = content.style.display === 'none' || content.style.display === '';
+      if (isHidden) {
+        content.style.display = 'block';
         icon.classList.remove('fa-chevron-down');
         icon.classList.add('fa-chevron-up');
+        // 초기 설정 섹션으로 스크롤
+        setTimeout(() => {
+          const btn = content.closest('.border.border-gray-300');
+          if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
       } else {
-        content.classList.add('hidden');
+        content.style.display = 'none';
         icon.classList.remove('fa-chevron-up');
         icon.classList.add('fa-chevron-down');
       }
@@ -9767,6 +9773,14 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'flex';
       document.body.classList.add('modal-open');
+      // 모달이 항상 보이도록 페이지 최상단으로 스크롤
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      // iframe 환경에서도 부모 프레임 스크롤 처리
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.scrollTo({ top: 0, behavior: 'instant' });
+        }
+      } catch(e) {}
     }
 
     function closeModal(id) {
