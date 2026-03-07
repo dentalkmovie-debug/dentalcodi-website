@@ -4092,34 +4092,10 @@ app.get('/embed-old/:memberCode', async (c) => {
     
     // 단축 URL 생성
     async function createShortUrl(url, playlistId) {
-      const urlEl = document.getElementById('tv-short-url-' + playlistId);
-      
-      try {
-        showToast('단축 URL 생성 중...');
-        
-        const res = await fetch(API_BASE + '/playlists/' + playlistId + '/create-short-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          const shortUrl = data.short_url;
-          const displayUrl = shortUrl.replace('https://', '');
-          
-          if (urlEl) {
-            urlEl.innerHTML = '<span class="text-green-600 font-bold">' + displayUrl + '</span>';
-          }
-          
-          await navigator.clipboard.writeText(shortUrl);
-          showToast('✅ 단축 URL: ' + displayUrl);
-        } else {
-          throw new Error('API 오류');
-        }
-      } catch (e) {
-        showToast('단축 URL 생성 실패', 'error');
-      }
+      // generateShortUrl로 위임
+      const playlist = playlists.find(p => p.id == playlistId);
+      const shortCode = playlist ? playlist.short_code : '';
+      await generateShortUrl(playlistId, shortCode);
     }
     
     // 치과명 변경
@@ -8856,38 +8832,10 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     async function createShortUrl(url, playlistId) {
-      const urlEl = document.getElementById('tv-short-url-' + playlistId);
-      
-      try {
-        showToast('단축 URL 생성 중...');
-        
-        // 서버 API를 통해 단축 URL 생성 (CORS 문제 해결)
-        const res = await fetch(API_BASE + '/playlists/' + playlistId + '/create-short-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: url })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          const shortUrl = data.short_url;
-          const displayUrl = shortUrl.replace('https://', '');
-          
-          // UI 업데이트 - 짧은 URL로 교체
-          if (urlEl) {
-            urlEl.innerHTML = '<span class="text-green-600 font-bold text-xl">' + displayUrl + '</span>';
-            urlEl.setAttribute('data-url', shortUrl);
-          }
-          
-          // 복사
-          await navigator.clipboard.writeText(shortUrl);
-          showToast('✅ 단축 URL 생성 완료! TV에 입력하세요: ' + displayUrl);
-        } else {
-          throw new Error('API 오류');
-        }
-      } catch (e) {
-        showToast('단축 URL 생성 실패: ' + e.message, 'error');
-      }
+      // generateShortUrl로 위임
+      const playlist = playlists.find(p => p.id == playlistId);
+      const shortCode = playlist ? playlist.short_code : '';
+      await generateShortUrl(playlistId, shortCode);
     }
     
     // USB 북마크 파일 다운로드
