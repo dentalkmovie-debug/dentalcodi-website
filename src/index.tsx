@@ -9772,36 +9772,31 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (!el) return;
       
+      // 현재 body 스크롤 위치 저장
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      
+      // 모달을 현재 보이는 뷰포트 위치에 고정
       el.style.display = 'flex';
       el.style.position = 'fixed';
       el.style.top = '0';
       el.style.left = '0';
       el.style.right = '0';
       el.style.bottom = '0';
+      el.style.zIndex = '9999';
       
+      // body 스크롤 잠금 (스크롤 위치 유지)
+      document.body.style.position = 'fixed';
+      document.body.style.top = '-' + scrollY + 'px';
+      document.body.style.width = '100%';
+      document.body.style.overflowY = 'scroll';
+      document.body.dataset.scrollY = String(scrollY);
       document.body.classList.add('modal-open');
       
-      // 1) iframe 내부 body를 맨 위로 스크롤 → fixed 모달이 iframe 뷰포트 상단에 표시됨
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      
-      // 2) 부모 페이지도 iframe 위치로 스크롤 (imweb 등 iframe 환경)
+      // iframe 환경: postMessage로 부모에게 iframe을 뷰포트 상단으로 스크롤 요청
       try {
         if (window.parent && window.parent !== window) {
-          // postMessage로 부모에게 scrollToTop 요청
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          // 직접 접근 가능한 경우 (동일 도메인)
-          try {
-            window.parent.scrollTo({ top: 0, behavior: 'instant' });
-          } catch(e) {}
-          try {
-            const frameEl = window.frameElement;
-            if (frameEl) {
-              // iframe 요소가 부모 뷰포트에 보이도록 스크롤
-              frameEl.scrollIntoView({ behavior: 'instant', block: 'start' });
-            }
-          } catch(e) {}
+          window.parent.postMessage({ type: 'modalOpen' }, '*');
         }
       } catch(e) {}
     }
@@ -9810,9 +9805,17 @@ app.get('/admin/:adminCode', async (c) => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
       // body 스크롤 잠금 해제 - 열린 모달이 없을 때만
-      const openModals = document.querySelectorAll('.fixed.inset-0[style*="flex"]:not(#loading)');
+      const openModals = document.querySelectorAll('[style*="display: flex"][style*="position: fixed"][style*="z-index: 9999"]');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
+        // body position:fixed 해제 + 스크롤 위치 복구
+        const savedScrollY = parseInt(document.body.dataset.scrollY || '0', 10);
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflowY = '';
+        window.scrollTo(0, savedScrollY);
+      }
       }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
@@ -11298,10 +11301,37 @@ app.get('/tv/:shortCode', async (c) => {
         }
         
       } catch (e) {
+        // 초기 로드 실패: 에러 화면 표시
         if (isInitial) {
           document.getElementById('loading-screen').classList.add('hidden');
           document.getElementById('error-screen').style.display = 'flex';
           document.getElementById('error-message').textContent = e.message;
+        } else {
+          // 폴링 중 404 (플레이리스트 삭제됨) → 재생 중단 + 안내 화면 표시
+          const status = (e && e.status) ? e.status : 0;
+          // fetch 응답에서 status를 직접 확인하기 위해 별도 처리
+          // 에러 메시지에 '404' 또는 '찾을 수 없습니다'가 포함되면 삭제된 것으로 판단
+          const isDeleted = e.message && (
+            e.message.includes('404') || 
+            e.message.includes('찾을 수 없습니다') ||
+            e.message.includes('not found')
+          );
+          if (isDeleted) {
+            console.log('[loadData] Playlist deleted (404), stopping playback');
+            // 재생 중단
+            try { if (typeof stopAllPlayback === 'function') stopAllPlayback(); } catch(_) {}
+            // 영상 숨기기
+            const videoEl = document.getElementById('main-video');
+            if (videoEl) videoEl.style.display = 'none';
+            const ytEl = document.getElementById('youtube-player');
+            if (ytEl) ytEl.style.display = 'none';
+            const vmEl = document.getElementById('vimeo-player');
+            if (vmEl) vmEl.style.display = 'none';
+            // 에러 화면 표시
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다.\nTV를 다른 채널로 전환해주세요.';
+            // 폴링 계속하되 빈번하지 않게 (혹시 복구될 경우 대비)
+          }
         }
       } finally {
         isLoadingData = false;
