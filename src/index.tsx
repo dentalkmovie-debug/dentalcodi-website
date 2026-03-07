@@ -1156,6 +1156,14 @@ app.post('/api/:adminCode/playlists', async (c) => {
   if (!name) {
     return c.json({ error: '플레이리스트 이름을 입력해주세요.' }, 400)
   }
+
+  // 동일 사용자 내 중복 이름 체크
+  const existing = await c.env.DB.prepare(`
+    SELECT id FROM playlists WHERE user_id = ? AND name = ?
+  `).bind(user.id, name).first()
+  if (existing) {
+    return c.json({ error: `'${name}' 이름이 이미 존재합니다. 다른 이름을 사용해주세요.` }, 409)
+  }
   
   const shortCode = generateRandomCode(5)
   const tvCode = String(Math.floor(1000 + Math.random() * 9000))
@@ -7265,6 +7273,12 @@ app.get('/admin/:adminCode', async (c) => {
         showToast('대기실 이름을 입력하세요', 'error');
         return;
       }
+
+      // 프론트엔드 중복 체크
+      if (playlists && playlists.some(p => p.name === name)) {
+        showToast('\'' + name + '\' 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
+        return;
+      }
       
       try {
         const res = await fetch(API_BASE + '/playlists', {
@@ -7301,6 +7315,12 @@ app.get('/admin/:adminCode', async (c) => {
       // 이름에 '체어'가 없으면 자동으로 추가
       if (!name.includes('체어')) {
         name = '체어' + name;
+      }
+
+      // 프론트엔드 중복 체크
+      if (playlists && playlists.some(p => p.name === name)) {
+        showToast('\'' + name + '\' 이름이 이미 존재합니다. 다른 이름을 사용해주세요.', 'error');
+        return;
       }
       
       try {
