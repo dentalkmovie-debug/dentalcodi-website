@@ -4263,8 +4263,8 @@ app.get('/admin/:adminCode', async (c) => {
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
     html, body { width: 100%; overflow-x: hidden; overflow-y: auto; }
-    /* 모달 열릴 때 body 스크롤 방지 */
-    /* body.modal-open: overflow not hidden - modal is fixed, backdrop blocks interaction */
+    /* 모달 열릴 때 body 스크롤 위치 고정 */
+    body.modal-open { overflow: hidden; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -9770,22 +9770,40 @@ app.get('/admin/:adminCode', async (c) => {
     
     function openModal(id) {
       const el = document.getElementById(id);
-      if (el) el.style.display = 'flex';
+      if (!el) return;
+      
+      el.style.display = 'flex';
+      el.style.position = 'fixed';
+      el.style.top = '0';
+      el.style.left = '0';
+      el.style.right = '0';
+      el.style.bottom = '0';
+      
       document.body.classList.add('modal-open');
       
-      // 모달 전체가 보이도록 iframe 내부 + 부모 페이지 모두 맨 위로 스크롤
+      // 1) iframe 내부 body를 맨 위로 스크롤 → fixed 모달이 iframe 뷰포트 상단에 표시됨
       window.scrollTo({ top: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
+      // 2) 부모 페이지도 iframe 위치로 스크롤 (imweb 등 iframe 환경)
       try {
         if (window.parent && window.parent !== window) {
-          // 직접 스크롤 시도
-          window.parent.scrollTo({ top: 0, behavior: 'instant' });
-          // postMessage로도 전달 (cross-origin 환경 대비)
+          // postMessage로 부모에게 scrollToTop 요청
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          // 직접 접근 가능한 경우 (동일 도메인)
+          try {
+            window.parent.scrollTo({ top: 0, behavior: 'instant' });
+          } catch(e) {}
+          try {
+            const frameEl = window.frameElement;
+            if (frameEl) {
+              // iframe 요소가 부모 뷰포트에 보이도록 스크롤
+              frameEl.scrollIntoView({ behavior: 'instant', block: 'start' });
+            }
+          } catch(e) {}
         }
-      } catch(e) {
-        // cross-origin: postMessage만 사용
-        try { window.parent.postMessage({ type: 'scrollToTop' }, '*'); } catch(e2) {}
-      }
+      } catch(e) {}
     }
 
     function closeModal(id) {
