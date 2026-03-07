@@ -123,6 +123,11 @@ async function getOrCreateUser(db: D1Database, adminCode: string, clinicName?: s
 
 // 아임웹 회원 코드로 사용자 조회/생성 (임베드용)
 async function getOrCreateUserByMemberCode(db: D1Database, memberCode: string, memberName?: string, memberEmail?: string) {
+  // 아임웹 변수가 치환되지 않은 경우 방어 (예: {{ member_code }}, {{member_code}})
+  if (!memberCode || memberCode.includes('{{') || memberCode.includes('}}') || memberCode.trim() === '') {
+    return null
+  }
+  
   const normalizedEmail = memberEmail && memberEmail.trim() ? memberEmail.trim().toLowerCase() : ''
 
   let user: any = await db.prepare(
@@ -13189,6 +13194,11 @@ app.post('/api/login', async (c) => {
 
   const normalizedEmail = normalizeEmail(email)
   const normalizedExpectedEmail = normalizeEmail(expectedEmail)
+  
+  // 아임웹 변수 미치환 방어 ({{ member_code }} 등이 그대로 들어오는 경우)
+  const safeMemberCode = (memberCode && !String(memberCode).includes('{{') && !String(memberCode).includes('}}'))
+    ? String(memberCode).trim()
+    : ''
 
   if (normalizedExpectedEmail && normalizedExpectedEmail !== normalizedEmail) {
     return c.json({
@@ -13220,8 +13230,8 @@ app.post('/api/login', async (c) => {
       const authData = await authRes.json() as any
       
       if (authData.access_token) {
-        const query = memberCode
-          ? 'member_code=' + encodeURIComponent(memberCode)
+        const query = safeMemberCode
+          ? 'member_code=' + encodeURIComponent(safeMemberCode)
           : 'email=' + encodeURIComponent(normalizedEmail)
 
         const membersRes = await fetch('https://api.imweb.me/v2/member/members?' + query, {
@@ -13230,10 +13240,10 @@ app.post('/api/login', async (c) => {
         const membersData = await membersRes.json() as any
         
         if (membersData.code === 200 && membersData.data?.list?.length > 0) {
-          if (memberCode) {
+          if (safeMemberCode) {
             imwebMember = membersData.data.list.find((item: any) => {
               const code = String(item.member_code || item.code || item.id || '')
-              return code === String(memberCode)
+              return code === String(safeMemberCode)
             })
           } else {
             imwebMember = membersData.data.list.find((item: any) => {
