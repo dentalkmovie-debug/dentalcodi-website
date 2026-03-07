@@ -1348,7 +1348,12 @@ app.post('/api/:adminCode/playlists/:id/external-shorten', async (c) => {
       return c.json({ success: true, shortUrl })
     }
     
-    return c.json({ error: '단축 URL 생성 실패' }, 500)
+    // 외부 단축 서비스 모두 실패 시 → 내부 URL을 그대로 반환 (실패하지 않음)
+    console.warn('All short URL services failed, using original URL as fallback')
+    await c.env.DB.prepare(`
+      UPDATE playlists SET external_short_url = ? WHERE id = ?
+    `).bind(targetUrl, playlistId).run()
+    return c.json({ success: true, shortUrl: targetUrl, fallback: true })
   } catch (e) {
     console.error('Short URL error:', e)
     return c.json({ error: '서버 오류' }, 500)
@@ -5519,7 +5524,7 @@ app.get('/admin/:adminCode', async (c) => {
   </div>
   
   <!-- 토스트 -->
-  <div id="toast" class="fixed top-4 right-4 hidden z-50">
+  <div id="toast" style="display:none" class="fixed top-4 right-4 z-50">
     <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg toast">
       <span id="toast-message"></span>
     </div>
@@ -9824,11 +9829,11 @@ app.get('/admin/:adminCode', async (c) => {
       const toastMessage = document.getElementById('toast-message');
       
       toastMessage.innerHTML = message.replace(/\\n/g, '<br>');
-      toast.classList.remove('hidden');
-      toast.querySelector('div').className = \`\${type === 'error' ? 'bg-red-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast\`;
+      toast.style.display = 'block';
+      toast.querySelector('div').className = \`\${type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast\`;
       
       setTimeout(() => {
-        toast.classList.add('hidden');
+        toast.style.display = 'none';
       }, duration);
     }
 
