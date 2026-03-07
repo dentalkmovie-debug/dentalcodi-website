@@ -3475,7 +3475,6 @@ app.get('/embed-old/:memberCode', async (c) => {
         const data = await res.json();
         items = data.items || [];
       } catch (e) {
-        console.error('[Master] Force refresh failed:', e);
         items = cachedMasterItems || [];
       }
 
@@ -3484,34 +3483,30 @@ app.get('/embed-old/:memberCode', async (c) => {
       masterItems = items;
 
       if (!currentPlaylist) return;
-
       const editModal = document.getElementById('edit-playlist-modal');
-      const isEditOpen = editModal && !editModal.classList.contains('hidden');
-      if (!isEditOpen) return;
+      if (!editModal || editModal.classList.contains('hidden')) return;
 
+      // 서버에서 playlist items(라이브러리) 갱신 - activeItemIds는 로컬 유지
       try {
         const playlistRes = await fetch(API_BASE + '/playlists/' + currentPlaylist.id + '?ts=' + Date.now(), { cache: 'no-store' });
         const playlistData = await playlistRes.json();
         if (playlistData && playlistData.playlist) {
+          const savedActiveIds = currentPlaylist.activeItemIds; // 로컬 상태 보존
           currentPlaylist = playlistData.playlist;
+          currentPlaylist.activeItemIds = savedActiveIds;     // 덮어쓰기 방지
         }
-      } catch (e) {
-        console.error('[Playlist] Force refresh failed:', e);
-      }
+      } catch (e) {}
 
-      if (typeof renderLibraryAndPlaylist === 'function') {
-        await renderLibraryAndPlaylist();
-      } else if (typeof renderPlaylistItems === 'function') {
-        await renderPlaylistItems();
-      }
+      // 라이브러리 패널만 갱신 (플레이리스트 오른쪽은 건드리지 않음)
+      if (typeof renderLibraryOnly === 'function') renderLibraryOnly();
     }
 
     async function refreshPlaylistEditorData() {
       if (!currentPlaylist) return;
+      const editModal = document.getElementById('edit-playlist-modal');
+      if (!editModal || editModal.classList.contains('hidden')) return;
 
       let masterOk = false;
-      let playlistOk = false;
-
       try {
         const masterRes = await fetch(window.location.origin + '/api/master/items?ts=' + Date.now(), { cache: 'no-store' });
         if (masterRes.ok) {
@@ -3520,51 +3515,29 @@ app.get('/embed-old/:memberCode', async (c) => {
           masterItemsCache = cachedMasterItems;
           masterOk = true;
         }
-      } catch (e) {
-        console.error('[Master] Force refresh failed:', e);
-      }
+      } catch (e) {}
 
+      // playlist items(라이브러리 항목)만 갱신 - activeItemIds는 로컬 유지
       try {
         const res = await fetch(API_BASE + '/playlists/' + currentPlaylist.id + '?ts=' + Date.now(), { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.playlist) {
+            const savedActiveIds = currentPlaylist.activeItemIds; // 로컬 상태 보존
             currentPlaylist = data.playlist;
-            loadPlaylistOrder();
-            playlistOk = true;
+            currentPlaylist.activeItemIds = savedActiveIds;       // 덮어쓰기 방지
           }
         }
-      } catch (e) {
-        console.error('[Playlist] Force refresh failed:', e);
-      }
+      } catch (e) {}
 
-      if (masterOk || playlistOk) {
-        const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-        if (newSignature && newSignature !== playlistEditorSignature) {
-          playlistEditorSignature = newSignature;
-          if (typeof renderLibraryAndPlaylist === 'function') {
-            await renderLibraryAndPlaylist();
-          } else if (typeof renderPlaylistItems === 'function') {
-            await renderPlaylistItems();
-          }
-        }
-      }
+      // 라이브러리 패널만 갱신 (플레이리스트는 사용자가 직접 변경 중일 수 있음)
+      if (masterOk && typeof renderLibraryOnly === 'function') renderLibraryOnly();
     }
 
     function startMasterItemsAutoRefresh() {
-      if (masterItemsRefreshTimer) {
-        clearInterval(masterItemsRefreshTimer);
-      }
-      const editModal = document.getElementById('edit-playlist-modal');
-      const isEditOpen = editModal && !editModal.classList.contains('hidden');
-
-      if (isEditOpen) {
-        refreshPlaylistEditorData();
-        masterItemsRefreshTimer = setInterval(refreshPlaylistEditorData, 5000);
-      } else {
-        refreshMasterItemsForce();
-        masterItemsRefreshTimer = setInterval(refreshMasterItemsForce, 5000);
-      }
+      if (masterItemsRefreshTimer) clearInterval(masterItemsRefreshTimer);
+      // 30초마다 라이브러리 패널만 조용히 갱신 (5초는 너무 잦음)
+      masterItemsRefreshTimer = setInterval(refreshPlaylistEditorData, 30000);
     }
     
     // 마스터 아이템 로드 (캐시 사용)
@@ -5583,6 +5556,8 @@ app.get('/admin/:adminCode', async (c) => {
 
     async function refreshPlaylistEditorData() {
       if (!currentPlaylist) return;
+      const editModal = document.getElementById('edit-playlist-modal');
+      if (!editModal || editModal.classList.contains('hidden')) return;
 
       try {
         const masterRes = await fetch(window.location.origin + '/api/master/items?ts=' + Date.now(), { cache: 'no-store' });
@@ -5591,39 +5566,30 @@ app.get('/admin/:adminCode', async (c) => {
           cachedMasterItems = masterData.items || [];
           masterItemsCache = cachedMasterItems;
         }
-      } catch (e) {
-        console.error('[Master] Refresh failed:', e);
-      }
+      } catch (e) {}
 
+      // playlist items(라이브러리 항목)만 갱신 - activeItemIds는 로컬 유지
       try {
         const res = await fetch(API_BASE + '/playlists/' + currentPlaylist.id + '?ts=' + Date.now(), { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (data.playlist) {
+            const savedActiveIds = currentPlaylist.activeItemIds; // 로컬 상태 보존
             currentPlaylist = data.playlist;
+            currentPlaylist.activeItemIds = savedActiveIds;       // 덮어쓰기 방지
             playlistCacheById[currentPlaylist.id] = currentPlaylist;
-            loadPlaylistOrder();
           }
         }
-      } catch (e) {
-        console.error('[Playlist] Refresh failed:', e);
-      }
+      } catch (e) {}
 
-      const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-      if (newSignature && newSignature !== playlistEditorSignature) {
-        playlistEditorSignature = newSignature;
-        if (typeof renderLibraryAndPlaylist === 'function') {
-          await renderLibraryAndPlaylist();
-        }
-      }
+      // 라이브러리 패널만 갱신
+      if (typeof renderLibraryOnly === 'function') renderLibraryOnly();
     }
 
     function startMasterItemsAutoRefresh() {
-      if (masterItemsRefreshTimer) {
-        clearInterval(masterItemsRefreshTimer);
-      }
-      refreshPlaylistEditorData();
-      masterItemsRefreshTimer = setInterval(refreshPlaylistEditorData, 5000);
+      if (masterItemsRefreshTimer) clearInterval(masterItemsRefreshTimer);
+      // 30초마다 라이브러리만 조용히 갱신
+      masterItemsRefreshTimer = setInterval(refreshPlaylistEditorData, 30000);
     }
     
     function normalizePlaylistSearchValue(value) {
@@ -8217,12 +8183,15 @@ app.get('/admin/:adminCode', async (c) => {
         const data = await res.json();
         
         if (data.success) {
-          // 서버에서 최신 데이터 다시 가져오기
+          // 서버에서 최신 데이터 다시 가져오기 (activeItemIds는 로컬 유지)
           const playlistRes = await fetch(API_BASE + '/playlists/' + currentPlaylist.id);
           const playlistData = await playlistRes.json();
+          const savedActiveIds = currentPlaylist.activeItemIds;
           currentPlaylist = playlistData.playlist;
+          currentPlaylist.activeItemIds = savedActiveIds;
           
-          renderLibraryAndPlaylist();
+          renderLibraryOnly();
+          _renderPlaylistOnly();
           document.getElementById('new-video-url').value = '';
           showToast('라이브러리에 추가되었습니다.');
         } else {
@@ -8263,12 +8232,15 @@ app.get('/admin/:adminCode', async (c) => {
         const data = await res.json();
         
         if (data.success) {
-          // 서버에서 최신 데이터 다시 가져오기
+          // 서버에서 최신 데이터 다시 가져오기 (activeItemIds는 로컬 유지)
           const playlistRes = await fetch(API_BASE + '/playlists/' + currentPlaylist.id);
           const playlistData = await playlistRes.json();
+          const savedActiveIds = currentPlaylist.activeItemIds;
           currentPlaylist = playlistData.playlist;
+          currentPlaylist.activeItemIds = savedActiveIds;
           
-          renderLibraryAndPlaylist();
+          renderLibraryOnly();
+          _renderPlaylistOnly();
           document.getElementById('new-image-url').value = '';
           showToast('라이브러리에 추가되었습니다.');
         } else {
@@ -8622,6 +8594,71 @@ app.get('/admin/:adminCode', async (c) => {
           }
         }
       });
+    }
+
+    // 라이브러리 왼쪽 패널만 렌더 (자동 리프레시 시 플레이리스트는 건드리지 않음)
+    function renderLibraryOnly() {
+      if (!currentPlaylist) return;
+      const libraryMasterList = document.getElementById('library-master-list');
+      const libraryUserList = document.getElementById('library-user-list');
+      const libraryMasterSection = document.getElementById('library-master-section');
+      const items = currentPlaylist.items || [];
+
+      if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
+        libraryMasterSection.classList.remove('hidden');
+        libraryMasterList.innerHTML = masterItemsCache.map(item => \`
+          <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
+               data-library-id="\${item.id}" data-library-master="1"
+               onclick="addToPlaylistFromLibrary(\${item.id})">
+            <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
+              \${item.thumbnail_url
+                ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
+                : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-purple-400"></i></div>\`
+              }
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-medium text-purple-800 truncate">\${item.title || item.url}</p>
+              <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+            </div>
+            <i class="fas fa-plus text-purple-400"></i>
+          </div>
+        \`).join('');
+      } else if (libraryMasterSection) {
+        libraryMasterSection.classList.add('hidden');
+      }
+
+      if (items.length > 0 && libraryUserList) {
+        libraryUserList.innerHTML = items.map(item => \`
+          <div class="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-blue-100 transition group" data-library-id="\${item.id}" data-library-master="0">
+            <div class="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 cursor-pointer"
+                 onclick="addToPlaylistFromLibrary(\${item.id})">
+              \${item.item_type === 'image'
+                ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+                : item.thumbnail_url
+                  ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
+                  : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>\`
+              }
+            </div>
+            <div class="flex-1 min-w-0 cursor-pointer" data-item-id="\${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
+              <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600">\${item.title || item.url}</p>
+              <p class="text-xs text-gray-500">
+                \${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' :
+                  item.item_type === 'vimeo' ? '<i class="fab fa-vimeo text-blue-400"></i>' :
+                  '<i class="fas fa-image text-green-400"></i>'}
+              </p>
+            </div>
+            <button onclick="addToPlaylistFromLibrary(\${item.id})"
+                    class="text-gray-400 hover:text-blue-500 p-1" title="재생목록에 추가">
+              <i class="fas fa-plus"></i>
+            </button>
+            <button onclick="deletePlaylistItem(\${item.id})"
+                    class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100" title="삭제">
+              <i class="fas fa-trash text-xs"></i>
+            </button>
+          </div>
+        \`).join('');
+      }
+      _updateLibraryPlusButtons();
     }
 
     // 영상 제목 수정 (ID로 아이템 찾아서 수정)
