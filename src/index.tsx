@@ -1190,9 +1190,9 @@ app.get('/api/:adminCode/playlists', async (c) => {
       activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
     }
     // 서버에서 is_active 계산 (클라이언트 시간 오차 방지)
-    // last_active_at이 30초 이내면 사용중 (TV 3초 폴링 × 10배 여유, D1 replica 지연 흡수)
+    // last_active_at이 60초 이내면 사용중 (TV 3초 폴링 기준, 네트워크 지연/cold start 여유 포함)
     const isActiveNow = p.last_active_at
-      ? (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 30000
+      ? (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 60000
       : false
     return { ...p, items, activeItemIds, is_tv_active: isActiveNow }
   })
@@ -1859,6 +1859,17 @@ app.post('/api/tv/:shortCode/deactivate', async (c) => {
   return c.json({ success: true })
 })
 
+// TV heartbeat - 경량 API (last_active_at만 업데이트, 데이터 로드 없음)
+app.post('/api/tv/:shortCode/heartbeat', async (c) => {
+  const shortCode = c.req.param('shortCode')
+  
+  await c.env.DB.prepare(`
+    UPDATE playlists SET last_active_at = datetime('now') WHERE short_code = ?
+  `).bind(shortCode).run()
+  
+  return c.json({ ok: true })
+})
+
 // 임시 영상 해제 (기본으로 복귀)
 app.delete('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   const adminCode = c.req.param('adminCode')
@@ -2263,10 +2274,8 @@ app.get('/api/tv/:shortCode', async (c) => {
   const normalNotices = allNotices.results.filter((n: any) => n.is_urgent !== 1)
   const notices = urgentNotices.length > 0 ? urgentNotices : normalNotices
   
-  // TV 접속 시간 업데이트 (30초마다 폴링되므로 실시간 활성 상태 추적)
-  await c.env.DB.prepare(`
-    UPDATE playlists SET last_active_at = datetime('now') WHERE id = ?
-  `).bind(playlist.id).run()
+  // TV 접속 시간 업데이트는 heartbeat API(/api/tv/:shortCode/heartbeat)가 전담
+  // 여기서는 업데이트하지 않음 (loadData 에러 시에도 heartbeat는 독립적으로 동작)
   
   // 임시 영상 체크 (대기실은 임시 영상 기능 비활성화 - 이름에 '체어'가 포함된 경우만 활성화)
   let tempVideo = null
@@ -5567,7 +5576,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308y"></script>
+  <script defer src="/static/admin.js?v=20260308z"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -13050,6 +13059,14 @@ app.get('/tv/:shortCode', async (c) => {
     
     // 실시간 동기화 (3초마다)
     setInterval(() => loadData(false), 3 * 1000);
+    
+    // Heartbeat - 사용중 표시 전용 독립 폴링 (5초마다, fetch 실패와 무관하게 동작)
+    // /api/tv/:shortCode 와 별개로 last_active_at만 업데이트 (경량, 빠름)
+    setInterval(function sendHeartbeat() {
+      fetch('/api/tv/' + SHORT_CODE + '/heartbeat', { method: 'POST' })
+        .catch(function() {}); // 실패해도 무시, 다음 인터벌에 재시도
+      return sendHeartbeat;
+    }(), 5000);
     
     // 탭 닫힘 시 즉시 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
