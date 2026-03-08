@@ -9874,12 +9874,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
       // 모달을 헤더 바로 아래부터 표시 (top: headerH)
-      el.style.cssText = \`display:flex !important; position:fixed; top:\${headerH}px; left:0; right:0; bottom:0; width:100%; z-index:9999;\`;
+      el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
       document.body.classList.add('modal-open');
 
-      // 내부 wrapper paddingTop 제거 (top 자체로 처리하므로)
+      // 내부 wrapper paddingTop 제거
       const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-      if (wrapperEl) { (wrapperEl as HTMLElement).style.paddingTop = ''; }
+      if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
       // 부모 창: iframe 높이 확보 + 즉시 최상단 스크롤
       try {
@@ -9887,7 +9887,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           const needH = isGuideModal
             ? (() => {
                 const box = wrapperEl ? wrapperEl.querySelector(':scope > div') : null;
-                return Math.max(box ? (box as HTMLElement).scrollHeight + 80 : 650, 600);
+                return Math.max(box ? box.scrollHeight + 80 : 650, 600);
               })()
             : Math.max(Math.round(window.screen.height * 0.92), 700);
           window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
