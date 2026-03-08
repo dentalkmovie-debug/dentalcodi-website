@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308f"></script>
+  <script defer src="/static/admin.js?v=20260308g"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6671,21 +6671,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           '</div>' +
           '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
         '</div>';
-      // iframe 내부 즉시 스크롤
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      // 부모 창: iframe 높이 확보 + 즉시 스크롤
+      // 부모 창: iframe 높이 확보
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({ type: 'setHeight', height: Math.max(Math.round(window.screen.height * 0.92), 700) }, '*');
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
+          if (iframePageTop > 100) {
+            window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          }
         }
       } catch(e) {}
-      // 50ms 후 모달 표시 (부모 스크롤 완료 대기)
+      // 모달 즉시 표시
       var _m = modal;
-      setTimeout(function() {
-        _m.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
-      }, 50);
+      _m.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
     }
     
     // 선택된 체어 BAT 다운로드
@@ -9166,24 +9164,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (!el) return;
       if (el.parentElement !== document.body) document.body.appendChild(el);
 
-      // iframe 내부 즉시 스크롤
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-
-      // 부모 창: iframe 높이 확보 + 즉시 스크롤 (동시 전송)
+      // 부모 창: iframe 높이 확보
       try {
         if (window.parent && window.parent !== window) {
           const needH = Math.max(Math.round(window.screen.height * 0.92), 700);
           window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
+          if (iframePageTop > 100) {
+            window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          }
         }
       } catch(e) {}
 
-      // 부모 스크롤 완료 대기 후 모달 표시 (50ms)
-      setTimeout(function() {
-        el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
-        document.body.classList.add('modal-open');
-      }, 50);
+      // 모달 즉시 표시
+      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
+      document.body.classList.add('modal-open');
     }
     
     // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
