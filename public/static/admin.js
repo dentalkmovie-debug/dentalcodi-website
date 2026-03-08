@@ -3607,8 +3607,10 @@ function _showScriptModal(el) {
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
-  // position:fixed + top:0 으로 표시 후 부모에 scrollToTop 요청
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:center; justify-content:center;';
+  // iframePageTop: 위젯에서 받은 iframe의 페이지 내 top (= 아임웹 헤더 높이)
+  // 이 값만큼 top을 내려야 모달이 iframe 뷰포트 최상단에 표시됨
+  var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
+  el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:center; justify-content:center;';
   document.body.classList.add('modal-open');
   // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
   try {
