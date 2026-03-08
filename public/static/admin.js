@@ -4303,21 +4303,27 @@ function openModal(id) {
     document.body.appendChild(el);
   }
 
-  // 모달 풀스크린 고정 표시
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
+  // 모달 풀스크린 고정 표시 (일반 모달은 처음에 투명하게, 스크롤 후 표시)
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; opacity:0; pointer-events:none;';
   document.body.classList.add('modal-open');
 
   // 일반 모달: 아임웹 헤더 높이만큼 내부 컨테이너 paddingTop 동적 조정
   if (!isGuideModal) {
     const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
     if (wrapper) {
-      // iframePageTop이 있으면 그 값 사용, 없으면 0 (헤더에 딱 붙게)
       const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 0;
       wrapper.style.paddingTop = headerH + 'px';
     }
   }
 
-  // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보 + 부모 스크롤 최상단으로 이동
+  // 모든 모달: iframe 높이 확보 + 부모 스크롤 최상단 → 완료 후 모달 표시
+  const showModal = () => {
+    el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+
   try {
     if (window.parent && window.parent !== window) {
       const needH = isGuideModal
@@ -4326,12 +4332,15 @@ function openModal(id) {
             const box = wrapper ? wrapper.querySelector(':scope > div') : null;
             return Math.max(box ? box.scrollHeight + 80 : 650, 600);
           })()
-        : Math.max(Math.round(window.screen.height * 0.92), 700); // 일반 모달: 화면 높이 기준
+        : Math.max(Math.round(window.screen.height * 0.92), 700);
       window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-      // 부모 페이지 스크롤을 최상단으로 이동 (iframe이 뷰포트에 보이도록)
       window.parent.postMessage({ type: 'scrollToTop' }, '*');
+      // 부모 스크롤 완료 대기 후 모달 표시 (smooth scroll ~300ms)
+      setTimeout(showModal, 320);
+    } else {
+      showModal();
     }
-  } catch(e) {}
+  } catch(e) { showModal(); }
 
   if (isGuideModal) {
     // 가이드 모달: postParentHeight로 한번 더 정리
