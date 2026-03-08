@@ -3591,9 +3591,13 @@ function downloadAutoRunScript() {
   showScriptDownloadModal();
 }
 
-// 스크립트 다운로드 모달 표시 (설치 방법 안내용)
+// 스크립트 다운로드 모달 표시 (설치 방법 안내용) - 즉시 표시 (scrollToTop 없음)
 function showScriptDownloadModal() {
-  openModal('script-download-modal');
+  const el = document.getElementById('script-download-modal');
+  if (!el) return;
+  if (el.parentElement !== document.body) document.body.appendChild(el);
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
+  document.body.classList.add('modal-open');
 }
 
 // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
@@ -4284,7 +4288,7 @@ async function saveClinicName(e) {
 
 // zoom이 필요한 가이드 모달 목록 (이것들만 dashboard 숨김 + scroll 처리)
 const GUIDE_MODALS = new Set([
-  'tv-guide-modal', 'script-download-modal', 'shortcut-guide-modal',
+  'tv-guide-modal', 'shortcut-guide-modal',
   'autorun-guide-modal', 'guide-url-modal', 'individual-install-modal'
 ]);
 
@@ -4409,7 +4413,7 @@ function showToast(message, type = 'success', duration = 1200, anchorEl) {
 
   if (anchorEl) {
     var rect = anchorEl.getBoundingClientRect();
-    var bottomVal = window.innerHeight - rect.top + 8;
+    var bottomVal = window.innerHeight - rect.top + 60;
     toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
   } else {
     toast.style.cssText = 'display:block;position:fixed;bottom:24px;left:50%;top:auto;right:auto;transform:translateX(-50%);z-index:99999;';
