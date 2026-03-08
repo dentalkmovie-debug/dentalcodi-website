@@ -1411,11 +1411,18 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   }
   
   // 백그라운드에서 최신 데이터 로드 (캐시 갱신 + 현재 전송 영상 확인)
+  // 이미 즉시 렌더링된 경우 재렌더링 없이 캐시만 갱신
+  const alreadyRendered = tempVideoPlaylistItems.length > 0;
   Promise.all([
     loadTempVideoPlaylistItems(playlistId),
     checkCurrentTempVideo(playlistId)
   ]).then(() => {
-    renderTempVideoSharedList();
+    if (!alreadyRendered) {
+      // 즉시 렌더링 못 한 경우(masterItemsCache 없었을 때)만 렌더링
+      renderTempVideoSharedList();
+    }
+    // 현재 전송 중인 영상 상태 표시는 항상 갱신
+    checkCurrentTempVideo(playlistId);
   });
 }
 
