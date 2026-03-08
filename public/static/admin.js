@@ -4300,7 +4300,7 @@ function openModal(id) {
   el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
   document.body.classList.add('modal-open');
 
-  // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보
+  // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보 + 부모 스크롤 최상단으로 이동
   try {
     if (window.parent && window.parent !== window) {
       const needH = isGuideModal
@@ -4311,6 +4311,8 @@ function openModal(id) {
           })()
         : Math.max(Math.round(window.screen.height * 0.92), 700); // 일반 모달: 화면 높이 기준
       window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+      // 부모 페이지 스크롤을 최상단으로 이동 (iframe이 뷰포트에 보이도록)
+      window.parent.postMessage({ type: 'scrollToTop' }, '*');
     }
   } catch(e) {}
 

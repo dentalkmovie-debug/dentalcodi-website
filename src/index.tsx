@@ -9862,7 +9862,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
       document.body.classList.add('modal-open');
 
-      // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보
+      // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보 + 부모 스크롤 최상단으로 이동
       try {
         if (window.parent && window.parent !== window) {
           const needH = isGuideModal
@@ -9873,6 +9873,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               })()
             : Math.max(Math.round(window.screen.height * 0.92), 700); // 일반 모달: 화면 높이 기준
           window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+          // 부모 페이지 스크롤을 최상단으로 이동 (iframe이 뷰포트에 보이도록)
+          window.parent.postMessage({ type: 'scrollToTop' }, '*');
         }
       } catch(e) {}
 
@@ -13023,7 +13025,7 @@ app.get('/', (c) => {
 
   // 최대 5초간 100ms마다 폴링
   var n=0, t=setInterval(function(){ launch(); if(launched||++n&gt;=50){ clearInterval(t); if(!launched) frame.src=host+'/not-logged-in'; }}, 100);
-  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; });
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop') window.scrollTo({top:0,behavior:'smooth'}); });
 })();
 &lt;/script&gt;</pre>
       <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
