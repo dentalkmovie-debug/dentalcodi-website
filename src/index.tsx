@@ -4995,8 +4995,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 플레이리스트 편집 모달 -->
   <div id="edit-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('edit-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-16 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="max-height:calc(100vh - 80px); height:90vh;">
+    <div class="absolute inset-0 flex items-start justify-center px-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="max-height:100vh; height:100vh;">
         <div class="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 id="edit-playlist-title" class="text-lg font-bold">플레이리스트 편집</h3>
           <button onclick="closeModal('edit-playlist-modal')" class="text-gray-400 hover:text-gray-600">
@@ -9873,9 +9873,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (!isGuideModal) {
         const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
         if (wrapper) {
-          // iframePageTop: 부모창에서 받은 iframe 상단 offset (=아임웹 헤더 높이)
-          // 최소 8px, 최대 160px로 클램핑
-          const headerH = Math.min(Math.max(iframePageTop || 8, 8), 160);
+          // iframePageTop이 있으면 그 값 사용, 없으면 0 (헤더에 딱 붙게)
+          const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 0;
           wrapper.style.paddingTop = headerH + 'px';
         }
       }

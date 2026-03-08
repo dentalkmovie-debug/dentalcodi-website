@@ -4311,9 +4311,8 @@ function openModal(id) {
   if (!isGuideModal) {
     const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
     if (wrapper) {
-      // iframePageTop: 부모창에서 받은 iframe 상단 offset (=아임웹 헤더 높이)
-      // 최소 8px, 최대 160px로 클램핑
-      const headerH = Math.min(Math.max(iframePageTop || 8, 8), 160);
+      // iframePageTop이 있으면 그 값 사용, 없으면 0 (헤더에 딱 붙게)
+      const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 0;
       wrapper.style.paddingTop = headerH + 'px';
     }
   }
