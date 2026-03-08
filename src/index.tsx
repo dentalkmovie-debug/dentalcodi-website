@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308g"></script>
+  <script defer src="/static/admin.js?v=20260308h"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9868,23 +9868,37 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.body.appendChild(el);
       }
 
-      // iframe 내부 스크롤 즉시 0
-      try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-
       // 내부 wrapper paddingTop 제거
       const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
       if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-      var _el = el;
-      function _doShow(topOffset) {
-        // topOffset: 스크롤 0 후 iframe의 헤더 높이 (페이지 내 top 위치)
-        var adjTop = (topOffset > 0 && topOffset < 200) ? topOffset : 0;
-        _el.style.cssText = 'display:flex !important; position:fixed; top:' + adjTop + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
-        document.body.classList.add('modal-open');
-      }
+      // ── 핵심 해결책 ──────────────────────────────────────────
+      // position:fixed는 iframe 뷰포트 기준이라 iframe이 페이지 아래에
+      // 있으면 top:0이 화면 밖에 렌더됨.
+      // → position:absolute + top = window.scrollY 로 현재 스크롤 위치에 고정
+      // body에 height:100% 없으면 absolute가 동작 안 할 수 있으므로
+      // body/html min-height 확보 후 적용
+      document.documentElement.style.minHeight = '100%';
+      document.body.style.minHeight = '100%';
+      document.body.style.position = 'relative';
 
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      el.style.cssText = [
+        'display:flex !important',
+        'position:absolute',
+        'top:' + scrollTop + 'px',
+        'left:0',
+        'right:0',
+        'height:100vh',
+        'width:100%',
+        'z-index:9999',
+        'align-items:center',
+        'justify-content:center',
+      ].join(';') + ';';
+      document.body.classList.add('modal-open');
+      // ─────────────────────────────────────────────────────────
+
+      // 부모에게 높이 확보 + 스크롤 요청 (구버전 위젯 무시해도 자체 동작)
       try {
         if (window.parent && window.parent !== window) {
           const needH = isGuideModal
@@ -9893,27 +9907,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 return Math.max(box ? box.scrollHeight + 80 : 650, 600);
               })()
             : Math.max(Math.round(window.screen.height * 0.92), 700);
-
-          // 먼저 숨긴 채로 높이 확보 + 스크롤 요청
-          _el.style.display = 'none';
           window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
-
-          // iframeTop 응답 오면(=스크롤 완료) 그때 표시
-          pendingModalAdjust = function(topOffset) {
-            _doShow(topOffset);
-          };
-          // 300ms fallback: iframeTop 안 오면 top:0으로 강제 표시
-          setTimeout(function() {
-            if (pendingModalAdjust) {
-              pendingModalAdjust = null;
-              _doShow(0);
-            }
-          }, 300);
-        } else {
-          _doShow(0);
         }
-      } catch(e) { _doShow(0); }
+      } catch(e) {}
 
       if (isGuideModal) {
         try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
@@ -9933,7 +9930,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
       
       // 열린 모달이 없을 때 공통 처리
-      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"]');
+      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"], [style*="position:absolute"][style*="display:flex"]');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
 
