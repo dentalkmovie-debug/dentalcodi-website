@@ -4303,46 +4303,35 @@ function openModal(id) {
     document.body.appendChild(el);
   }
 
-  // 모달 풀스크린 고정 표시 (스크롤 완료 전 숨김)
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; opacity:0; pointer-events:none;';
-  document.body.classList.add('modal-open');
-
-  // 일반 모달: paddingTop 설정 (위젯에서 iframeTop 받았으면 사용, 없으면 70px 기본)
-  if (!isGuideModal) {
-    const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-    if (wrapper) {
-      const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 70;
-      wrapper.style.paddingTop = headerH + 'px';
-    }
-  }
-
-  // iframe 내부 즉시 스크롤
-  try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { try { window.scrollTo(0, 0); } catch(e2) {} }
+  // iframe 내부 즉시 스크롤 (모달 표시 전)
+  try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 
-  // 모달 표시 함수
-  const showModal = () => {
-    el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
-  };
+  // 아임웹 헤더 높이 계산 (위젯에서 받은 값 or 기본 70px)
+  const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
+  // 모달을 헤더 바로 아래부터 표시 (top: headerH)
+  el.style.cssText = `display:flex !important; position:fixed; top:${headerH}px; left:0; right:0; bottom:0; width:100%; z-index:9999;`;
+  document.body.classList.add('modal-open');
+
+  // 내부 wrapper paddingTop 제거 (top 자체로 처리하므로)
+  const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+  if (wrapperEl) { (wrapperEl as HTMLElement).style.paddingTop = ''; }
+
+  // 부모 창: iframe 높이 확보 + 즉시 최상단 스크롤
   try {
     if (window.parent && window.parent !== window) {
       const needH = isGuideModal
         ? (() => {
-            const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-            const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-            return Math.max(box ? box.scrollHeight + 80 : 650, 600);
+            const box = wrapperEl ? wrapperEl.querySelector(':scope > div') : null;
+            return Math.max(box ? (box as HTMLElement).scrollHeight + 80 : 650, 600);
           })()
         : Math.max(Math.round(window.screen.height * 0.92), 700);
       window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
       window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      // instant scroll이므로 바로 표시
-      setTimeout(showModal, 50);
-    } else {
-      showModal();
     }
-  } catch(e) { showModal(); }
+  } catch(e) {}
 
   if (isGuideModal) {
     // 가이드 모달: postParentHeight로 한번 더 정리
