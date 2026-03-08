@@ -9750,40 +9750,19 @@ app.get('/admin/:adminCode', async (c) => {
       // 5. postParentHeight 호출 → imweb iframe 높이를 줄임
       try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
 
-      // 6. 200ms 후 실제 뷰포트 높이 측정 → 모달 박스 zoom 조정
-      //    dashboard 숨김 + postParentHeight 후 imweb이 iframe을 줄이는 시간 필요
-      function applyZoom() {
-        const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-        const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-        if (!box) return;
-
-        box.style.zoom = '';
-        box.style.transform = '';
-        const boxH = box.scrollHeight;
-
-        // visualViewport.height 가 가장 정확한 실제 화면 높이
-        // imweb iframe 환경에서도 실제 보이는 영역 반환
-        const viewH = (window.visualViewport && window.visualViewport.height > 0)
-          ? window.visualViewport.height
-          : window.innerHeight;
-        const available = viewH - 32; // 16px 상하 여백
-
-        console.log('[modal] id=' + id + ' boxH=' + boxH + ' viewH=' + viewH + ' available=' + available);
-
-        if (boxH > available && available > 100) {
-          const scale = available / boxH;
-          // zoom 사용 (Chrome/Edge/Samsung Browser 지원, Firefox는 transform으로 폴백)
-          if (CSS.supports('zoom', '1')) {
-            box.style.zoom = scale.toFixed(4);
-          } else {
-            box.style.transformOrigin = 'top center';
-            box.style.transform = 'scale(' + scale.toFixed(4) + ')';
+      // 6. iframe 높이를 모달이 충분히 보이도록 확장
+      setTimeout(() => {
+        try {
+          if (window.parent && window.parent !== window) {
+            // 모달 박스 실제 높이 측정
+            const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+            const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+            const modalH = box ? box.scrollHeight + 80 : 650; // 여백 포함
+            const sendH = Math.max(modalH, 600); // 최소 600px 보장
+            window.parent.postMessage({ type: 'setHeight', height: sendH }, '*');
           }
-        }
-      }
-
-      setTimeout(applyZoom, 200);  // imweb iframe 리사이즈 대기
-      setTimeout(applyZoom, 500);  // 혹시 늦게 처리되는 경우 한 번 더
+        } catch(e) {}
+      }, 100);
     }
 
     function closeModal(id) {
