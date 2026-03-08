@@ -17,6 +17,13 @@ let playlistSearchQuery = '';
 let masterItemsSignature = '';
 let playlistEditorSignature = '';
 let masterItemsRefreshTimer = null;
+// 아임웹 iframe의 페이지 상단으로부터 top offset (헤더 높이 보정용)
+let iframePageTop = 0;
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'iframeTop') {
+    iframePageTop = e.data.top || 0;
+  }
+});
 
 function getMasterItemsSignature(items) {
   return (items || [])
@@ -4300,6 +4307,17 @@ function openModal(id) {
   el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
   document.body.classList.add('modal-open');
 
+  // 일반 모달: 아임웹 헤더 높이만큼 내부 컨테이너 paddingTop 동적 조정
+  if (!isGuideModal) {
+    const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+    if (wrapper) {
+      // iframePageTop: 부모창에서 받은 iframe 상단 offset (=아임웹 헤더 높이)
+      // 최소 60px, 최대 160px로 클램핑
+      const headerH = Math.min(Math.max(iframePageTop || 60, 60), 160);
+      wrapper.style.paddingTop = headerH + 'px';
+    }
+  }
+
   // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보 + 부모 스크롤 최상단으로 이동
   try {
     if (window.parent && window.parent !== window) {
@@ -4327,9 +4345,10 @@ function closeModal(id) {
   if (el) {
     // cssText로 일괄 초기화
     el.style.cssText = 'display:none;';
-    // 모달 박스 zoom/transform 초기화
+    // 모달 박스 zoom/transform/paddingTop 초기화
     const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
     const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+    if (wrapper) { wrapper.style.paddingTop = ''; }
     if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
   }
   
