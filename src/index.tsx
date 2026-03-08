@@ -4995,8 +4995,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 플레이리스트 편집 모달 -->
   <div id="edit-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('edit-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="height:90vh;">
+    <div class="absolute inset-0 flex items-start justify-center pt-16 px-4 pointer-events-none">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="max-height:calc(100vh - 80px); height:90vh;">
         <div class="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 id="edit-playlist-title" class="text-lg font-bold">플레이리스트 편집</h3>
           <button onclick="closeModal('edit-playlist-modal')" class="text-gray-400 hover:text-gray-600">
