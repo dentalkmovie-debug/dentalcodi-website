@@ -4175,10 +4175,10 @@ app.get('/admin/:adminCode', async (c) => {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일이 일치하지 않습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
-    // email이 있고 DB에 없으면 저장 - 응답 기다리지 않음 (fire-and-forget)
+    // email이 있고 DB에 없으면 저장 (단, ADMIN_EMAILS는 저장하지 않음)
     if (emailParam && !user.imweb_email && !ADMIN_EMAILS.includes(emailParam)) {
-      c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
-        .bind(emailParam, user.id).run().catch(() => {})
+      await c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
+        .bind(emailParam, user.id).run()
     }
 
     // 계정 상태 확인 (정지 또는 구독 만료)
@@ -4205,12 +4205,33 @@ app.get('/admin/:adminCode', async (c) => {
   // 2. 마스터 관리자 페이지에서 설정한 관리자인 경우
   const isOwnerAdmin = isAdminQuery || finalUser?.is_site_admin === 1 || isAdminEmail(finalUser?.imweb_email)
   
-  // DB 쿼리 없이 최소 데이터만 사용 → 즉시 HTML 응답 (shell-first)
-  // 실제 데이터는 클라이언트에서 API로 비동기 로드
+  // 서버에서 초기 데이터 미리 로드 (병렬)
+  const [playlistsData, noticesData, masterItemsData] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT p.*, 
+        (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+      FROM playlists p
+      WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
+      ORDER BY p.id
+    `).bind(finalUser?.id || 0).all(),
+    c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? ORDER BY sort_order ASC, id DESC')
+      .bind(finalUser?.id || 0).all(),
+    (async () => {
+      const masterUser = await c.env.DB.prepare('SELECT id FROM users WHERE is_master = 1').first() as any
+      if (!masterUser) return { results: [] }
+      const masterPlaylist = await c.env.DB.prepare(
+        'SELECT id FROM playlists WHERE user_id = ? AND is_master_playlist = 1'
+      ).bind(masterUser.id).first() as any
+      if (!masterPlaylist) return { results: [] }
+      return c.env.DB.prepare('SELECT * FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order')
+        .bind(masterPlaylist.id).all()
+    })()
+  ])
+  
   const initialData = {
-    playlists: [],
-    notices: [],
-    masterItems: [],
+    playlists: playlistsData.results || [],
+    notices: noticesData.results || [],
+    masterItems: masterItemsData.results || [],
     clinicName: finalUser?.clinic_name || '내 치과',
     isOwnerAdmin: isOwnerAdmin
   }
@@ -4241,13 +4262,9 @@ app.get('/admin/:adminCode', async (c) => {
       }
     } catch (e) {}
   </script>
-  <!-- Tailwind: preload로 병렬 다운로드 시작 -->
-  <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SortableJS, FontAwesome: defer/비동기로 렌더링 블로킹 제거 -->
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" defer></script>
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.rel='stylesheet'">
-  <noscript><link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"></noscript>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
     /* body: 스크롤 가능 (imweb이 iframe 높이를 콘텐츠에 맞게 자동 조정) */
     html, body { margin: 0; padding: 0; width: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
@@ -5713,8 +5730,11 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     function init() {
+      // 초기 데이터로 즉시 렌더링 (API 호출 없이)
       const loadingDiv = document.getElementById('loading');
+      const dashboardDiv = document.getElementById('dashboard');
       if (loadingDiv) loadingDiv.style.display = 'none';
+      // dashboard는 이미 표시 상태이므로 추가 처리 불필요
 
       if (INITIAL_DATA.isOwnerAdmin) {
         document.getElementById('clinic-name-text').textContent = '관리자';
@@ -5723,22 +5743,18 @@ app.get('/admin/:adminCode', async (c) => {
       } else {
         document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
       }
-
-      // 빈 상태 즉시 렌더링 → 레이아웃 바로 표시
+      
+      // 이미 로드된 데이터로 즉시 렌더링
       renderPlaylists();
       renderNotices();
       checkMasterLoginStatus();
+      
+      // 설정은 백그라운드에서 로드 (UI 업데이트용)
+      loadNoticeSettings();
       setupAutoHeight();
-
-      // API에서 실제 데이터 병렬 로드 (서버 DB 쿼리 제거 → 클라이언트 비동기)
-      Promise.all([
-        loadPlaylists(),
-        loadNotices(),
-        loadMasterItemsForAdmin(),
-        loadNoticeSettings()
-      ]).catch(e => console.error('Init load error:', e));
-
-      // 30초마다 플레이리스트 자동 갱신
+      
+      // 30초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
+      // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
       setInterval(async () => {
         const editModal = document.getElementById('edit-playlist-modal');
         if (editModal && editModal.style.display !== 'none') return;
