@@ -4198,7 +4198,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const isOwnerAdmin = isAdminQuery || finalUser?.is_site_admin === 1 || isAdminEmail(finalUser?.imweb_email)
   
   // 서버에서 초기 데이터 미리 로드 (병렬)
-  const [playlistsData, noticesData, masterItemsData] = await Promise.all([
+  const [playlistsData, noticesData, masterItemsData, playlistItemsData] = await Promise.all([
     c.env.DB.prepare(`
       SELECT p.*, 
         (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
@@ -4216,11 +4216,47 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       JOIN users u ON p.user_id = u.id
       WHERE u.is_master = 1 AND p.is_master_playlist = 1
       ORDER BY pi.sort_order
-    `).all()
+    `).all(),
+    // 사용자 playlist의 items를 한 번에 로드 (편집창 즉시 렌더링용)
+    c.env.DB.prepare(`
+      SELECT pi.*
+      FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
+      ORDER BY pi.playlist_id, pi.sort_order ASC
+    `).bind(finalUser?.id || 0).all()
   ])
-  
+
+  // playlist별로 items 그룹핑
+  const playlistItemsMap: Record<number, any[]> = {}
+  for (const item of (playlistItemsData.results || [])) {
+    const pid = (item as any).playlist_id
+    if (!playlistItemsMap[pid]) playlistItemsMap[pid] = []
+    playlistItemsMap[pid].push({ ...(item as any), is_master: false })
+  }
+
+  // playlists에 items와 activeItemIds 추가
+  const playlistsWithItems = (playlistsData.results || []).map((p: any) => {
+    const items = playlistItemsMap[p.id] || []
+    let activeItemIds: number[] = []
+    try {
+      const raw = p.active_item_ids
+      if (raw === null || raw === undefined) {
+        activeItemIds = items.map((i: any) => i.id)
+      } else {
+        activeItemIds = JSON.parse(raw || '[]')
+        activeItemIds = Array.isArray(activeItemIds)
+          ? activeItemIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id))
+          : []
+      }
+    } catch (e) {
+      activeItemIds = items.map((i: any) => i.id)
+    }
+    return { ...p, items, activeItemIds }
+  })
+
   const initialData = {
-    playlists: playlistsData.results || [],
+    playlists: playlistsWithItems,
     notices: noticesData.results || [],
     masterItems: masterItemsData.results || [],
     clinicName: finalUser?.clinic_name || '내 치과',
@@ -7503,11 +7539,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
 
       // ── 1단계: playlists 배열에서 기본 정보를 즉시 사용 ──
-      // playlists 배열(INITIAL_DATA)에서 해당 id의 playlist 기본 정보 탐색
+      // playlists 배열(INITIAL_DATA)에는 이제 items, activeItemIds도 포함됨
       const basePlaylist = playlists.find(p => p.id == id);
       
       if (basePlaylist) {
-        // 기본 정보로 currentPlaylist 즉시 설정 (items는 빈 배열로 시작)
+        // INITIAL_DATA에서 items 포함한 전체 정보로 즉시 설정
         currentPlaylist = Object.assign({ items: [], activeItemIds: [] }, basePlaylist);
         document.getElementById('edit-playlist-title').textContent = currentPlaylist.name + ' 편집';
         document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
@@ -7526,45 +7562,41 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
       }
 
-      // ── 2단계: masterItemsCache로 라이브러리 즉시 렌더링 ──
-      // masterItemsCache는 INITIAL_DATA.masterItems에서 이미 초기화됨
-      // playlist items는 아직 없으므로 라이브러리(공용영상)만 즉시 표시
-      if (masterItemsCache && masterItemsCache.length > 0) {
-        // 라이브러리 공용영상 즉시 렌더링
-        const libraryMasterSection = document.getElementById('library-master-section');
-        const libraryMasterList = document.getElementById('library-master-list');
-        if (libraryMasterSection && libraryMasterList) {
-          libraryMasterSection.classList.remove('hidden');
-          libraryMasterList.innerHTML = masterItemsCache.map(item => \`
-            <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
-                 data-library-id="\${item.id}" data-library-master="1"
-                 onclick="addToPlaylistFromLibrary(\${item.id})">
-              <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
-                \${item.thumbnail_url
-                  ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover" loading="lazy">\`
-                  : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-purple-400"></i></div>\`
-                }
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-xs font-medium text-purple-800 truncate">\${item.title || item.url}</p>
-                <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
-              </div>
-              <i class="fas fa-plus text-purple-400"></i>
-            </div>
-          \`).join('');
+      // ── 2단계: INITIAL_DATA로 즉시 전체 렌더링 ──
+      // masterItemsCache + currentPlaylist.items 모두 이미 있으므로 즉시 렌더링
+      if (masterItemsCache && masterItemsCache.length > 0 && currentPlaylist) {
+        // renderLibraryAndPlaylist()는 currentPlaylist.items와 masterItemsCache를 모두 사용
+        // 캐시에 있으면 즉시 동기적으로 렌더링 가능 (API fetch 불필요)
+        playlistEditorSignature = getPlaylistEditorSignature(masterItemsCache, currentPlaylist);
+        await renderLibraryAndPlaylist();
+        loadPlaylistOrder();
+        // 설정은 백그라운드에서 로드 (UI 블로킹 없음)
+        loadPlaylistSettings().catch(() => {});
+        if (typeof startMasterItemsAutoRefresh === 'function') {
+          startMasterItemsAutoRefresh();
         }
-        // 내 영상 목록: items 로드 전까지 로딩 스피너
-        const libraryUserList = document.getElementById('library-user-list');
-        if (libraryUserList) {
-          libraryUserList.innerHTML = '<div class="flex items-center justify-center py-4 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>영상 목록 로드 중...</div>';
-        }
-        // 재생 플레이리스트: items 로드 전까지 로딩 스피너
-        const playlistContainer = document.getElementById('playlist-items-container');
-        if (playlistContainer) {
-          playlistContainer.innerHTML = '<div class="flex items-center justify-center py-8 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>재생목록 로드 중...</div>';
-        }
+        // 3단계 API fetch는 캐시 업데이트용으로만 백그라운드에서 실행
+        // (다음 번 편집창 열 때 캐시 사용)
+        fetch(API_BASE + '/playlists/' + id + '?ts=' + Date.now())
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.playlist) {
+              playlistCacheById[id] = data.playlist;
+              // 데이터가 변경된 경우만 재렌더링 (서명 비교)
+              const newSig = getPlaylistEditorSignature(masterItemsCache, data.playlist);
+              if (newSig !== playlistEditorSignature) {
+                currentPlaylist = data.playlist;
+                playlistEditorSignature = newSig;
+                renderLibraryAndPlaylist();
+                loadPlaylistOrder();
+              }
+            }
+          })
+          .catch(() => {});
+        isOpeningEditor = false;
+        return;
       } else {
-        // masterItemsCache도 없으면 스켈레톤 표시
+        // masterItemsCache가 없으면 스켈레톤 표시
         const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
         const libraryMasterList = document.getElementById('library-master-list');
         if (libraryMasterList) libraryMasterList.innerHTML = skeletonItem.repeat(4);
