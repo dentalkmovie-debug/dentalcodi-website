@@ -5537,7 +5537,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </div>
   
   <!-- 토스트 -->
-  <div id="toast" style="display:none; transform:translateX(-50%)" class="fixed bottom-6 left-1/2 z-[99999]">
+  <div id="toast" style="display:none" class="fixed z-[99999]">
     <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg toast">
       <span id="toast-message"></span>
     </div>
