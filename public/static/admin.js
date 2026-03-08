@@ -295,13 +295,13 @@ function init() {
   loadNoticeSettings();
   setupAutoHeight();
   
-  // 30초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
+  // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
   // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
   setInterval(async () => {
     const editModal = document.getElementById('edit-playlist-modal');
     if (editModal && editModal.style.display !== 'none') return;
     await loadPlaylists();
-  }, 30000);
+  }, 5000);
 }
 
 // DOMContentLoaded 또는 즉시 실행 (이미 fired된 경우 대비)
@@ -766,7 +766,7 @@ function renderPlaylists() {
       </h3>
       <div id="waitingroom-sortable-container" class="grid gap-3">
         ${waitingRooms.map((p, idx) => {
-          const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 15000;
+          const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
           return `
         <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 ${isActive ? 'border-green-500' : 'border-teal-400'}" 
              id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" draggable="true">
@@ -828,7 +828,7 @@ function renderPlaylists() {
       </h3>
       <div id="chair-sortable-container" class="grid gap-3">
         ${chairs.map((p, idx) => {
-          const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 15000;
+          const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
           return `
         <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 ${isActive ? 'border-green-500' : 'border-indigo-400'}" 
              id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" draggable="true">

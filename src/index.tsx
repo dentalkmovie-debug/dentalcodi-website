@@ -5562,7 +5562,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308r"></script>
+  <script defer src="/static/admin.js?v=20260308s"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -5862,13 +5862,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       loadNoticeSettings();
       setupAutoHeight();
       
-      // 30초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
+      // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
       // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
       setInterval(async () => {
         const editModal = document.getElementById('edit-playlist-modal');
         if (editModal && editModal.style.display !== 'none') return;
         await loadPlaylists();
-      }, 30000);
+      }, 5000);
     }
 
     // DOMContentLoaded 또는 즉시 실행 (이미 fired된 경우 대비)
@@ -6333,7 +6333,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="waitingroom-sortable-container" class="grid gap-3">
             \${waitingRooms.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 15000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-teal-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
@@ -6395,7 +6395,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="chair-sortable-container" class="grid gap-3">
             \${chairs.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 15000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-indigo-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
@@ -13012,16 +13012,17 @@ app.get('/tv/:shortCode', async (c) => {
     // 실시간 동기화 (5초마다)
     setInterval(() => loadData(false), 5 * 1000);
     
-    // 탭 닫힘/숨김 시 즉시 비활성화 (sendBeacon 사용 - 페이지 언로드 중에도 전송 보장)
+    // 탭 닫힘 시 즉시 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
       navigator.sendBeacon('/api/tv/' + SHORT_CODE + '/deactivate');
     }
+    // capture:true 로 visibilitychange 차단 리스너보다 먼저 실행
     document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'hidden') {
+      if (document.hidden) {
         deactivateTV();
       }
-    });
-    window.addEventListener('pagehide', deactivateTV);
+    }, true);
+    window.addEventListener('pagehide', deactivateTV, true);
     
     // 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
     document.addEventListener('click', function autoFullscreen() {
