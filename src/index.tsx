@@ -9865,25 +9865,27 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.body.appendChild(el);
       }
 
-      // 모달 풀스크린 고정 표시 (일반 모달은 처음에 투명하게, 스크롤 후 표시)
+      // 모달 풀스크린 고정 표시 (스크롤 완료 전 숨김)
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; opacity:0; pointer-events:none;';
       document.body.classList.add('modal-open');
 
-      // 일반 모달: 아임웹 헤더 높이만큼 내부 컨테이너 paddingTop 동적 조정
+      // 일반 모달: paddingTop 설정 (위젯에서 iframeTop 받았으면 사용, 없으면 70px 기본)
       if (!isGuideModal) {
         const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
         if (wrapper) {
-          const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 0;
+          const headerH = iframePageTop > 0 ? Math.min(iframePageTop, 160) : 70;
           wrapper.style.paddingTop = headerH + 'px';
         }
       }
 
-      // 모든 모달: iframe 높이 확보 + 부모 스크롤 최상단 → 완료 후 모달 표시
+      // iframe 내부 즉시 스크롤
+      try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { try { window.scrollTo(0, 0); } catch(e2) {} }
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+
+      // 모달 표시 함수
       const showModal = () => {
         el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
       };
 
       try {
@@ -9897,8 +9899,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             : Math.max(Math.round(window.screen.height * 0.92), 700);
           window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          // 부모 스크롤 완료 대기 후 모달 표시 (smooth scroll ~300ms)
-          setTimeout(showModal, 320);
+          // instant scroll이므로 바로 표시
+          setTimeout(showModal, 50);
         } else {
           showModal();
         }
@@ -13067,7 +13069,7 @@ app.get('/', (c) => {
   // 창 리사이즈/스크롤 시 재전달
   window.addEventListener('resize', sendIframeTop);
   window.addEventListener('scroll', sendIframeTop);
-  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(sendIframeTop,400); }catch(err){} } });
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
 })();
 &lt;/script&gt;</pre>
       <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
