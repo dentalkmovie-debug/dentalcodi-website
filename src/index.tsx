@@ -5562,7 +5562,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308v"></script>
+  <script defer src="/static/admin.js?v=20260308w"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6343,7 +6343,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="waitingroom-sortable-container" class="grid gap-3">
             \${waitingRooms.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 20000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 12000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-teal-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
@@ -6405,7 +6405,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="chair-sortable-container" class="grid gap-3">
             \${chairs.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 20000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 12000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-indigo-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
@@ -10016,6 +10016,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
         loadPlaylists();
       }
+      // 스크립트/설치방법 모달 닫힐 때 체크박스 전체 해제
+      if (id === 'script-download-modal' || id === 'script-type-modal') {
+        document.querySelectorAll('.chair-checkbox').forEach(cb => { cb.checked = false; });
+        const selectAll = document.getElementById('select-all-chairs');
+        if (selectAll) selectAll.checked = false;
+      }
     }
     
     function copyToClipboard(text) {
@@ -13037,8 +13043,8 @@ app.get('/tv/:shortCode', async (c) => {
     initWatchdog(); // 워치독 시작
     loadData(true);
     
-    // 실시간 동기화 (5초마다)
-    setInterval(() => loadData(false), 5 * 1000);
+    // 실시간 동기화 (3초마다)
+    setInterval(() => loadData(false), 3 * 1000);
     
     // 탭 닫힘 시 즉시 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
