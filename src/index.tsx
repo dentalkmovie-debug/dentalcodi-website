@@ -4275,6 +4275,9 @@ app.get('/admin/:adminCode', async (c) => {
     .toast { animation: slideIn 0.3s ease; }
     .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
     .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
+
+    /* ── 안내 모달 공통: 스크롤 없이 화면에 딱 맞게 ── */
+    /* openModal JS에서 transform: scale()로 자동 축소 처리 */
     @keyframes slideIn {
       from { transform: translateY(-100%); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
@@ -4477,7 +4480,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
         <!-- 헤더 -->
         <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
@@ -4525,7 +4528,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
         <!-- 헤더 -->
         <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
@@ -4596,7 +4599,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 바로가기 생성 가이드 모달 -->
   <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
         <div class="px-5 py-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold"><i class="fas fa-link mr-2"></i>바로가기 직접 만들기</h3>
@@ -4644,7 +4647,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 자동 실행 가이드 모달 -->
   <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
         <div class="px-5 py-4 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold"><i class="fas fa-check-circle mr-2"></i>다운로드 완료!</h3>
@@ -4814,7 +4817,7 @@ app.get('/admin/:adminCode', async (c) => {
   <!-- 대기실 설치 가이드 모달 (단축 URL) -->
   <div id="guide-url-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('guide-url-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
         <!-- 헤더 -->
         <div class="px-5 py-4 border-b bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-t-xl flex justify-between items-center">
@@ -9703,7 +9706,7 @@ app.get('/admin/:adminCode', async (c) => {
         document.body.appendChild(el);
       }
       
-      // 3. 모달을 풀스크린 블록으로 표시
+      // 3. 모달을 풀스크린으로 표시
       el.style.display = 'flex';
       el.style.position = 'fixed';
       el.style.top = '0';
@@ -9722,17 +9725,28 @@ app.get('/admin/:adminCode', async (c) => {
       document.body.scrollTop = 0;
       
       document.body.classList.add('modal-open');
-      
-      // 5. imweb에 iframe 높이를 viewport 높이로 재설정 요청
-      try {
-        if (window.parent && window.parent !== window) {
-          modalHeightLocked = true;
-          window.parent.postMessage({ type: 'setHeight', height: window.innerHeight }, '*');
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          window.parent.postMessage({ action: 'scrollTo', top: 0 }, '*');
-          try { window.frameElement && window.frameElement.scrollIntoView({ block: 'start' }); } catch(e2) {}
+
+      // 5. 내부 흰 박스(첫 번째 자식이 backdrop, 두 번째가 wrapper, 그 안에 박스)를 찾아
+      //    뷰포트보다 크면 scale()로 축소 → 스크롤 없이 전체 보임
+      requestAnimationFrame(() => {
+        // wrapper div (absolute inset-0 flex ...) 안에 있는 실제 콘텐츠 박스
+        const wrapper = el.querySelector('.absolute.inset-0.flex');
+        const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+        if (box) {
+          // scale 초기화 후 자연 높이 측정
+          box.style.transform = '';
+          box.style.transformOrigin = '';
+          const boxH = box.scrollHeight;
+          const viewH = window.innerHeight;
+          const padding = 32; // 상하 16px씩
+          const available = viewH - padding;
+          if (boxH > available) {
+            const scale = available / boxH;
+            box.style.transform = 'scale(' + scale + ')';
+            box.style.transformOrigin = 'top center';
+          }
         }
-      } catch(e) {}
+      });
     }
 
     function closeModal(id) {
@@ -9749,6 +9763,10 @@ app.get('/admin/:adminCode', async (c) => {
         el.style.minHeight = '';
         el.style.zIndex = '';
         el.style.overflowY = '';
+        // scale 초기화
+        const wrapper = el.querySelector('.absolute.inset-0.flex');
+        const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+        if (box) { box.style.transform = ''; box.style.transformOrigin = ''; }
       }
       
       // 대시보드 복원 (열린 모달이 없을 때)
