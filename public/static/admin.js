@@ -4303,7 +4303,6 @@ function openModal(id) {
   const isGuideModal = GUIDE_MODALS.has(id);
 
   if (isGuideModal) {
-    // 가이드 모달: dashboard 숨김
     const dashboard = document.getElementById('dashboard');
     if (dashboard) dashboard.style.display = 'none';
   }
@@ -4313,20 +4312,23 @@ function openModal(id) {
     document.body.appendChild(el);
   }
 
-  // iframe 내부 스크롤 즉시 0으로
+  // iframe 내부 스크롤 즉시 0
   try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
-
-  // 모달 표시: position:fixed; top:0 → 부모가 scrollToTop 하면 iframe도 뷰포트 최상단으로 이동
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:9999;';
-  document.body.classList.add('modal-open');
 
   // 내부 wrapper paddingTop 제거
   const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
   if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-  // 부모 창: iframe 높이 확보 + 최상단 스크롤 (스크롤되면 iframe top:0 = 화면 상단)
+  var _el = el;
+  function _doShow(topOffset) {
+    // topOffset: 스크롤 0 후 iframe의 헤더 높이 (페이지 내 top 위치)
+    var adjTop = (topOffset > 0 && topOffset < 200) ? topOffset : 0;
+    _el.style.cssText = 'display:flex !important; position:fixed; top:' + adjTop + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
+    document.body.classList.add('modal-open');
+  }
+
   try {
     if (window.parent && window.parent !== window) {
       const needH = isGuideModal
@@ -4335,19 +4337,27 @@ function openModal(id) {
             return Math.max(box ? box.scrollHeight + 80 : 650, 600);
           })()
         : Math.max(Math.round(window.screen.height * 0.92), 700);
+
+      // 먼저 숨긴 채로 높이 확보 + 스크롤 요청
+      _el.style.display = 'none';
       window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
       window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      // scrollToTop 완료 후 iframeTop 메시지 수신 시 top 재보정
-      var _el = el;
+
+      // iframeTop 응답 오면(=스크롤 완료) 그때 표시
       pendingModalAdjust = function(topOffset) {
-        // topOffset: 스크롤 0 기준으로 iframe의 페이지 내 top (= 헤더 높이)
-        var adjTop = Math.max(0, Math.min(topOffset, 120));
-        _el.style.top = adjTop + 'px';
+        _doShow(topOffset);
       };
-      // 500ms 후에도 iframeTop 안 오면 무시
-      setTimeout(function() { pendingModalAdjust = null; }, 500);
+      // 300ms fallback: iframeTop 안 오면 top:0으로 강제 표시
+      setTimeout(function() {
+        if (pendingModalAdjust) {
+          pendingModalAdjust = null;
+          _doShow(0);
+        }
+      }, 300);
+    } else {
+      _doShow(0);
     }
-  } catch(e) {}
+  } catch(e) { _doShow(0); }
 
   if (isGuideModal) {
     try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
