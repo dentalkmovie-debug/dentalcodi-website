@@ -19,16 +19,16 @@ let playlistEditorSignature = '';
 let masterItemsRefreshTimer = null;
 // 아임웹 iframe의 페이지 상단으로부터 top offset (헤더 높이 보정용)
 let iframePageTop = 0;
-// 스크롤 완료 후 표시할 모달 콜백
-let pendingModalShow = null;
+// 스크롤 완료 후 모달 top 재조정 콜백
+let pendingModalAdjust = null;
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'iframeTop') {
     iframePageTop = e.data.top || 0;
-    // 스크롤 완료 후 대기 중인 모달 표시
-    if (pendingModalShow) {
-      var fn = pendingModalShow;
-      pendingModalShow = null;
-      fn();
+    // scrollToTop 완료 후 열린 모달의 top을 iframePageTop 기준으로 재조정
+    if (pendingModalAdjust) {
+      var fn = pendingModalAdjust;
+      pendingModalAdjust = null;
+      fn(iframePageTop);
     }
   }
 });
@@ -4303,12 +4303,9 @@ function openModal(id) {
   const isGuideModal = GUIDE_MODALS.has(id);
 
   if (isGuideModal) {
-    // 가이드 모달: dashboard 숨김 + scroll
+    // 가이드 모달: dashboard 숨김
     const dashboard = document.getElementById('dashboard');
     if (dashboard) dashboard.style.display = 'none';
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
   }
 
   // 모달을 body 직접 자식으로 이동
@@ -4316,23 +4313,20 @@ function openModal(id) {
     document.body.appendChild(el);
   }
 
-  // iframe 내부 즉시 스크롤 (모달 표시 전)
+  // iframe 내부 스크롤 즉시 0으로
   try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 
-  // 아임웹 헤더 높이 계산 (위젯에서 받은 값 or 기본 70px)
-  const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
-
-  // 모달을 헤더 바로 아래부터 표시 (top: headerH)
-  el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
+  // 모달 표시: position:fixed; top:0 → 부모가 scrollToTop 하면 iframe도 뷰포트 최상단으로 이동
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:9999;';
   document.body.classList.add('modal-open');
 
   // 내부 wrapper paddingTop 제거
   const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
   if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-  // 부모 창: iframe 높이 확보 + 즉시 최상단 스크롤
+  // 부모 창: iframe 높이 확보 + 최상단 스크롤 (스크롤되면 iframe top:0 = 화면 상단)
   try {
     if (window.parent && window.parent !== window) {
       const needH = isGuideModal
@@ -4343,11 +4337,19 @@ function openModal(id) {
         : Math.max(Math.round(window.screen.height * 0.92), 700);
       window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
       window.parent.postMessage({ type: 'scrollToTop' }, '*');
+      // scrollToTop 완료 후 iframeTop 메시지 수신 시 top 재보정
+      var _el = el;
+      pendingModalAdjust = function(topOffset) {
+        // topOffset: 스크롤 0 기준으로 iframe의 페이지 내 top (= 헤더 높이)
+        var adjTop = Math.max(0, Math.min(topOffset, 120));
+        _el.style.top = adjTop + 'px';
+      };
+      // 500ms 후에도 iframeTop 안 오면 무시
+      setTimeout(function() { pendingModalAdjust = null; }, 500);
     }
   } catch(e) {}
 
   if (isGuideModal) {
-    // 가이드 모달: postParentHeight로 한번 더 정리
     try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
   }
 }
