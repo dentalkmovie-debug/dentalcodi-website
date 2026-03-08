@@ -13025,7 +13025,7 @@ app.get('/', (c) => {
 
   // 최대 5초간 100ms마다 폴링
   var n=0, t=setInterval(function(){ launch(); if(launched||++n&gt;=50){ clearInterval(t); if(!launched) frame.src=host+'/not-logged-in'; }}, 100);
-  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop') window.scrollTo({top:0,behavior:'smooth'}); });
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'smooth',block:'start'}); }catch(err){} } });
 })();
 &lt;/script&gt;</pre>
       <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
