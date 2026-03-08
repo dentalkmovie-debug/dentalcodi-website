@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
  * build-admin-css.cjs
- * src/index.tsx 전체를 스캔해서 실제 사용되는 Tailwind 클래스만 추출
- * → public/static/admin.css 에 저장 (Cloudflare Pages가 /static/admin.css 로 서빙)
- * → src/admin-styles.gen.css 에도 저장 (import 호환용 fallback)
+ * 1. src/index.tsx 전체를 스캔해서 실제 사용되는 Tailwind 클래스만 추출
+ *    → public/static/admin.css 에 저장
+ * 2. src/index.tsx 에서 @@ADMIN_JS_BEGIN@@ ~ @@ADMIN_JS_END@@ 사이 JS 추출
+ *    → public/static/admin.js 에 저장
+ *    → src/index.tsx 에서 해당 구간을 defer src 참조로 교체
  */
 const { execSync } = require('child_process')
 const fs = require('fs')
@@ -11,14 +13,14 @@ const path = require('path')
 
 const root = __dirname
 const srcFile = path.join(root, 'src/index.tsx')
-const outFileStatic = path.join(root, 'public/static/admin.css')
-const outFileSrc = path.join(root, 'src/admin-styles.gen.css')
+const outCssStatic = path.join(root, 'public/static/admin.css')
+const outCssSrc = path.join(root, 'src/admin-styles.gen.css')
+const outJs = path.join(root, 'public/static/admin.js')
 
-// 1. src/index.tsx 전체를 스캔 대상으로 사용
+// ── Step 1: CSS 빌드 ──────────────────────────────────────────
 const content = fs.readFileSync(srcFile, 'utf-8')
 fs.writeFileSync('/tmp/admin_scan.html', content)
 
-// 2. 최소 config (safelist 없이 실제 사용 클래스만)
 const twConfig = `
 module.exports = {
   content: ['/tmp/admin_scan.html'],
@@ -28,24 +30,45 @@ module.exports = {
 }
 `
 fs.writeFileSync('/tmp/tw_build_config.cjs', twConfig)
-
-// 3. input CSS
 fs.writeFileSync('/tmp/tw_input.css', '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n')
 
-// 4. Tailwind CLI 실행
 try {
   execSync(
-    'npx tailwindcss --config /tmp/tw_build_config.cjs -i /tmp/tw_input.css -o ' + outFileStatic + ' --minify',
+    'npx tailwindcss --config /tmp/tw_build_config.cjs -i /tmp/tw_input.css -o ' + outCssStatic + ' --minify',
     { cwd: root, stdio: 'pipe' }
   )
-  // src/admin-styles.gen.css 에도 복사 (import 호환)
-  fs.copyFileSync(outFileStatic, outFileSrc)
-  const size = fs.statSync(outFileStatic).size
-  console.log(`✅ Admin CSS: ${(size/1024).toFixed(1)}KB → public/static/admin.css (CDN 407KB 대비)`)
+  fs.copyFileSync(outCssStatic, outCssSrc)
+  const cssSize = fs.statSync(outCssStatic).size
+  console.log(`✅ Admin CSS: ${(cssSize/1024).toFixed(1)}KB → public/static/admin.css`)
 } catch (e) {
   console.error('❌ Tailwind build failed:', e.stderr?.toString() || e.message)
-  // 실패해도 빈 파일 생성 (빌드 중단 방지)
   const empty = '/* tailwind build failed */'
-  fs.writeFileSync(outFileStatic, empty)
-  fs.writeFileSync(outFileSrc, empty)
+  fs.writeFileSync(outCssStatic, empty)
+  fs.writeFileSync(outCssSrc, empty)
+}
+
+// ── Step 2: JS 추출 ──────────────────────────────────────────
+const BEGIN_MARKER = '// @@ADMIN_JS_BEGIN@@'
+const END_MARKER = '// @@ADMIN_JS_END@@'
+
+const beginIdx = content.indexOf(BEGIN_MARKER)
+const endIdx = content.indexOf(END_MARKER)
+
+if (beginIdx === -1 || endIdx === -1) {
+  console.warn('⚠️  ADMIN_JS markers not found – skipping JS extraction')
+} else {
+  // 마커 사이의 JS 내용 추출 (마커 줄 제외)
+  const jsContent = content.slice(beginIdx + BEGIN_MARKER.length, endIdx)
+    .replace(/^\n/, '') // 첫 빈 줄 제거
+
+  // 들여쓰기 4칸 제거 (template literal 안의 들여쓰기)
+  const dedentedJs = jsContent
+    .split('\n')
+    .map(line => line.startsWith('    ') ? line.slice(4) : line)
+    .join('\n')
+
+  fs.mkdirSync(path.dirname(outJs), { recursive: true })
+  fs.writeFileSync(outJs, dedentedJs)
+  const jsSize = fs.statSync(outJs).size
+  console.log(`✅ Admin JS:  ${(jsSize/1024).toFixed(1)}KB → public/static/admin.js`)
 }

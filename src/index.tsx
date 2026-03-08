@@ -2290,16 +2290,13 @@ app.get('/embed/:memberCode', async (c) => {
   ).bind(memberCode).first() as any
 
   if (existingUser) {
-    // 기존 사용자 → API 호출 없이 바로 관리자 페이지로
+    // 기존 사용자 → redirect 없이 handleAdminPage 직접 호출 (네트워크 왕복 1회 절약)
     const adminCode = existingUser.admin_code
     const rawEmail = normalizedEmail || existingUser.imweb_email || ''
     const finalEmail = ADMIN_EMAILS.includes(rawEmail) ? '' : rawEmail
     const isMasterAdmin = adminCode === 'master_admin'
     const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
-    const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
-    if (finalEmail) adminUrl.searchParams.set('email', finalEmail)
-    if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
-    return c.redirect(adminUrl.toString())
+    return handleAdminPage(c, adminCode, finalEmail, isAdminFlag)
   }
 
   // ── 신규 사용자: 아임웹 API로 이메일/이름 검증 후 계정 생성 ──
@@ -2373,10 +2370,8 @@ app.get('/embed/:memberCode', async (c) => {
   const finalEmail = ADMIN_EMAILS.includes(rawFinalEmail) ? '' : rawFinalEmail
   const isMasterAdmin = adminCode === 'master_admin'
   const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
-  const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
-  if (finalEmail) adminUrl.searchParams.set('email', finalEmail)
-  if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
-  return c.redirect(adminUrl.toString())
+  // 신규 사용자도 redirect 없이 직접 handleAdminPage 호출
+  return handleAdminPage(c, adminCode, finalEmail, isAdminFlag)
 })
 
 // 아임웹 임베드용 - 이전 코드 (사용하지 않음)
@@ -4135,14 +4130,14 @@ app.get('/embed-old/:memberCode', async (c) => {
   `)
 })
 
-// ============================================
-// 관리자 페이지 (직접 접속용 - 테스트/개발용)
-// ============================================
 
-app.get('/admin/:adminCode', async (c) => {
-  const adminCode = c.req.param('adminCode')
-  const isAdminQuery = c.req.query('is_admin') === '1'
-  let emailParam = normalizeEmail(c.req.query('email') || '')
+// ============================================
+// 관리자 페이지 통합 핸들러 함수
+// /admin/ 과 /embed/ 모두 이 함수를 직접 호출 (redirect 없음)
+// ============================================
+async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, isAdminFlagIn: boolean) {
+  let emailParam = normalizeEmail(emailParamIn)
+  const isAdminQuery = isAdminFlagIn
 
   try {
     // 사용자 조회
@@ -5475,7 +5470,11 @@ app.get('/admin/:adminCode', async (c) => {
     
     // 서버에서 미리 로드한 초기 데이터
     const INITIAL_DATA = ${initialDataJson};
-    
+  </script>
+  <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
+  <script defer src="/static/admin.js"></script>
+  <script>
+    // @@ADMIN_JS_BEGIN@@
     let clinicName = INITIAL_DATA.clinicName || '';
     let playlists = INITIAL_DATA.playlists || [];
     let notices = INITIAL_DATA.notices || [];
@@ -9860,6 +9859,7 @@ app.get('/admin/:adminCode', async (c) => {
     }
     
     init();
+    // @@ADMIN_JS_END@@
   </script>
 </body>
 </html>
@@ -9868,6 +9868,16 @@ app.get('/admin/:adminCode', async (c) => {
     console.error('Admin page error:', err)
     return c.html(getBlockedPageHtml('일시적인 오류가 발생했습니다', '관리자 페이지 로딩 중 문제가 발생했습니다.', '잠시 후 다시 시도해주세요.'))
   }
+}
+
+// ============================================
+// 관리자 페이지 (직접 접속용)
+// ============================================
+app.get('/admin/:adminCode', async (c) => {
+  const adminCode = c.req.param('adminCode')
+  const isAdminFlag = c.req.query('is_admin') === '1'
+  const emailParam = (c.req.query('email') || '').trim().toLowerCase()
+  return handleAdminPage(c, adminCode, emailParam, isAdminFlag)
 })
 
 // ============================================
