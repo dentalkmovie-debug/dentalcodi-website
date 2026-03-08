@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308p"></script>
+  <script defer src="/static/admin.js?v=20260308q"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6481,7 +6481,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   <button onclick="exportSelectedScripts()" class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 text-sm">
                     스크립트 다운로드
                   </button>
-                  <button onclick="downloadAutoRunScript()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 text-sm">
+                  <button onclick="downloadAutoRunScript(this)" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 text-sm">
                     설치 방법
                   </button>
                 </div>
@@ -9147,18 +9147,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     // 전체 자동 실행 스크립트 다운로드
-    function downloadAutoRunScript() {
+    // 모달용 선택 체어 저장 변수
+    var selectedChairsForModal = [];
+
+    function downloadAutoRunScript(btnEl) {
       if (playlists.length === 0) {
-        showToast('체어를 먼저 추가해주세요', 'error');
+        showToast('체어를 먼저 추가해주세요', 'error', 1200, btnEl);
         return;
       }
-      // 체어만 필터링
-      const chairs = playlists.filter(p => p.playlist_type === 'chair' || p.type === 'chair' || (!p.playlist_type && !p.type));
       const selected = getSelectedChairs();
       if (selected.length === 0) {
-        showToast('체어를 먼저 선택하세요', 'error');
+        showToast('체어를 먼저 선택하세요', 'error', 1200, btnEl);
         return;
       }
+      // 선택 체어를 전역에 저장해서 모달 안에서도 사용
+      selectedChairsForModal = selected;
       showScriptDownloadModal();
     }
     
@@ -9190,9 +9193,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       _showScriptModal(document.getElementById('script-download-modal'));
     }
     
-    // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
+    // 선택된 체어의 링크 복사
     function copyInstallLink() {
-      const selected = getSelectedChairs();
+      const selected = selectedChairsForModal.length > 0 ? selectedChairsForModal : getSelectedChairs();
       if (selected.length === 0) {
         showToast('체어를 선택해주세요', 'error');
         return;
@@ -9212,7 +9215,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     
     // 선택된 체어의 스크립트 다운로드
     function downloadInstallScript() {
-      const selected = getSelectedChairs();
+      const selected = selectedChairsForModal.length > 0 ? selectedChairsForModal : getSelectedChairs();
       const scriptType = document.querySelector('input[name="script-type"]:checked').value;
       
       if (selected.length === 0) {
@@ -10006,11 +10009,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       if (anchorEl) {
         var rect = anchorEl.getBoundingClientRect();
-        var bottomVal = window.innerHeight - rect.top + 60;
-        toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
+        // 버튼 바로 위에 표시 (top 기준)
+        var toastTop = Math.max(4, rect.top - 52);
+        toast.style.cssText = 'display:block;position:fixed;top:' + toastTop + 'px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:999999;';
       } else {
-        // iframePageTop: 위젯이 전달한 iframe의 페이지 내 top (= 아임웹 헤더 높이)
-        // position:fixed top값 = iframePageTop + 여백. iframePageTop이 없으면 80px
         var topPx = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop + 16 : 80;
         toast.style.cssText = 'display:block;position:fixed;top:' + topPx + 'px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:999999;';
       }
