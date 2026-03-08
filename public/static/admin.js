@@ -4409,17 +4409,24 @@ function closeModal(id) {
 }
 
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
     showToast('클립보드에 복사되었습니다.');
-  }).catch(() => {
-    const input = document.createElement('input');
-    input.value = text;
-    document.body.appendChild(input);
-    input.select();
-    document.execCommand('copy');
-    document.body.removeChild(input);
-    showToast('클립보드에 복사되었습니다.');
-  });
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('클립보드에 복사되었습니다.');
+    }).catch(fallback);
+  } else {
+    fallback();
+  }
 }
 
 function showToast(message, type = 'success', duration = 1200, anchorEl) {

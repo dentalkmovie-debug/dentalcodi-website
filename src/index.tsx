@@ -4796,7 +4796,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 대기실/체어 추가 모달 -->
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+    <div class="absolute inset-0 flex items-start justify-center p-4 pt-10 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308l"></script>
+  <script defer src="/static/admin.js?v=20260308m"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9965,17 +9965,24 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
+      function fallback() {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
         showToast('클립보드에 복사되었습니다.');
-      }).catch(() => {
-        const input = document.createElement('input');
-        input.value = text;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand('copy');
-        document.body.removeChild(input);
-        showToast('클립보드에 복사되었습니다.');
-      });
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('클립보드에 복사되었습니다.');
+        }).catch(fallback);
+      } else {
+        fallback();
+      }
     }
     
     function showToast(message, type = 'success', duration = 1200, anchorEl) {
