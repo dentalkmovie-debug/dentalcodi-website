@@ -4617,7 +4617,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center px-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center px-4 pt-10 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <!-- 헤더 -->
         <div class="px-4 py-3 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308k"></script>
+  <script defer src="/static/admin.js?v=20260308l"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
