@@ -4276,8 +4276,17 @@ app.get('/admin/:adminCode', async (c) => {
     .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
     .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
 
-    /* ── 안내 모달 공통: 스크롤 없이 화면에 딱 맞게 ── */
-    /* openModal JS에서 transform: scale()로 자동 축소 처리 */
+    /* ── 안내 모달(guide-url, script-download, tv-guide 등) 공통 ── */
+    /* zoom은 JS openModal에서 동적으로 적용 (visualViewport 기준)      */
+    /* 모달 박스 자체 overflow:visible → 스크롤 없이 zoom으로 축소       */
+    #tv-guide-modal .bg-white,
+    #script-download-modal .bg-white,
+    #shortcut-guide-modal .bg-white,
+    #autorun-guide-modal .bg-white,
+    #guide-url-modal .bg-white {
+      transform-origin: top center;
+      overflow: visible;
+    }
     @keyframes slideIn {
       from { transform: translateY(-100%); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
@@ -4687,7 +4696,7 @@ app.get('/admin/:adminCode', async (c) => {
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
           <p class="text-blue-100 text-sm mt-1">대기실 또는 체어를 추가하세요</p>
@@ -9692,81 +9701,73 @@ app.get('/admin/:adminCode', async (c) => {
     function openModal(id) {
       const el = document.getElementById(id);
       if (!el) return;
-      
-      // ── 방식: dashboard를 숨기고 모달을 인라인 풀스크린으로 표시 ──
-      // position:fixed 대신 일반 블록으로 전체 화면을 채움
-      // 이렇게 하면 imweb iframe 스크롤 문제와 무관하게 동작
-      
-      // 1. 대시보드 숨김
+
+      // 1. 대시보드 숨김 → iframe 높이가 줄어들어 실제 화면 높이에 근접
       const dashboard = document.getElementById('dashboard');
       if (dashboard) dashboard.style.display = 'none';
-      
-      // 2. 모달을 body에 이동 (이미 거기 있으면 그대로)
-      if (el.parentElement !== document.body && el.parentElement !== document.getElementById('app')) {
+
+      // 2. 모달을 body 직접 자식으로 이동
+      if (el.parentElement !== document.body) {
         document.body.appendChild(el);
       }
-      
-      // 3. 모달을 풀스크린으로 표시
-      el.style.display = 'flex';
-      el.style.position = 'fixed';
-      el.style.top = '0';
-      el.style.left = '0';
-      el.style.right = '0';
-      el.style.bottom = '0';
-      el.style.width = '100%';
-      el.style.height = '100vh';
-      el.style.minHeight = '100vh';
-      el.style.zIndex = '9999';
-      el.style.overflowY = '';
-      
-      // 4. 스크롤을 최상단으로
+
+      // 3. 모달 풀스크린 고정 표시
+      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
+
+      // 4. 스크롤 최상단 고정
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      
       document.body.classList.add('modal-open');
 
-      // 5. 내부 흰 박스(첫 번째 자식이 backdrop, 두 번째가 wrapper, 그 안에 박스)를 찾아
-      //    뷰포트보다 크면 scale()로 축소 → 스크롤 없이 전체 보임
-      requestAnimationFrame(() => {
-        // wrapper div (absolute inset-0 flex ...) 안에 있는 실제 콘텐츠 박스
-        const wrapper = el.querySelector('.absolute.inset-0.flex');
+      // 5. postParentHeight 호출 → imweb iframe 높이를 줄임
+      try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
+
+      // 6. 200ms 후 실제 뷰포트 높이 측정 → 모달 박스 zoom 조정
+      //    dashboard 숨김 + postParentHeight 후 imweb이 iframe을 줄이는 시간 필요
+      function applyZoom() {
+        const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
         const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-        if (box) {
-          // scale 초기화 후 자연 높이 측정
-          box.style.transform = '';
-          box.style.transformOrigin = '';
-          const boxH = box.scrollHeight;
-          const viewH = window.innerHeight;
-          const padding = 32; // 상하 16px씩
-          const available = viewH - padding;
-          if (boxH > available) {
-            const scale = available / boxH;
-            box.style.transform = 'scale(' + scale + ')';
+        if (!box) return;
+
+        box.style.zoom = '';
+        box.style.transform = '';
+        const boxH = box.scrollHeight;
+
+        // visualViewport.height 가 가장 정확한 실제 화면 높이
+        // imweb iframe 환경에서도 실제 보이는 영역 반환
+        const viewH = (window.visualViewport && window.visualViewport.height > 0)
+          ? window.visualViewport.height
+          : window.innerHeight;
+        const available = viewH - 32; // 16px 상하 여백
+
+        console.log('[modal] id=' + id + ' boxH=' + boxH + ' viewH=' + viewH + ' available=' + available);
+
+        if (boxH > available && available > 100) {
+          const scale = available / boxH;
+          // zoom 사용 (Chrome/Edge/Samsung Browser 지원, Firefox는 transform으로 폴백)
+          if (CSS.supports('zoom', '1')) {
+            box.style.zoom = scale.toFixed(4);
+          } else {
             box.style.transformOrigin = 'top center';
+            box.style.transform = 'scale(' + scale.toFixed(4) + ')';
           }
         }
-      });
+      }
+
+      setTimeout(applyZoom, 200);  // imweb iframe 리사이즈 대기
+      setTimeout(applyZoom, 500);  // 혹시 늦게 처리되는 경우 한 번 더
     }
 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
-        el.style.display = 'none';
-        el.style.position = '';
-        el.style.top = '';
-        el.style.left = '';
-        el.style.right = '';
-        el.style.bottom = '';
-        el.style.width = '';
-        el.style.height = '';
-        el.style.minHeight = '';
-        el.style.zIndex = '';
-        el.style.overflowY = '';
-        // scale 초기화
-        const wrapper = el.querySelector('.absolute.inset-0.flex');
+        // cssText로 일괄 초기화
+        el.style.cssText = 'display:none;';
+        // 모달 박스 zoom/transform 초기화
+        const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
         const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-        if (box) { box.style.transform = ''; box.style.transformOrigin = ''; }
+        if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
       }
       
       // 대시보드 복원 (열린 모달이 없을 때)
