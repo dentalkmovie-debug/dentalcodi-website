@@ -4911,7 +4911,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <div id="edit-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('edit-playlist-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] min-h-[600px] overflow-hidden pointer-events-auto flex flex-col">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="height:90vh;">
         <div class="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 id="edit-playlist-title" class="text-lg font-bold">플레이리스트 편집</h3>
           <button onclick="closeModal('edit-playlist-modal')" class="text-gray-400 hover:text-gray-600">
@@ -4979,7 +4979,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
             
             <!-- 라이브러리 목록 -->
-            <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto">
+            <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto" style="min-height:0;">
               <!-- 공용 영상 -->
               <div id="library-master-section" class="mb-4 hidden">
                 <div class="flex items-center gap-2 mb-2 text-sm">
@@ -5020,7 +5020,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               <p class="text-xs text-gray-500 mt-1">위에서부터 순서대로 재생됩니다</p>
             </div>
             
-            <div id="playlist-items-container" class="flex-1 overflow-y-auto p-4 space-y-2 border-t">
+            <div id="playlist-items-container" class="flex-1 overflow-y-auto p-4 space-y-2 border-t" style="min-height:0;">
               <div class="text-center py-8 text-gray-400 text-sm">
                 왼쪽 라이브러리에서 영상을 클릭하여 추가하세요
               </div>
@@ -9748,9 +9748,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const isGuideModal = GUIDE_MODALS.has(id);
 
       if (isGuideModal) {
-        // 가이드 모달: 기존 로직 (dashboard 숨김 + scroll + iframe 높이 조정)
+        // 가이드 모달: dashboard 숨김 + scroll
         const dashboard = document.getElementById('dashboard');
         if (dashboard) dashboard.style.display = 'none';
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       }
 
       // 모달을 body 직접 자식으로 이동
@@ -9760,30 +9763,25 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       // 모달 풀스크린 고정 표시
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
-
       document.body.classList.add('modal-open');
 
+      // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보
+      try {
+        if (window.parent && window.parent !== window) {
+          const needH = isGuideModal
+            ? (() => {
+                const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+                const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+                return Math.max(box ? box.scrollHeight + 80 : 650, 600);
+              })()
+            : Math.max(Math.round(window.screen.height * 0.92), 700); // 일반 모달: 화면 높이 기준
+          window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+        }
+      } catch(e) {}
+
       if (isGuideModal) {
-        // 스크롤 최상단 고정 (가이드 모달만)
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-
-        // postParentHeight 호출 → imweb iframe 높이를 줄임
+        // 가이드 모달: postParentHeight로 한번 더 정리
         try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
-
-        // iframe 높이를 모달이 충분히 보이도록 확장
-        setTimeout(() => {
-          try {
-            if (window.parent && window.parent !== window) {
-              const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-              const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-              const modalH = box ? box.scrollHeight + 80 : 650;
-              const sendH = Math.max(modalH, 600);
-              window.parent.postMessage({ type: 'setHeight', height: sendH }, '*');
-            }
-          } catch(e) {}
-        }, 100);
       }
     }
 

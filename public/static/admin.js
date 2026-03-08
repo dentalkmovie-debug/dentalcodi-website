@@ -4271,9 +4271,12 @@ function openModal(id) {
   const isGuideModal = GUIDE_MODALS.has(id);
 
   if (isGuideModal) {
-    // 가이드 모달: 기존 로직 (dashboard 숨김 + scroll + iframe 높이 조정)
+    // 가이드 모달: dashboard 숨김 + scroll
     const dashboard = document.getElementById('dashboard');
     if (dashboard) dashboard.style.display = 'none';
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }
 
   // 모달을 body 직접 자식으로 이동
@@ -4283,30 +4286,25 @@ function openModal(id) {
 
   // 모달 풀스크린 고정 표시
   el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
-
   document.body.classList.add('modal-open');
 
+  // 모든 모달: iframe 높이를 필요한 만큼 즉시 확보
+  try {
+    if (window.parent && window.parent !== window) {
+      const needH = isGuideModal
+        ? (() => {
+            const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+            const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+            return Math.max(box ? box.scrollHeight + 80 : 650, 600);
+          })()
+        : Math.max(Math.round(window.screen.height * 0.92), 700); // 일반 모달: 화면 높이 기준
+      window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+    }
+  } catch(e) {}
+
   if (isGuideModal) {
-    // 스크롤 최상단 고정 (가이드 모달만)
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-
-    // postParentHeight 호출 → imweb iframe 높이를 줄임
+    // 가이드 모달: postParentHeight로 한번 더 정리
     try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
-
-    // iframe 높이를 모달이 충분히 보이도록 확장
-    setTimeout(() => {
-      try {
-        if (window.parent && window.parent !== window) {
-          const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-          const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-          const modalH = box ? box.scrollHeight + 80 : 650;
-          const sendH = Math.max(modalH, 600);
-          window.parent.postMessage({ type: 'setHeight', height: sendH }, '*');
-        }
-      } catch(e) {}
-    }, 100);
   }
 }
 
