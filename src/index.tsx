@@ -2283,9 +2283,26 @@ app.get('/embed/:memberCode', async (c) => {
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
 
   const normalizedEmail = normalizeEmail(memberEmail)
-  // 이메일 없어도 member_code만으로 진행 (아임웹에서 이메일을 제공 안 할 수 있음)
 
-  // 아임웹 회원 이메일/회원코드 일치 검증
+  // ── 빠른 경로: DB에 이미 해당 member_code 사용자가 있으면 아임웹 API 완전 스킵 ──
+  const existingUser = await c.env.DB.prepare(
+    'SELECT * FROM users WHERE imweb_member_id = ?'
+  ).bind(memberCode).first() as any
+
+  if (existingUser) {
+    // 기존 사용자 → API 호출 없이 바로 관리자 페이지로
+    const adminCode = existingUser.admin_code
+    const rawEmail = normalizedEmail || existingUser.imweb_email || ''
+    const finalEmail = ADMIN_EMAILS.includes(rawEmail) ? '' : rawEmail
+    const isMasterAdmin = adminCode === 'master_admin'
+    const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
+    const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
+    if (finalEmail) adminUrl.searchParams.set('email', finalEmail)
+    if (isAdminFlag) adminUrl.searchParams.set('is_admin', '1')
+    return c.redirect(adminUrl.toString())
+  }
+
+  // ── 신규 사용자: 아임웹 API로 이메일/이름 검증 후 계정 생성 ──
   let imwebApiConfigured = false
   let imwebMemberValid = false
   let apiMemberName = ''
@@ -2322,28 +2339,14 @@ app.get('/embed/:memberCode', async (c) => {
     console.error('Imweb API error (embed):', e)
   }
 
-  // 아임웹 API로 이메일 조회 (이메일이 없는 경우)
   let resolvedEmail = normalizedEmail
   if (!resolvedEmail && imwebApiConfigured) {
-    // API에서 이미 registeredEmail을 가져왔으면 사용
-    // 단, ADMIN_EMAILS에 해당하는 경우 API 계정 이메일이 잘못 반환된 것이므로 사용하지 않음
     if (registeredEmail && !ADMIN_EMAILS.includes(registeredEmail)) {
       resolvedEmail = registeredEmail
     }
   }
 
-  if (!resolvedEmail) {
-    // 이메일 없으면 member_code만으로 DB 조회 (API 설정 여부 무관)
-    const dbUser = await c.env.DB.prepare(
-      'SELECT * FROM users WHERE imweb_member_id = ?'
-    ).bind(memberCode).first() as any
-    if (dbUser) {
-      resolvedEmail = dbUser.imweb_email || ''
-    }
-  }
-
   if (!imwebMemberValid && resolvedEmail) {
-    // 이메일이 있는데 아임웹 검증 실패 → DB에서 확인
     const dbUser = await c.env.DB.prepare(
       'SELECT * FROM users WHERE lower(imweb_email) = ? OR imweb_member_id = ?'
     ).bind(resolvedEmail, memberCode).first() as any
@@ -2359,21 +2362,15 @@ app.get('/embed/:memberCode', async (c) => {
   }
 
   const finalMemberName = apiMemberName || memberName
-  // 회원 코드로 사용자 조회/생성 (이메일 없어도 허용)
   const user = await getOrCreateUserByMemberCode(c.env.DB, memberCode, finalMemberName, resolvedEmail)
-  
+
   if (!user) {
     return c.html('<h1>오류가 발생했습니다.</h1>')
   }
-  
+
   const adminCode = (user as any).admin_code
-  // ADMIN_EMAILS에 해당하는 이메일은 URL에 포함하지 않음 (API 계정 이메일 오염 방지)
   const rawFinalEmail = resolvedEmail || (user as any).imweb_email || ''
   const finalEmail = ADMIN_EMAILS.includes(rawFinalEmail) ? '' : rawFinalEmail
-
-  // /login 거치지 않고 바로 관리자 페이지로 이동
-  // is_admin 플래그: URL 파라미터로 명시된 경우 OR master_admin 계정인 경우만
-  // 이메일 기반 admin 체크는 제거 (API 이메일이 admin 이메일과 겹칠 수 있음)
   const isMasterAdmin = adminCode === 'master_admin'
   const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
   const adminUrl = new URL('/admin/' + adminCode, new URL(c.req.url).origin)
@@ -4175,10 +4172,10 @@ app.get('/admin/:adminCode', async (c) => {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일이 일치하지 않습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
-    // email이 있고 DB에 없으면 저장 (단, ADMIN_EMAILS는 저장하지 않음)
+    // email이 있고 DB에 없으면 저장 (단, ADMIN_EMAILS는 저장하지 않음) - fire & forget (응답 지연 없음)
     if (emailParam && !user.imweb_email && !ADMIN_EMAILS.includes(emailParam)) {
-      await c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
-        .bind(emailParam, user.id).run()
+      c.env.DB.prepare('UPDATE users SET imweb_email = ? WHERE id = ?')
+        .bind(emailParam, user.id).run().catch(() => {})
     }
 
     // 계정 상태 확인 (정지 또는 구독 만료)
@@ -4216,16 +4213,15 @@ app.get('/admin/:adminCode', async (c) => {
     `).bind(finalUser?.id || 0).all(),
     c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? ORDER BY sort_order ASC, id DESC')
       .bind(finalUser?.id || 0).all(),
-    (async () => {
-      const masterUser = await c.env.DB.prepare('SELECT id FROM users WHERE is_master = 1').first() as any
-      if (!masterUser) return { results: [] }
-      const masterPlaylist = await c.env.DB.prepare(
-        'SELECT id FROM playlists WHERE user_id = ? AND is_master_playlist = 1'
-      ).bind(masterUser.id).first() as any
-      if (!masterPlaylist) return { results: [] }
-      return c.env.DB.prepare('SELECT * FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order')
-        .bind(masterPlaylist.id).all()
-    })()
+    // 3단계 직렬 쿼리 → 1개 JOIN 쿼리로 최적화 (DB 왕복 2→1회)
+    c.env.DB.prepare(`
+      SELECT pi.*
+      FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      JOIN users u ON p.user_id = u.id
+      WHERE u.is_master = 1 AND p.is_master_playlist = 1
+      ORDER BY pi.sort_order
+    `).all()
   ])
   
   const initialData = {
