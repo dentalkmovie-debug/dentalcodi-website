@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308j"></script>
+  <script defer src="/static/admin.js?v=20260308k"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9166,7 +9166,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // iframePageTop: 위젯에서 받은 iframe의 페이지 내 top (= 아임웹 헤더 높이)
       // 이 값만큼 top을 내려야 모달이 iframe 뷰포트 최상단에 표시됨
       var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
-      el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:center; justify-content:center;';
+      el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:40px; box-sizing:border-box;';
       document.body.classList.add('modal-open');
       // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
       try {
