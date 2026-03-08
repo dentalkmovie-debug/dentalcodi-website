@@ -4995,7 +4995,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 플레이리스트 편집 모달 -->
   <div id="edit-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('edit-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl overflow-hidden pointer-events-auto flex flex-col" style="height:90vh;">
         <div class="p-4 border-b flex justify-between items-center bg-gray-50">
           <h3 id="edit-playlist-title" class="text-lg font-bold">플레이리스트 편집</h3>
@@ -5439,7 +5439,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 임시 영상 전송 모달 -->
   <div id="temp-video-modal" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/50" onclick="closeModal('temp-video-modal')"></div>
-    <div class="absolute inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[600px] md:max-h-[80vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
+    <div class="absolute inset-4 md:inset-auto md:top-4 md:left-1/2 md:-translate-x-1/2 md:w-[600px] md:max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <div>
@@ -6954,15 +6954,25 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 재생목록 탭으로 초기화
       switchTempVideoTab('shared');
       
+      // ── 즉시 렌더링: masterItemsCache + playlists에서 items 사용 ──
       const cachedItems = tempVideoCacheByPlaylist[playlistId];
       if (cachedItems && cachedItems.length) {
+        // 캐시 우선
         tempVideoPlaylistItems = cachedItems;
+        renderTempVideoSharedList();
+      } else if (masterItemsCache && masterItemsCache.length > 0) {
+        // masterItemsCache로 즉시 렌더링 (API fetch 없이)
+        const basePlaylist = playlists.find(p => p.id == playlistId);
+        const userItems = (basePlaylist?.items || []).map(item => ({ ...item, is_master: false }));
+        const masterItemsWithFlag = masterItemsCache.map(item => ({ ...item, is_master: true }));
+        tempVideoPlaylistItems = [...masterItemsWithFlag, ...userItems];
+        tempVideoCacheByPlaylist[playlistId] = tempVideoPlaylistItems;
         renderTempVideoSharedList();
       } else {
         document.getElementById('temp-video-shared-list').innerHTML = '<div class="text-center py-4 text-gray-500">로딩 중...</div>';
       }
       
-      // 데이터 비동기 로드 (모달 열린 후)
+      // 백그라운드에서 최신 데이터 로드 (캐시 갱신 + 현재 전송 영상 확인)
       Promise.all([
         loadTempVideoPlaylistItems(playlistId),
         checkCurrentTempVideo(playlistId)

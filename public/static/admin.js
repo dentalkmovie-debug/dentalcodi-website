@@ -1392,15 +1392,25 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   // 재생목록 탭으로 초기화
   switchTempVideoTab('shared');
   
+  // ── 즉시 렌더링: masterItemsCache + playlists에서 items 사용 ──
   const cachedItems = tempVideoCacheByPlaylist[playlistId];
   if (cachedItems && cachedItems.length) {
+    // 캐시 우선
     tempVideoPlaylistItems = cachedItems;
+    renderTempVideoSharedList();
+  } else if (masterItemsCache && masterItemsCache.length > 0) {
+    // masterItemsCache로 즉시 렌더링 (API fetch 없이)
+    const basePlaylist = playlists.find(p => p.id == playlistId);
+    const userItems = (basePlaylist?.items || []).map(item => ({ ...item, is_master: false }));
+    const masterItemsWithFlag = masterItemsCache.map(item => ({ ...item, is_master: true }));
+    tempVideoPlaylistItems = [...masterItemsWithFlag, ...userItems];
+    tempVideoCacheByPlaylist[playlistId] = tempVideoPlaylistItems;
     renderTempVideoSharedList();
   } else {
     document.getElementById('temp-video-shared-list').innerHTML = '<div class="text-center py-4 text-gray-500">로딩 중...</div>';
   }
   
-  // 데이터 비동기 로드 (모달 열린 후)
+  // 백그라운드에서 최신 데이터 로드 (캐시 갱신 + 현재 전송 영상 확인)
   Promise.all([
     loadTempVideoPlaylistItems(playlistId),
     checkCurrentTempVideo(playlistId)
