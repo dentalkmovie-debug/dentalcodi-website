@@ -2062,21 +2062,14 @@ async function openPlaylistEditor(id) {
     if (typeof startMasterItemsAutoRefresh === 'function') {
       startMasterItemsAutoRefresh();
     }
-    // 3단계 API fetch는 캐시 업데이트용으로만 백그라운드에서 실행
-    // (다음 번 편집창 열 때 캐시 사용)
+    // 3단계 API fetch는 캐시 업데이트 전용 (재렌더링 없음)
+    // INITIAL_DATA가 이미 완전한 데이터를 포함하므로 화면 갱신 불필요
     fetch(API_BASE + '/playlists/' + id + '?ts=' + Date.now())
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data && data.playlist) {
+          // 캐시만 업데이트 (다음 번 편집창 열 때 사용)
           playlistCacheById[id] = data.playlist;
-          // 데이터가 변경된 경우만 재렌더링 (서명 비교)
-          const newSig = getPlaylistEditorSignature(masterItemsCache, data.playlist);
-          if (newSig !== playlistEditorSignature) {
-            currentPlaylist = data.playlist;
-            playlistEditorSignature = newSig;
-            renderLibraryAndPlaylist();
-            loadPlaylistOrder();
-          }
         }
       })
       .catch(() => {});
