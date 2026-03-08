@@ -1190,9 +1190,9 @@ app.get('/api/:adminCode/playlists', async (c) => {
       activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
     }
     // 서버에서 is_active 계산 (클라이언트 시간 오차 방지)
-    // last_active_at이 12초 이내면 사용중 (TV 3초 폴링 × 4배 여유)
+    // last_active_at이 30초 이내면 사용중 (TV 3초 폴링 × 10배 여유, D1 replica 지연 흡수)
     const isActiveNow = p.last_active_at
-      ? (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 12000
+      ? (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 30000
       : false
     return { ...p, items, activeItemIds, is_tv_active: isActiveNow }
   })
@@ -5567,7 +5567,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308x"></script>
+  <script defer src="/static/admin.js?v=20260308y"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
