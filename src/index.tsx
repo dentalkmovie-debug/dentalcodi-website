@@ -9724,44 +9724,56 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
     
+    // zoom이 필요한 가이드 모달 목록 (이것들만 dashboard 숨김 + scroll 처리)
+    const GUIDE_MODALS = new Set([
+      'tv-guide-modal', 'script-download-modal', 'shortcut-guide-modal',
+      'autorun-guide-modal', 'guide-url-modal', 'individual-install-modal'
+    ]);
+
     function openModal(id) {
       const el = document.getElementById(id);
       if (!el) return;
 
-      // 1. 대시보드 숨김 → iframe 높이가 줄어들어 실제 화면 높이에 근접
-      const dashboard = document.getElementById('dashboard');
-      if (dashboard) dashboard.style.display = 'none';
+      const isGuideModal = GUIDE_MODALS.has(id);
 
-      // 2. 모달을 body 직접 자식으로 이동
+      if (isGuideModal) {
+        // 가이드 모달: 기존 로직 (dashboard 숨김 + scroll + iframe 높이 조정)
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) dashboard.style.display = 'none';
+      }
+
+      // 모달을 body 직접 자식으로 이동
       if (el.parentElement !== document.body) {
         document.body.appendChild(el);
       }
 
-      // 3. 모달 풀스크린 고정 표시
+      // 모달 풀스크린 고정 표시
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
 
-      // 4. 스크롤 최상단 고정
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
       document.body.classList.add('modal-open');
 
-      // 5. postParentHeight 호출 → imweb iframe 높이를 줄임
-      try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
+      if (isGuideModal) {
+        // 스크롤 최상단 고정 (가이드 모달만)
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
 
-      // 6. iframe 높이를 모달이 충분히 보이도록 확장
-      setTimeout(() => {
-        try {
-          if (window.parent && window.parent !== window) {
-            // 모달 박스 실제 높이 측정
-            const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-            const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-            const modalH = box ? box.scrollHeight + 80 : 650; // 여백 포함
-            const sendH = Math.max(modalH, 600); // 최소 600px 보장
-            window.parent.postMessage({ type: 'setHeight', height: sendH }, '*');
-          }
-        } catch(e) {}
-      }, 100);
+        // postParentHeight 호출 → imweb iframe 높이를 줄임
+        try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
+
+        // iframe 높이를 모달이 충분히 보이도록 확장
+        setTimeout(() => {
+          try {
+            if (window.parent && window.parent !== window) {
+              const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
+              const box = wrapper ? wrapper.querySelector(':scope > div') : null;
+              const modalH = box ? box.scrollHeight + 80 : 650;
+              const sendH = Math.max(modalH, 600);
+              window.parent.postMessage({ type: 'setHeight', height: sendH }, '*');
+            }
+          } catch(e) {}
+        }, 100);
+      }
     }
 
     function closeModal(id) {
@@ -9775,19 +9787,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
       }
       
-      // 대시보드 복원 (열린 모달이 없을 때)
+      // 열린 모달이 없을 때 공통 처리
       const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"]');
       if (openModals.length === 0) {
-        const dashboard = document.getElementById('dashboard');
-        if (dashboard) dashboard.style.display = '';
         document.body.classList.remove('modal-open');
-        // iframe 높이 원상 복구
-        try {
-          if (window.parent && window.parent !== window) {
-            modalHeightLocked = false;
-            setTimeout(() => { if (typeof postParentHeight === 'function') postParentHeight(); }, 100);
-          }
-        } catch(e) {}
+
+        // 가이드 모달이 닫힐 때만 dashboard 복원 + iframe 높이 원상 복구
+        if (GUIDE_MODALS.has(id)) {
+          const dashboard = document.getElementById('dashboard');
+          if (dashboard) dashboard.style.display = '';
+          try {
+            if (window.parent && window.parent !== window) {
+              modalHeightLocked = false;
+              setTimeout(() => { if (typeof postParentHeight === 'function') postParentHeight(); }, 100);
+            }
+          } catch(e) {}
+        }
       }
       if (id === 'preview-modal') {
         document.getElementById('preview-iframe').src = '';
