@@ -11432,7 +11432,7 @@ app.get('/tv/:shortCode', async (c) => {
             if (vmEl) vmEl.style.display = 'none';
             // 에러 화면 표시
             document.getElementById('error-screen').style.display = 'flex';
-            document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다.\nTV를 다른 채널로 전환해주세요.';
+            document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.';
             // 폴링 계속하되 빈번하지 않게 (혹시 복구될 경우 대비)
           }
         }
