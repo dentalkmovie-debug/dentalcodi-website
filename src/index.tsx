@@ -4618,16 +4618,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto flex flex-col" style="max-height:92vh;">
         <!-- 헤더 -->
-        <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl">
+        <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex-shrink-0">
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-bold">유니트체어 모니터 설치 방법</h3>
             <button onclick="closeModal('script-download-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
           </div>
         </div>
 
-        <div class="p-4 space-y-3">
+        <div class="p-4 space-y-3 overflow-y-auto flex-1">
           <!-- 설치 단계 -->
           <div class="space-y-2">
             <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
