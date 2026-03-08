@@ -1086,32 +1086,39 @@ function getSelectedChairs() {
 function exportSelectedScripts() {
   const selected = getSelectedChairs();
   if (selected.length === 0) {
-    showToast('체어를 선택하세요', 'error', 3000, document.querySelector('[onclick="exportSelectedScripts()"]'));
+    showToast('체어를 선택하세요', 'error', 1200, document.querySelector('[onclick="exportSelectedScripts()"]'));
     return;
   }
   
-  // 형식 선택 모달 표시
-  const modal = document.createElement('div');
-  modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4';
-  modal.innerHTML = '<div class="absolute inset-0 bg-black/50" onclick="this.parentElement.remove()"></div>' +
-    '<div class="relative bg-white rounded-xl p-6 max-w-md w-full shadow-xl">' +
-      '<h3 class="text-lg font-bold mb-4"><i class="fas fa-download mr-2 text-indigo-500"></i>스크립트 다운로드</h3>' +
-      '<p class="text-sm text-gray-600 mb-4">선택된 ' + selected.length + '개 체어의 스크립트를 다운로드합니다.</p>' +
-      '<div class="grid grid-cols-2 gap-3">' +
-        '<button onclick="downloadSelectedBat(); this.closest(\'.fixed\').remove();" class="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 text-center">' +
-          '<i class="fas fa-file-code text-2xl mb-1"></i><br>' +
-          '<span class="font-bold">BAT 파일</span><br>' +
-          '<span class="text-xs text-blue-100">일반적인 경우</span>' +
+  // 형식 선택 모달 표시 - openModal 방식으로 body에 고정
+  var modal = document.getElementById('script-type-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'script-type-modal';
+    document.body.appendChild(modal);
+  }
+  modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'"></div>' +
+    '<div style="position:relative;background:white;border-radius:12px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<h3 style="font-size:17px;font-weight:700;margin-bottom:12px"><i class="fas fa-download" style="color:#6366f1;margin-right:8px"></i>스크립트 다운로드</h3>' +
+      '<p style="font-size:13px;color:#666;margin-bottom:16px">선택된 ' + selected.length + '개 체어의 스크립트를 다운로드합니다.</p>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<button onclick="downloadSelectedBat(); document.getElementById(\'script-type-modal\').style.display=\'none\'" style="background:#3b82f6;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
+          '<i class="fas fa-file-code" style="font-size:24px;display:block;margin-bottom:4px"></i>' +
+          '<span style="font-weight:700;display:block">BAT 파일</span>' +
+          '<span style="font-size:11px;color:#bfdbfe">일반적인 경우</span>' +
         '</button>' +
-        '<button onclick="downloadSelectedVbs(); this.closest(\'.fixed\').remove();" class="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 text-center">' +
-          '<i class="fas fa-shield-alt text-2xl mb-1"></i><br>' +
-          '<span class="font-bold">VBS 파일</span><br>' +
-          '<span class="text-xs text-green-100">백신 차단 시</span>' +
+        '<button onclick="downloadSelectedVbs(); document.getElementById(\'script-type-modal\').style.display=\'none\'" style="background:#22c55e;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
+          '<i class="fas fa-shield-alt" style="font-size:24px;display:block;margin-bottom:4px"></i>' +
+          '<span style="font-weight:700;display:block">VBS 파일</span>' +
+          '<span style="font-size:11px;color:#bbf7d0">백신 차단 시</span>' +
         '</button>' +
       '</div>' +
-      '<button onclick="this.closest(\'.fixed\').remove()" class="w-full mt-3 text-gray-500 text-sm hover:text-gray-700">취소</button>' +
+      '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
     '</div>';
-  document.body.appendChild(modal);
+  // 스크롤 최상단 이동 후 즉시 표시
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
 }
 
 // 선택된 체어 BAT 다운로드
