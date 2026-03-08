@@ -6653,7 +6653,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         modal.id = 'script-type-modal';
         document.body.appendChild(modal);
       }
-      modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
       modal.innerHTML = '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'"></div>' +
         '<div style="position:relative;background:white;border-radius:12px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
           '<h3 style="font-size:17px;font-weight:700;margin-bottom:12px"><i class="fas fa-download" style="color:#6366f1;margin-right:8px"></i>스크립트 다운로드</h3>' +
@@ -6672,9 +6671,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           '</div>' +
           '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
         '</div>';
-      // 스크롤 최상단 이동 후 즉시 표시
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
+      // 즉시 화면 중앙에 표시 (스크롤 대기 없음)
+      modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
     }
     
     // 선택된 체어 BAT 다운로드
@@ -9970,7 +9968,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         toast.style.position = 'fixed';
         toast.style.bottom = '';
         toast.style.transform = '';
-        toast.style.top = Math.max(8, rect.top - 52) + 'px';
+        toast.style.top = Math.max(8, rect.top - 56) + 'px';
         toast.style.left = rect.left + 'px';
         toast.style.right = '';
       } else {
