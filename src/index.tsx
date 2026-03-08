@@ -4216,16 +4216,15 @@ app.get('/admin/:adminCode', async (c) => {
     `).bind(finalUser?.id || 0).all(),
     c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? ORDER BY sort_order ASC, id DESC')
       .bind(finalUser?.id || 0).all(),
-    (async () => {
-      const masterUser = await c.env.DB.prepare('SELECT id FROM users WHERE is_master = 1').first() as any
-      if (!masterUser) return { results: [] }
-      const masterPlaylist = await c.env.DB.prepare(
-        'SELECT id FROM playlists WHERE user_id = ? AND is_master_playlist = 1'
-      ).bind(masterUser.id).first() as any
-      if (!masterPlaylist) return { results: [] }
-      return c.env.DB.prepare('SELECT * FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order')
-        .bind(masterPlaylist.id).all()
-    })()
+    // 3단계 직렬 쿼리 → 1개 JOIN 쿼리로 최적화 (속도 개선)
+    c.env.DB.prepare(`
+      SELECT pi.*
+      FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      JOIN users u ON p.user_id = u.id
+      WHERE u.is_master = 1 AND p.is_master_playlist = 1
+      ORDER BY pi.sort_order
+    `).all()
   ])
   
   const initialData = {
