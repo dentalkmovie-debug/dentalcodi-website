@@ -1,3 +1,8 @@
+// Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
+let sortableInstance = null;
+let playlistItemsSortableInstance = null;
+let noticeSortableInstance = null;
+
 let clinicName = INITIAL_DATA.clinicName || '';
 let playlists = INITIAL_DATA.playlists || [];
 let notices = INITIAL_DATA.notices || [];
@@ -73,7 +78,7 @@ function normalizePlaylistSearchValue(value) {
     .toString()
     .normalize('NFKC')
     .toLowerCase()
-    .replace(/\\s/g, '')
+    .replace(/\s/g, '')
     .replace(/[._-]/g, '');
 }
 
@@ -592,22 +597,22 @@ async function loadMasterItems() {
       return;
     }
     
-    container.innerHTML = items.map((item, idx) => \`
+    container.innerHTML = items.map((item, idx) => `
       <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-        <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm">\${idx + 1}</span>
-        <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 master-thumb-loading" data-item-id="\${item.id}" data-type="\${item.item_type}" data-url="\${item.url}">
-          \${item.thumbnail_url ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\` : 
-            \`<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-spinner fa-spin"></i></div>\`}
+        <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm">${idx + 1}</span>
+        <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 master-thumb-loading" data-item-id="${item.id}" data-type="${item.item_type}" data-url="${item.url}">
+          ${item.thumbnail_url ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">` : 
+            `<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-spinner fa-spin"></i></div>`}
         </div>
         <div class="flex-1 min-w-0">
-          <p class="font-medium text-gray-800 truncate" id="master-title-\${item.id}">\${item.title || item.url}</p>
-          <p class="text-xs text-gray-500">\${item.item_type.toUpperCase()}</p>
+          <p class="font-medium text-gray-800 truncate" id="master-title-${item.id}">${item.title || item.url}</p>
+          <p class="text-xs text-gray-500">${item.item_type.toUpperCase()}</p>
         </div>
-        <button onclick="masterDeleteItem(\${item.id})" class="text-red-500 hover:text-red-600 p-2">
+        <button onclick="masterDeleteItem(${item.id})" class="text-red-500 hover:text-red-600 p-2">
           <i class="fas fa-trash"></i>
         </button>
       </div>
-    \`).join('');
+    `).join('');
     
     loadMasterThumbnails();
   } catch (e) {
@@ -623,7 +628,7 @@ async function loadMasterThumbnails() {
     const url = el.dataset.url;
     
     if (type === 'vimeo') {
-      const match = url.match(/vimeo\\.com\\/(\\d+)/);
+      const match = url.match(/vimeo\.com\/(\d+)/);
       if (match) {
         try {
           const res = await fetch('/api/vimeo-thumbnail/' + match[1]);
@@ -638,7 +643,7 @@ async function loadMasterThumbnails() {
         }
       }
     } else if (type === 'youtube') {
-      const match = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([\\w-]+)/);
+      const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
       if (match) {
         el.innerHTML = '<img src="https://img.youtube.com/vi/' + match[1] + '/mqdefault.jpg" class="w-full h-full object-cover">';
       }
@@ -680,7 +685,7 @@ async function masterAddItem() {
 }
 
 async function masterDeleteItem(itemId) {
-  if (!confirm('이 동영상을 삭제하시겠습니까?\\n삭제하면 모든 치과에서 즉시 제거됩니다.')) return;
+  if (!confirm('이 동영상을 삭제하시겠습니까?\n삭제하면 모든 치과에서 즉시 제거됩니다.')) return;
   
   try {
     await fetch(MASTER_API + '/items/' + itemId, { method: 'DELETE' });
@@ -709,7 +714,7 @@ function renderPlaylists() {
   const container = document.getElementById('playlists-container');
   
   if (playlists.length === 0) {
-    container.innerHTML = \`
+    container.innerHTML = `
       <div class="bg-white rounded-xl shadow-sm p-8 text-center">
         <i class="fas fa-folder-open text-4xl text-gray-300 mb-4"></i>
         <p class="text-gray-500 mb-4">등록된 대기실/체어가 없습니다.</p>
@@ -717,7 +722,7 @@ function renderPlaylists() {
           <i class="fas fa-plus mr-2"></i>대기실/체어 추가
         </button>
       </div>
-    \`;
+    `;
     return;
   }
   
@@ -734,140 +739,140 @@ function renderPlaylists() {
     .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
   
   // 대기실/체어 분리하여 표시
-  container.innerHTML = \`
+  container.innerHTML = `
     <!-- =========================================================
          대기실 목록
          ========================================================= -->
-    \${waitingRooms.length > 0 ? \`
+    ${waitingRooms.length > 0 ? `
     <div class="mb-6">
       <h3 class="text-sm font-bold text-teal-600 mb-3 flex items-center">
-        <i class="fas fa-couch mr-2"></i>대기실 (\${waitingRooms.length}개)
+        <i class="fas fa-couch mr-2"></i>대기실 (${waitingRooms.length}개)
         <span class="ml-2 text-xs text-gray-400 font-normal">드래그하여 순서 변경</span>
       </h3>
       <div id="waitingroom-sortable-container" class="grid gap-3">
-        \${waitingRooms.map((p, idx) => {
+        ${waitingRooms.map((p, idx) => {
           const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 90000;
-          return \`
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-teal-400'}" 
-             id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
+          return `
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 ${isActive ? 'border-green-500' : 'border-teal-400'}" 
+             id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" draggable="true">
           <div class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 flex items-center justify-center text-gray-300 cursor-grab drag-handle">
                 <i class="fas fa-grip-vertical"></i>
               </div>
-              <div class="w-10 h-10 \${isActive ? 'bg-green-100' : 'bg-teal-100'} rounded-lg flex items-center justify-center relative">
-                <i class="fas fa-couch \${isActive ? 'text-green-500' : 'text-teal-500'}"></i>
-                \${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
+              <div class="w-10 h-10 ${isActive ? 'bg-green-100' : 'bg-teal-100'} rounded-lg flex items-center justify-center relative">
+                <i class="fas fa-couch ${isActive ? 'text-green-500' : 'text-teal-500'}"></i>
+                ${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
               </div>
               <div>
                 <h3 class="font-bold text-gray-800">
-                  \${p.name}
-                  \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                  \${!p.external_short_url ? '<span id="badge-setup-' + p.id + '" class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">TV 설정 필요</span>' : ''}
+                  ${p.name}
+                  ${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
+                  ${!p.external_short_url ? '<span id="badge-setup-' + p.id + '" class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">TV 설정 필요</span>' : ''}
                 </h3>
                 <p class="text-xs text-gray-500">
-                  <span class="text-teal-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
+                  <span class="text-teal-600 font-mono">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
                   <span class="mx-2">•</span>
-                  \${p.item_count || 0}개 미디어
+                  ${p.item_count || 0}개 미디어
                 </p>
               </div>
             </div>
             <div class="flex items-center gap-1">
-              <button onclick="openPlaylistEditor(\${p.id})" 
+              <button onclick="openPlaylistEditor(${p.id})" 
                 class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs">
                 플레이리스트
               </button>
-              <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
+              <button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" 
                 class="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded text-xs">
                 TV로 내보내기
               </button>
-              <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
+              <button onclick="copyToClipboard('${p.external_short_url || location.origin + '/' + p.short_code}')" 
                 class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded text-xs">
                 URL 복사
               </button>
-              <button onclick="deletePlaylist(\${p.id})" 
+              <button onclick="deletePlaylist(${p.id})" 
                 class="p-2 text-red-400 hover:text-red-600" title="삭제">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
         </div>
-        \`}).join('')}
+        `}).join('')}
       </div>
     </div>
-    \` : ''}
+    ` : ''}
     
     <!-- =========================================================
          체어 목록
          ========================================================= -->
-    \${chairs.length > 0 ? \`
+    ${chairs.length > 0 ? `
     <div class="mb-4">
       <h3 class="text-sm font-bold text-indigo-600 mb-3 flex items-center">
-        <i class="fas fa-tv mr-2"></i>체어 (\${chairs.length}개)
+        <i class="fas fa-tv mr-2"></i>체어 (${chairs.length}개)
         <span class="ml-2 text-xs text-gray-400 font-normal">드래그하여 순서 변경</span>
       </h3>
       <div id="chair-sortable-container" class="grid gap-3">
-        \${chairs.map((p, idx) => {
+        ${chairs.map((p, idx) => {
           const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 90000;
-          return \`
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-indigo-400'}" 
-             id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
+          return `
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 ${isActive ? 'border-green-500' : 'border-indigo-400'}" 
+             id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" draggable="true">
           <div class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 flex items-center justify-center text-gray-300 cursor-grab drag-handle">
                 <i class="fas fa-grip-vertical"></i>
               </div>
-              <div class="w-10 h-10 \${isActive ? 'bg-green-100' : 'bg-indigo-100'} rounded-lg flex items-center justify-center relative">
-                <i class="fas fa-tv \${isActive ? 'text-green-500' : 'text-indigo-500'}"></i>
-                \${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
-                <span id="temp-indicator-\${p.id}" class="hidden absolute -top-1 -left-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" title="임시 영상 재생 중"></span>
+              <div class="w-10 h-10 ${isActive ? 'bg-green-100' : 'bg-indigo-100'} rounded-lg flex items-center justify-center relative">
+                <i class="fas fa-tv ${isActive ? 'text-green-500' : 'text-indigo-500'}"></i>
+                ${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
+                <span id="temp-indicator-${p.id}" class="hidden absolute -top-1 -left-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" title="임시 영상 재생 중"></span>
               </div>
               <div>
                 <h3 class="font-bold text-gray-800">
-                  \${p.name}
-                  \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                  \${!p.last_active_at ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">체어 설치 필요</span>' : ''}
+                  ${p.name}
+                  ${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
+                  ${!p.last_active_at ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">체어 설치 필요</span>' : ''}
                 </h3>
                 <p class="text-xs text-gray-500">
-                  <span class="text-indigo-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
+                  <span class="text-indigo-600 font-mono">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
                   <span class="mx-2">•</span>
-                  \${p.item_count || 0}개 미디어
+                  ${p.item_count || 0}개 미디어
                 </p>
               </div>
             </div>
             <div class="flex items-center gap-1">
-              <button onclick="openPlaylistEditor(\${p.id})" 
+              <button onclick="openPlaylistEditor(${p.id})" 
                 class="px-3 py-1.5 w-[110px] bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs text-center">
                 플레이리스트
               </button>
-              <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
+              <button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" 
                 class="px-3 py-1.5 w-[110px] bg-green-50 hover:bg-green-100 text-green-600 rounded text-xs text-center">
                 TV로 내보내기
               </button>
-              <button onclick="showTempVideoModal(\${p.id}, '\${p.name}', '\${p.short_code}')" 
+              <button onclick="showTempVideoModal(${p.id}, '${p.name}', '${p.short_code}')" 
                 class="px-3 py-1.5 w-[110px] bg-orange-50 hover:bg-orange-100 text-orange-600 rounded text-xs text-center">
                 임시 영상 전송
               </button>
-              <button id="stop-temp-btn-\${p.id}" onclick="stopTempVideoForPlaylist(\${p.id})" 
+              <button id="stop-temp-btn-${p.id}" onclick="stopTempVideoForPlaylist(${p.id})" 
                 class="px-3 py-1.5 w-[110px] bg-gray-50 text-gray-600 border border-gray-200 rounded text-xs font-medium text-center cursor-not-allowed inline-flex items-center justify-center gap-1 opacity-100 visible whitespace-nowrap" aria-disabled="true">
                 <i class="fas fa-stop"></i>
                 <span>기본으로 복귀</span>
               </button>
-              <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
+              <button onclick="copyToClipboard('${p.external_short_url || location.origin + '/' + p.short_code}')" 
                 class="px-3 py-1.5 w-[110px] bg-gray-50 hover:bg-gray-100 text-gray-600 rounded text-xs text-center">
                 URL 복사
               </button>
-              <button onclick="deletePlaylist(\${p.id})" 
+              <button onclick="deletePlaylist(${p.id})" 
                 class="p-2 text-red-400 hover:text-red-600" title="삭제">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
         </div>
-        \`}).join('')}
+        `}).join('')}
       </div>
     </div>
-    \` : ''}
+    ` : ''}
     
     <!-- =========================================================
          초기 설정 섹션 (접기/펼치기)
@@ -889,17 +894,17 @@ function renderPlaylists() {
             <span class="text-xs text-gray-500">(PC 모니터 자동 실행)</span>
           </div>
           
-          \${chairs.length > 0 ? \`
+          ${chairs.length > 0 ? `
           <div class="bg-white rounded-lg p-4 border border-gray-200">
             <div class="flex flex-wrap gap-2 mb-3">
-              \${chairs.map(p => \`
+              ${chairs.map(p => `
                 <label class="flex items-center gap-2 bg-gray-100 hover:bg-indigo-50 px-3 py-2 rounded-lg cursor-pointer transition border border-gray-200">
-                  <input type="checkbox" class="chair-checkbox rounded text-indigo-500" data-id="\${p.id}" data-code="\${p.short_code}" data-name="\${p.name}">
-                  <span class="text-sm text-gray-700">\${p.name}</span>
-                  <span class="text-xs text-gray-400">(\${p.item_count || 0})</span>
-                  \${!p.last_active_at ? '<span class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded">미설치</span>' : '<span class="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded">연결됨</span>'}
+                  <input type="checkbox" class="chair-checkbox rounded text-indigo-500" data-id="${p.id}" data-code="${p.short_code}" data-name="${p.name}">
+                  <span class="text-sm text-gray-700">${p.name}</span>
+                  <span class="text-xs text-gray-400">(${p.item_count || 0})</span>
+                  ${!p.last_active_at ? '<span class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded">미설치</span>' : '<span class="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded">연결됨</span>'}
                 </label>
-              \`).join('')}
+              `).join('')}
             </div>
             <div class="flex flex-wrap gap-2">
               <button onclick="exportSelectedScripts()" class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 text-sm">
@@ -910,12 +915,12 @@ function renderPlaylists() {
               </button>
             </div>
           </div>
-          \` : \`
+          ` : `
           <div class="bg-white rounded-lg p-4 border border-gray-200 text-center text-gray-500">
             <i class="fas fa-info-circle mr-1"></i>
             등록된 체어가 없습니다. 위에서 체어를 추가하세요.
           </div>
-          \`}
+          `}
         </div>
         
         <!-- 대기실 설정 -->
@@ -926,34 +931,34 @@ function renderPlaylists() {
             <span class="text-xs text-gray-500">(스마트 TV 연결)</span>
           </div>
           
-          \${waitingRooms.length > 0 ? \`
+          ${waitingRooms.length > 0 ? `
           <div class="space-y-3">
-            \${waitingRooms.map(p => \`
+            ${waitingRooms.map(p => `
             <div class="bg-white rounded-lg p-4 border border-gray-200">
               <div class="flex items-center gap-2 mb-3">
-                <span class="font-medium text-gray-800">\${p.name}</span>
-                <span class="text-xs text-gray-400">(\${p.item_count || 0}개 미디어)</span>
+                <span class="font-medium text-gray-800">${p.name}</span>
+                <span class="text-xs text-gray-400">(${p.item_count || 0}개 미디어)</span>
               </div>
               
               <!-- URL 복사 -->
               <div class="flex items-center gap-2 mb-3">
-                <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
+                <input type="text" id="setting-url-${p.id}" value="${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
                   class="flex-1 bg-gray-100 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700 font-mono" readonly>
-                <button onclick="copySettingUrl(\${p.id})" 
+                <button onclick="copySettingUrl(${p.id})" 
                   class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm text-gray-600">
                   복사
                 </button>
-                \${!p.external_short_url ? \`
-                <button id="btn-shorten-\${p.id}" onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
+                ${!p.external_short_url ? `
+                <button id="btn-shorten-${p.id}" onclick="generateShortUrl(${p.id}, '${p.short_code}')" 
                   class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded text-sm">
                   단축 URL 생성
                 </button>
-                \` : ''}
+                ` : ''}
               </div>
               
               <!-- 사용법 안내 -->
               <div class="flex flex-wrap gap-2">
-                <button onclick="showTvExportModal(\${p.id}, '\${p.name}', '\${p.short_code}')"
+                <button onclick="showTvExportModal(${p.id}, '${p.name}', '${p.short_code}')"
                   class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded text-xs">
                   사용법 (URL 직접 입력)
                 </button>
@@ -963,19 +968,19 @@ function renderPlaylists() {
                 USB 인식 문제로 <strong>URL 직접 입력 방식</strong>만 제공합니다.
               </p>
             </div>
-            \`).join('')}
+            `).join('')}
           </div>
-          \` : \`
+          ` : `
           <div class="bg-white rounded-lg p-4 border border-gray-200 text-center text-gray-500">
             <i class="fas fa-info-circle mr-1"></i>
             등록된 대기실이 없습니다. 위에서 대기실을 추가하세요.
           </div>
-          \`}
+          `}
         </div>
         
       </div>
     </div>
-  \`;
+  `;
   
   // 임시 영상 상태 확인
   checkTempVideoStatus();
@@ -1086,18 +1091,18 @@ function exportSelectedScripts() {
       '<h3 class="text-lg font-bold mb-4"><i class="fas fa-download mr-2 text-indigo-500"></i>스크립트 다운로드</h3>' +
       '<p class="text-sm text-gray-600 mb-4">선택된 ' + selected.length + '개 체어의 스크립트를 다운로드합니다.</p>' +
       '<div class="grid grid-cols-2 gap-3">' +
-        '<button onclick="downloadSelectedBat(); this.closest(\\'.fixed\\').remove();" class="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 text-center">' +
+        '<button onclick="downloadSelectedBat(); this.closest(\'.fixed\').remove();" class="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 text-center">' +
           '<i class="fas fa-file-code text-2xl mb-1"></i><br>' +
           '<span class="font-bold">BAT 파일</span><br>' +
           '<span class="text-xs text-blue-100">일반적인 경우</span>' +
         '</button>' +
-        '<button onclick="downloadSelectedVbs(); this.closest(\\'.fixed\\').remove();" class="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 text-center">' +
+        '<button onclick="downloadSelectedVbs(); this.closest(\'.fixed\').remove();" class="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 text-center">' +
           '<i class="fas fa-shield-alt text-2xl mb-1"></i><br>' +
           '<span class="font-bold">VBS 파일</span><br>' +
           '<span class="text-xs text-green-100">백신 차단 시</span>' +
         '</button>' +
       '</div>' +
-      '<button onclick="this.closest(\\'.fixed\\').remove()" class="w-full mt-3 text-gray-500 text-sm hover:text-gray-700">취소</button>' +
+      '<button onclick="this.closest(\'.fixed\').remove()" class="w-full mt-3 text-gray-500 text-sm hover:text-gray-700">취소</button>' +
     '</div>';
   document.body.appendChild(modal);
 }
@@ -1108,41 +1113,41 @@ function downloadSelectedBat() {
   const today = new Date().toLocaleDateString('ko-KR');
   const chairNames = selected.map(p => p.name).join(', ');
   
-  let batContent = '@echo off\\n';
-  batContent += 'chcp 65001 > nul\\n';
-  batContent += 'REM =========================================================\\n';
-  batContent += 'REM 치과 TV 스크립트 (선택된 체어)\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM 생성일: ' + today + '\\n';
-  batContent += 'REM 체어 수: ' + selected.length + '개\\n';
-  batContent += 'REM 체어 목록: ' + chairNames + '\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [사용 방법]\\n';
-  batContent += 'REM 1. 이 파일을 더블클릭하면 선택된 체어의 크롬 창이 열립니다\\n';
-  batContent += 'REM 2. 열린 창을 해당 모니터로 드래그해서 배치하세요\\n';
-  batContent += 'REM 3. 화면을 클릭하면 전체화면 모드로 전환됩니다\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [자동 실행] Win+R -> shell:startup -> 이 파일 복사\\n';
-  batContent += 'REM =========================================================\\n\\n';
-  batContent += 'echo =========================================================\\n';
-  batContent += 'echo   치과 TV - ' + selected.length + '개 체어 실행\\n';
-  batContent += 'echo =========================================================\\n\\n';
+  let batContent = '@echo off\n';
+  batContent += 'chcp 65001 > nul\n';
+  batContent += 'REM =========================================================\n';
+  batContent += 'REM 치과 TV 스크립트 (선택된 체어)\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM 생성일: ' + today + '\n';
+  batContent += 'REM 체어 수: ' + selected.length + '개\n';
+  batContent += 'REM 체어 목록: ' + chairNames + '\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [사용 방법]\n';
+  batContent += 'REM 1. 이 파일을 더블클릭하면 선택된 체어의 크롬 창이 열립니다\n';
+  batContent += 'REM 2. 열린 창을 해당 모니터로 드래그해서 배치하세요\n';
+  batContent += 'REM 3. 화면을 클릭하면 전체화면 모드로 전환됩니다\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [자동 실행] Win+R -> shell:startup -> 이 파일 복사\n';
+  batContent += 'REM =========================================================\n\n';
+  batContent += 'echo =========================================================\n';
+  batContent += 'echo   치과 TV - ' + selected.length + '개 체어 실행\n';
+  batContent += 'echo =========================================================\n\n';
   
   selected.forEach((p, idx) => {
     const url = location.origin + '/' + p.code;
-    batContent += 'REM [' + (idx + 1) + '] ' + p.name + ': ' + url + '\\n';
-    batContent += 'echo [' + (idx + 1) + '/' + selected.length + '] ' + p.name + ' 실행...\\n';
-    batContent += 'start "" chrome --kiosk --new-window "' + url + '"\\n';
-    batContent += 'timeout /t 3 /nobreak > nul\\n\\n';
+    batContent += 'REM [' + (idx + 1) + '] ' + p.name + ': ' + url + '\n';
+    batContent += 'echo [' + (idx + 1) + '/' + selected.length + '] ' + p.name + ' 실행...\n';
+    batContent += 'start "" chrome --kiosk --new-window "' + url + '"\n';
+    batContent += 'timeout /t 3 /nobreak > nul\n\n';
   });
   
-  batContent += 'echo.\\n';
-  batContent += 'echo =========================================================\\n';
-  batContent += 'echo   모든 체어 화면 실행 완료!\\n';
-  batContent += 'echo =========================================================\\n';
-  batContent += 'timeout /t 5\\n';
+  batContent += 'echo.\n';
+  batContent += 'echo =========================================================\n';
+  batContent += 'echo   모든 체어 화면 실행 완료!\n';
+  batContent += 'echo =========================================================\n';
+  batContent += 'timeout /t 5\n';
   
-  const blob = new Blob([batContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([batContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;
@@ -1161,29 +1166,29 @@ function downloadSelectedVbs() {
   const today = new Date().toLocaleDateString('ko-KR');
   const chairNames = selected.map(p => p.name).join(', ');
   
-  let vbsContent = '\\'=========================================================\\n';
-  vbsContent += '\\' 치과 TV 스크립트 (선택된 체어)\\n';
-  vbsContent += '\\'---------------------------------------------------------\\n';
-  vbsContent += '\\' 생성일: ' + today + '\\n';
-  vbsContent += '\\' 체어 수: ' + selected.length + '개\\n';
-  vbsContent += '\\' 체어 목록: ' + chairNames + '\\n';
-  vbsContent += '\\'---------------------------------------------------------\\n';
-  vbsContent += '\\' [사용 방법]\\n';
-  vbsContent += '\\' 1. 이 파일을 더블클릭하면 선택된 체어의 크롬 창이 열립니다\\n';
-  vbsContent += '\\' 2. 열린 창을 해당 모니터로 드래그해서 배치하세요\\n';
-  vbsContent += '\\' [자동 실행] Win+R -> shell:startup -> 이 파일 복사\\n';
-  vbsContent += '\\' (백신이 BAT 파일 차단 시 이 VBS 파일 사용)\\n';
-  vbsContent += '\\'=========================================================\\n\\n';
-  vbsContent += 'Set WshShell = CreateObject("WScript.Shell")\\n\\n';
+  let vbsContent = '\'=========================================================\n';
+  vbsContent += '\' 치과 TV 스크립트 (선택된 체어)\n';
+  vbsContent += '\'---------------------------------------------------------\n';
+  vbsContent += '\' 생성일: ' + today + '\n';
+  vbsContent += '\' 체어 수: ' + selected.length + '개\n';
+  vbsContent += '\' 체어 목록: ' + chairNames + '\n';
+  vbsContent += '\'---------------------------------------------------------\n';
+  vbsContent += '\' [사용 방법]\n';
+  vbsContent += '\' 1. 이 파일을 더블클릭하면 선택된 체어의 크롬 창이 열립니다\n';
+  vbsContent += '\' 2. 열린 창을 해당 모니터로 드래그해서 배치하세요\n';
+  vbsContent += '\' [자동 실행] Win+R -> shell:startup -> 이 파일 복사\n';
+  vbsContent += '\' (백신이 BAT 파일 차단 시 이 VBS 파일 사용)\n';
+  vbsContent += '\'=========================================================\n\n';
+  vbsContent += 'Set WshShell = CreateObject("WScript.Shell")\n\n';
   
   selected.forEach((p, idx) => {
     const url = location.origin + '/' + p.code;
-    vbsContent += '\\' [' + (idx + 1) + '] ' + p.name + ': ' + url + '\\n';
-    vbsContent += 'WshShell.Run "chrome --kiosk --new-window ""' + url + '"""\\n';
-    vbsContent += 'WScript.Sleep 3000\\n\\n';
+    vbsContent += '\' [' + (idx + 1) + '] ' + p.name + ': ' + url + '\n';
+    vbsContent += 'WshShell.Run "chrome --kiosk --new-window ""' + url + '"""\n';
+    vbsContent += 'WScript.Sleep 3000\n\n';
   });
   
-  const blob = new Blob([vbsContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([vbsContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;
@@ -1203,9 +1208,9 @@ function copySelectedLinks() {
     showToast('복사할 체어를 선택하세요', 'error');
     return;
   }
-  const links = selected.map(p => p.name + ' TV: ' + location.origin + '/' + p.code).join('\\n');
+  const links = selected.map(p => p.name + ' TV: ' + location.origin + '/' + p.code).join('\n');
   navigator.clipboard.writeText(links);
-  showToast('📋 ' + selected.length + '개 체어 TV URL 복사됨\\n(각 체어 PC에서 이 URL을 열어주세요)');
+  showToast('📋 ' + selected.length + '개 체어 TV URL 복사됨\n(각 체어 PC에서 이 URL을 열어주세요)');
 }
 
 // 카카오톡으로 공유
@@ -1215,8 +1220,8 @@ function shareSelectedViaKakao() {
     showToast('공유할 체어를 선택하세요', 'error');
     return;
   }
-  const links = selected.map(p => p.name + ': ' + location.origin + '/' + p.code).join('\\n');
-  const text = '📺 체어 TV URL\\n\\n' + links + '\\n\\n각 체어 PC에서 해당 URL을 열어주세요.';
+  const links = selected.map(p => p.name + ': ' + location.origin + '/' + p.code).join('\n');
+  const text = '📺 체어 TV URL\n\n' + links + '\n\n각 체어 PC에서 해당 URL을 열어주세요.';
   
   // 클립보드에 복사
   navigator.clipboard.writeText(text).then(() => {
@@ -1227,7 +1232,7 @@ function shareSelectedViaKakao() {
       window.location.href = 'kakaotalk://';
     }
     // 복사 완료 메시지 표시
-    showToast('✅ 클립보드에 복사되었습니다!\\n카카오톡에서 Ctrl+V로 붙여넣기 하세요', 'success', 4000);
+    showToast('✅ 클립보드에 복사되었습니다!\n카카오톡에서 Ctrl+V로 붙여넣기 하세요', 'success', 4000);
   }).catch(() => {
     showToast('복사 실패', 'error');
   });
@@ -1240,8 +1245,8 @@ function shareSelectedViaSMS() {
     showToast('공유할 체어를 선택하세요', 'error');
     return;
   }
-  const links = selected.map(p => p.name + ': ' + location.origin + '/' + p.code).join('\\n');
-  const text = '체어 TV URL\\n' + links + '\\n\\n각 체어 PC에서 해당 URL을 열어주세요.';
+  const links = selected.map(p => p.name + ': ' + location.origin + '/' + p.code).join('\n');
+  const text = '체어 TV URL\n' + links + '\n\n각 체어 PC에서 해당 URL을 열어주세요.';
   window.location.href = 'sms:?body=' + encodeURIComponent(text);
 }
 
@@ -1469,7 +1474,7 @@ const normalizeSearchValue = (value) => {
     .normalize('NFKC');
 
   const stripped = base
-    .replace(/\\s/g, '')
+    .replace(/\s/g, '')
     .replace(/[._-]/g, '');
 
   return stripped.replace(/[^a-z0-9가-힣]/g, '');
@@ -1563,22 +1568,22 @@ function renderTempVideoItem(item, idx) {
     && Boolean(selectedTempVideoItem?.is_master) === Boolean(item.is_master);
   const itemData = JSON.stringify(item).replace(/"/g, '&quot;');
   
-  return \`
-    <div class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 transition \${isSelected ? 'bg-indigo-100' : ''}"
-      onclick="selectTempVideoItem(\${itemData})">
-      <input type="radio" name="temp-video-item" \${isSelected ? 'checked' : ''} class="text-indigo-600 flex-shrink-0">
-      <div class="w-10 h-10 \${item.is_master ? 'bg-purple-100' : 'bg-gray-100'} rounded overflow-hidden flex-shrink-0">
-        \${item.thumbnail_url 
-          ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-          : \`<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fab fa-\${item.item_type}"></i></div>\`
+  return `
+    <div class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 transition ${isSelected ? 'bg-indigo-100' : ''}"
+      onclick="selectTempVideoItem(${itemData})">
+      <input type="radio" name="temp-video-item" ${isSelected ? 'checked' : ''} class="text-indigo-600 flex-shrink-0">
+      <div class="w-10 h-10 ${item.is_master ? 'bg-purple-100' : 'bg-gray-100'} rounded overflow-hidden flex-shrink-0">
+        ${item.thumbnail_url 
+          ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+          : `<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fab fa-${item.item_type}"></i></div>`
         }
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm text-gray-800 truncate">\${item.title || item.url}</p>
+        <p class="text-sm text-gray-800 truncate">${item.title || item.url}</p>
       </div>
-      <span class="text-xs \${item.is_master ? 'text-purple-400' : 'text-gray-400'} flex-shrink-0">\${item.item_type}</span>
+      <span class="text-xs ${item.is_master ? 'text-purple-400' : 'text-gray-400'} flex-shrink-0">${item.item_type}</span>
     </div>
-  \`;
+  `;
 }
 
 // 영상 선택
@@ -2294,7 +2299,7 @@ async function saveScheduleSettings() {
   }
 }
 
-let sortableInstance = null;
+// sortableInstance는 JS 블록 상단에 선언됨
 
 async function renderPlaylistItems() {
   const container = document.getElementById('playlist-items-container');
@@ -2328,82 +2333,82 @@ async function renderPlaylistItems() {
   const hasMasterItems = masterItemsCache && masterItemsCache.length > 0;
   
   if (!hasUserItems && !hasMasterItems) {
-    container.innerHTML = \`
+    container.innerHTML = `
       <div class="bg-gray-50 rounded-lg p-8 text-center">
         <i class="fas fa-video text-3xl text-gray-300 mb-3"></i>
         <p class="text-gray-500">추가된 미디어가 없습니다.</p>
         <p class="text-sm text-gray-400 mt-1">위에서 YouTube 또는 Vimeo URL을 추가해주세요.</p>
       </div>
-    \`;
+    `;
     return;
   }
   
   // 공용 영상 HTML 생성 (맨 위에 표시, 수정 불가)
-  const masterItemsHtml = masterItemsCache.map((item, index) => \`
+  const masterItemsHtml = masterItemsCache.map((item, index) => `
     <div class="playlist-item bg-purple-50 rounded-lg p-4 flex items-center gap-4 border-l-4 border-purple-400" data-master="true">
       <div class="text-purple-300 p-2">
         <i class="fas fa-lock text-lg"></i>
       </div>
-      <span class="text-purple-400 font-bold w-6 text-center">\${index + 1}</span>
-      <div class="w-24 h-16 bg-purple-100 rounded overflow-hidden flex-shrink-0 editor-master-thumb" data-type="\${item.item_type}" data-url="\${item.url}">
-        \${item.thumbnail_url 
-          ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-          : \`<div class="w-full h-full flex items-center justify-center"><i class="fas fa-spinner fa-spin text-purple-400"></i></div>\`
+      <span class="text-purple-400 font-bold w-6 text-center">${index + 1}</span>
+      <div class="w-24 h-16 bg-purple-100 rounded overflow-hidden flex-shrink-0 editor-master-thumb" data-type="${item.item_type}" data-url="${item.url}">
+        ${item.thumbnail_url 
+          ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+          : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-spinner fa-spin text-purple-400"></i></div>`
         }
       </div>
       <div class="flex-1 min-w-0">
-        <p class="font-medium text-purple-800 truncate">\${item.title || item.url}</p>
+        <p class="font-medium text-purple-800 truncate">${item.title || item.url}</p>
         <p class="text-sm text-purple-500">
-          <i class="fab fa-\${item.item_type} mr-1"></i>\${item.item_type} · <span class="bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded text-xs">공용</span>
+          <i class="fab fa-${item.item_type} mr-1"></i>${item.item_type} · <span class="bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded text-xs">공용</span>
         </p>
       </div>
     </div>
-  \`).join('');
+  `).join('');
   
   // 내 영상 HTML 생성 (수정 가능)
-  const userItemsHtml = items.map((item, index) => \`
-    <div class="playlist-item bg-gray-50 rounded-lg p-4 flex items-center gap-4 \${item.item_type === 'image' ? 'border-l-4 border-green-400' : ''}" data-id="\${item.id}">
+  const userItemsHtml = items.map((item, index) => `
+    <div class="playlist-item bg-gray-50 rounded-lg p-4 flex items-center gap-4 ${item.item_type === 'image' ? 'border-l-4 border-green-400' : ''}" data-id="${item.id}">
       <div class="drag-handle text-gray-400 hover:text-gray-600 p-2 cursor-grab active:cursor-grabbing">
         <i class="fas fa-grip-vertical text-lg"></i>
       </div>
-      <span class="item-number text-gray-400 font-bold w-6 text-center">\${masterItemsCache.length + index + 1}</span>
-      <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 relative" id="thumb-\${item.id}">
-        \${item.item_type === 'image' 
-          ? \`<img src="\${item.url}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\\\'w-full h-full flex items-center justify-center bg-purple-100\\\\'><i class=\\\\'fas fa-image text-purple-400 text-xl\\\\'></i></div>'">\`
+      <span class="item-number text-gray-400 font-bold w-6 text-center">${masterItemsCache.length + index + 1}</span>
+      <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 relative" id="thumb-${item.id}">
+        ${item.item_type === 'image' 
+          ? `<img src="${item.url}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center bg-purple-100\\'><i class=\\'fas fa-image text-purple-400 text-xl\\'></i></div>'">`
           : (item.thumbnail_url && !item.thumbnail_url.includes('vimeo.com/') && !item.thumbnail_url.includes('youtube.com/'))
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/120x80?text=Video'">\`
-            : \`<div class="w-full h-full flex items-center justify-center thumb-loading" data-type="\${item.item_type}" data-url="\${item.url}" data-item-id="\${item.id}">
-                <i class="fas fa-spinner fa-spin \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'} text-xl"></i>
-              </div>\`
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/120x80?text=Video'">`
+            : `<div class="w-full h-full flex items-center justify-center thumb-loading" data-type="${item.item_type}" data-url="${item.url}" data-item-id="${item.id}">
+                <i class="fas fa-spinner fa-spin ${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'} text-xl"></i>
+              </div>`
         }
-        \${item.item_type === 'image' ? \`<div class="absolute bottom-0 right-0 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-tl">\${item.display_time}s</div>\` : ''}
+        ${item.item_type === 'image' ? `<div class="absolute bottom-0 right-0 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-tl">${item.display_time}s</div>` : ''}
       </div>
       <div class="flex-1 min-w-0">
-        <p class="font-medium text-gray-800 truncate" id="title-\${item.id}">\${item.title || (item.item_type === 'image' ? '이미지' : item.url)}</p>
-        <p class="text-sm \${item.item_type === 'image' ? 'text-green-500' : 'text-gray-500'}">
-          \${item.item_type === 'youtube' 
+        <p class="font-medium text-gray-800 truncate" id="title-${item.id}">${item.title || (item.item_type === 'image' ? '이미지' : item.url)}</p>
+        <p class="text-sm ${item.item_type === 'image' ? 'text-green-500' : 'text-gray-500'}">
+          ${item.item_type === 'youtube' 
             ? '<i class="fab fa-youtube text-red-500 mr-1"></i>YouTube'
             : item.item_type === 'vimeo'
               ? '<i class="fab fa-vimeo text-blue-400 mr-1"></i>Vimeo'
               : '<i class="fas fa-image text-green-400 mr-1"></i>이미지'
           }
-          \${item.item_type === 'image' ? \` · <i class="fas fa-clock mr-1"></i>\${item.display_time}초 표시\` : ''}
+          ${item.item_type === 'image' ? ` · <i class="fas fa-clock mr-1"></i>${item.display_time}초 표시` : ''}
         </p>
       </div>
-      \${item.item_type === 'image' ? \`
+      ${item.item_type === 'image' ? `
         <div class="flex items-center gap-2 bg-white border rounded-lg px-3 py-2">
           <i class="fas fa-clock text-green-400"></i>
-          <input type="number" value="\${item.display_time}" min="1" max="300"
+          <input type="number" value="${item.display_time}" min="1" max="300"
             class="w-16 px-2 py-1 border rounded text-center text-sm focus:ring-2 focus:ring-green-300"
-            onchange="updateItemDisplayTime(\${item.id}, this.value)">
+            onchange="updateItemDisplayTime(${item.id}, this.value)">
           <span class="text-sm text-gray-500">초</span>
         </div>
-      \` : ''}
-      <button onclick="deletePlaylistItem(\${item.id})" class="text-red-500 hover:text-red-600 p-2 hover:bg-red-50 rounded">
+      ` : ''}
+      <button onclick="deletePlaylistItem(${item.id})" class="text-red-500 hover:text-red-600 p-2 hover:bg-red-50 rounded">
         <i class="fas fa-trash"></i>
       </button>
     </div>
-  \`).join('');
+  `).join('');
   
   // 공용 영상이 있으면 구분선 추가
   if (hasMasterItems && hasUserItems) {
@@ -2442,24 +2447,24 @@ async function renderMasterItemsInEditor() {
     }
     
     section.classList.remove('hidden');
-    container.innerHTML = items.map((item, idx) => \`
+    container.innerHTML = items.map((item, idx) => `
       <div class="flex items-center gap-4 bg-white bg-opacity-70 p-4 rounded-lg border border-purple-200">
         <i class="fas fa-lock text-purple-300"></i>
-        <span class="text-purple-400 font-bold w-6 text-center">\${idx + 1}</span>
-        <div class="w-24 h-16 bg-purple-100 rounded overflow-hidden flex-shrink-0 editor-master-thumb" data-type="\${item.item_type}" data-url="\${item.url}">
-          \${item.thumbnail_url 
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-            : \`<div class="w-full h-full flex items-center justify-center"><i class="fas fa-spinner fa-spin text-purple-400"></i></div>\`
+        <span class="text-purple-400 font-bold w-6 text-center">${idx + 1}</span>
+        <div class="w-24 h-16 bg-purple-100 rounded overflow-hidden flex-shrink-0 editor-master-thumb" data-type="${item.item_type}" data-url="${item.url}">
+          ${item.thumbnail_url 
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-spinner fa-spin text-purple-400"></i></div>`
           }
         </div>
         <div class="flex-1 min-w-0">
-          <p class="font-medium text-purple-800 truncate">\${item.title || item.url}</p>
+          <p class="font-medium text-purple-800 truncate">${item.title || item.url}</p>
           <p class="text-sm text-purple-400">
-            <i class="fab fa-\${item.item_type} mr-1"></i>\${item.item_type} · 공용
+            <i class="fab fa-${item.item_type} mr-1"></i>${item.item_type} · 공용
           </p>
         </div>
       </div>
-    \`).join('');
+    `).join('');
     
     // 썸네일 자동 로드
     loadEditorMasterThumbnails();
@@ -2477,7 +2482,7 @@ async function loadEditorMasterThumbnails() {
     const url = el.dataset.url;
     
     if (type === 'vimeo') {
-      const match = url.match(/vimeo\\.com\\/(\\d+)/);
+      const match = url.match(/vimeo\.com\/(\d+)/);
       const videoId = match ? match[1] : null;
       if (videoId) {
         try {
@@ -2493,7 +2498,7 @@ async function loadEditorMasterThumbnails() {
         }
       }
     } else if (type === 'youtube') {
-      const match = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([\\w-]+)/);
+      const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
       const videoId = match ? match[1] : null;
       if (videoId) {
         el.innerHTML = '<img src="https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg" class="w-full h-full object-cover">';
@@ -2547,12 +2552,12 @@ async function loadMissingThumbnails() {
 }
 
 function extractVimeoIdFront(url) {
-  const m = url.match(/vimeo\\.com\\/(\\d+)/);
+  const m = url.match(/vimeo\.com\/(\d+)/);
   return m ? m[1] : null;
 }
 
 function extractYouTubeIdFront(url) {
-  const m = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/|youtube\\.com\\/embed\\/|youtube\\.com\\/shorts\\/)([^&\\n?#]+)/);
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\n?#]+)/);
   return m ? m[1] : null;
 }
 
@@ -2935,59 +2940,59 @@ async function renderLibraryAndPlaylist() {
   // 라이브러리: 공용 영상
   if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
     libraryMasterSection.classList.remove('hidden');
-    libraryMasterList.innerHTML = masterItemsCache.map(item => \`
+    libraryMasterList.innerHTML = masterItemsCache.map(item => `
       <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
-           data-library-id="\${item.id}" data-library-master="1"
-           onclick="addToPlaylistFromLibrary(\${item.id})">
+           data-library-id="${item.id}" data-library-master="1"
+           onclick="addToPlaylistFromLibrary(${item.id})">
         <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
-          \${item.thumbnail_url 
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-            : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-purple-400"></i></div>\`
+          ${item.thumbnail_url 
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-purple-400"></i></div>`
           }
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-xs font-medium text-purple-800 truncate">\${item.title || item.url}</p>
+          <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
           <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
         </div>
         <i class="fas fa-plus text-purple-400"></i>
       </div>
-    \`).join('');
+    `).join('');
   } else if (libraryMasterSection) {
     libraryMasterSection.classList.add('hidden');
   }
   
   // 라이브러리: 내 영상
   if (items.length > 0) {
-    libraryUserList.innerHTML = items.map(item => \`
-      <div class="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-blue-100 transition group" data-library-id="\${item.id}" data-library-master="0">
+    libraryUserList.innerHTML = items.map(item => `
+      <div class="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-blue-100 transition group" data-library-id="${item.id}" data-library-master="0">
         <div class="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 cursor-pointer"
-             onclick="addToPlaylistFromLibrary(\${item.id})">
-          \${item.item_type === 'image'
-            ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+             onclick="addToPlaylistFromLibrary(${item.id})">
+          ${item.item_type === 'image'
+            ? `<img src="${item.url}" class="w-full h-full object-cover">`
             : item.thumbnail_url 
-              ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-              : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>\`
+              ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+              : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} ${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>`
           }
         </div>
-        <div class="flex-1 min-w-0 cursor-pointer" data-item-id="\${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
-          <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600" title="클릭하여 제목 수정">\${item.title || item.url}</p>
+        <div class="flex-1 min-w-0 cursor-pointer" data-item-id="${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
+          <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600" title="클릭하여 제목 수정">${item.title || item.url}</p>
           <p class="text-xs text-gray-500">
-            \${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' : 
+            ${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' : 
               item.item_type === 'vimeo' ? '<i class="fab fa-vimeo text-blue-400"></i>' : 
               '<i class="fas fa-image text-green-400"></i>'}
             <i class="fas fa-pencil-alt ml-1 text-gray-400 text-xs"></i>
           </p>
         </div>
-        <button onclick="addToPlaylistFromLibrary(\${item.id})" 
+        <button onclick="addToPlaylistFromLibrary(${item.id})" 
                 class="text-gray-400 hover:text-blue-500 p-1" title="재생목록에 추가">
           <i class="fas fa-plus"></i>
         </button>
-        <button onclick="deletePlaylistItem(\${item.id})" 
+        <button onclick="deletePlaylistItem(${item.id})" 
                 class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100" title="삭제">
           <i class="fas fa-trash text-xs"></i>
         </button>
       </div>
-    \`).join('');
+    `).join('');
   } else {
     libraryUserList.innerHTML = '<div class="text-center py-4 text-gray-400 text-xs">영상을 추가하세요</div>';
   }
@@ -3009,30 +3014,30 @@ async function renderLibraryAndPlaylist() {
     return;
   }
   
-  playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-    <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-         data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
+  playlistContainer.innerHTML = playlistItems.map((item, index) => `
+    <div class="flex items-center gap-2 p-2 ${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}">
       <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
         <i class="fas fa-grip-vertical"></i>
       </div>
-      <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+      <span class="text-sm font-bold ${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
       <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-        \${item.item_type === 'image'
-          ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+        ${item.item_type === 'image'
+          ? `<img src="${item.url}" class="w-full h-full object-cover">`
           : item.thumbnail_url 
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-            : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-gray-400"></i></div>\`
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-gray-400"></i></div>`
         }
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
+        <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
       </div>
-      <button onclick="removeFromPlaylist('\${item.id}')" 
+      <button onclick="removeFromPlaylist('${item.id}')" 
               class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
         <i class="fas fa-times"></i>
       </button>
     </div>
-  \`).join('');
+  `).join('');
   
   // Sortable 초기화 (플레이리스트 에디터 내 영상 순서)
   initPlaylistItemsSortable();
@@ -3057,30 +3062,30 @@ function _renderPlaylistOnly() {
     playlistContainer.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">왼쪽 라이브러리에서 영상을 클릭하여 추가하세요</div>';
     return;
   }
-  playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-    <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-         data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
+  playlistContainer.innerHTML = playlistItems.map((item, index) => `
+    <div class="flex items-center gap-2 p-2 ${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}">
       <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
         <i class="fas fa-grip-vertical"></i>
       </div>
-      <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+      <span class="text-sm font-bold ${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
       <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-        \${item.item_type === 'image'
-          ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+        ${item.item_type === 'image'
+          ? `<img src="${item.url}" class="w-full h-full object-cover">`
           : item.thumbnail_url
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-            : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-gray-400"></i></div>\`
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-gray-400"></i></div>`
         }
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
+        <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
       </div>
-      <button onclick="removeFromPlaylist('\${item.id}')"
+      <button onclick="removeFromPlaylist('${item.id}')"
               class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
         <i class="fas fa-times"></i>
       </button>
     </div>
-  \`).join('');
+  `).join('');
   initPlaylistItemsSortable();
 }
 
@@ -3119,57 +3124,57 @@ function renderLibraryOnly() {
 
   if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
     libraryMasterSection.classList.remove('hidden');
-    libraryMasterList.innerHTML = masterItemsCache.map(item => \`
+    libraryMasterList.innerHTML = masterItemsCache.map(item => `
       <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
-           data-library-id="\${item.id}" data-library-master="1"
-           onclick="addToPlaylistFromLibrary(\${item.id})">
+           data-library-id="${item.id}" data-library-master="1"
+           onclick="addToPlaylistFromLibrary(${item.id})">
         <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
-          \${item.thumbnail_url
-            ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-            : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} text-purple-400"></i></div>\`
+          ${item.thumbnail_url
+            ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-purple-400"></i></div>`
           }
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-xs font-medium text-purple-800 truncate">\${item.title || item.url}</p>
+          <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
           <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
         </div>
         <i class="fas fa-plus text-purple-400"></i>
       </div>
-    \`).join('');
+    `).join('');
   } else if (libraryMasterSection) {
     libraryMasterSection.classList.add('hidden');
   }
 
   if (items.length > 0 && libraryUserList) {
-    libraryUserList.innerHTML = items.map(item => \`
-      <div class="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-blue-100 transition group" data-library-id="\${item.id}" data-library-master="0">
+    libraryUserList.innerHTML = items.map(item => `
+      <div class="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-blue-100 transition group" data-library-id="${item.id}" data-library-master="0">
         <div class="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0 cursor-pointer"
-             onclick="addToPlaylistFromLibrary(\${item.id})">
-          \${item.item_type === 'image'
-            ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
+             onclick="addToPlaylistFromLibrary(${item.id})">
+          ${item.item_type === 'image'
+            ? `<img src="${item.url}" class="w-full h-full object-cover">`
             : item.thumbnail_url
-              ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\`
-              : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>\`
+              ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+              : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} ${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>`
           }
         </div>
-        <div class="flex-1 min-w-0 cursor-pointer" data-item-id="\${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
-          <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600">\${item.title || item.url}</p>
+        <div class="flex-1 min-w-0 cursor-pointer" data-item-id="${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
+          <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600">${item.title || item.url}</p>
           <p class="text-xs text-gray-500">
-            \${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' :
+            ${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' :
               item.item_type === 'vimeo' ? '<i class="fab fa-vimeo text-blue-400"></i>' :
               '<i class="fas fa-image text-green-400"></i>'}
           </p>
         </div>
-        <button onclick="addToPlaylistFromLibrary(\${item.id})"
+        <button onclick="addToPlaylistFromLibrary(${item.id})"
                 class="text-gray-400 hover:text-blue-500 p-1" title="재생목록에 추가">
           <i class="fas fa-plus"></i>
         </button>
-        <button onclick="deletePlaylistItem(\${item.id})"
+        <button onclick="deletePlaylistItem(${item.id})"
                 class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100" title="삭제">
           <i class="fas fa-trash text-xs"></i>
         </button>
       </div>
-    \`).join('');
+    `).join('');
   }
   _updateLibraryPlusButtons();
 }
@@ -3211,8 +3216,7 @@ async function editItemTitleById(itemId) {
   }
 }
 
-// 플레이리스트 에디터 내 영상 순서 Sortable 초기화
-let playlistItemsSortableInstance = null;
+// 플레이리스트 에디터 내 영상 순서 Sortable 초기화 (playlistItemsSortableInstance는 JS 블록 상단에 선언됨)
 function initPlaylistItemsSortable() {
   const container = document.getElementById('playlist-items-container');
   if (playlistItemsSortableInstance) {
@@ -3297,7 +3301,7 @@ async function shortenUrl(playlistId, currentCode) {
     return;
   }
   
-  if (!confirm('URL을 5자리로 단축하시겠습니까?\\n기존 URL(' + currentCode + ')은 더 이상 작동하지 않습니다.')) {
+  if (!confirm('URL을 5자리로 단축하시겠습니까?\n기존 URL(' + currentCode + ')은 더 이상 작동하지 않습니다.')) {
     return;
   }
   
@@ -3415,7 +3419,7 @@ function downloadBookmark(name, url, shortCode, variant = 'universal') {
     '  <p class="note">파일이 TV에서 열리지 않으면 <strong>단축 URL을 직접 입력</strong>해 주세요.</p>',
     '</body>',
     '</html>'
-  ].join('\\n');
+  ].join('\n');
 
   const blob = new Blob(['\ufeff' + bookmarkHtmlTv], { type: 'text/html;charset=utf-8' });
   const downloadUrl = URL.createObjectURL(blob);
@@ -3428,7 +3432,7 @@ function downloadBookmark(name, url, shortCode, variant = 'universal') {
   document.body.removeChild(a);
   URL.revokeObjectURL(downloadUrl);
   
-  showToast('📁 TV 전용 HTML(.htm) 다운로드 완료!\\nUSB에 복사 후 TV에서 열기');
+  showToast('📁 TV 전용 HTML(.htm) 다운로드 완료!\nUSB에 복사 후 TV에서 열기');
 }
 
 // =========================================================
@@ -3439,19 +3443,19 @@ function downloadBookmark(name, url, shortCode, variant = 'universal') {
 function downloadUrlFile(name, url) {
   const today = new Date().toLocaleDateString('ko-KR');
   // Windows 인터넷 바로가기 형식 (.url)
-  let urlContent = '[InternetShortcut]\\n';
-  urlContent += 'URL=' + url + '\\n';
-  urlContent += '; =========================================================\\n';
-  urlContent += '; 치과 TV URL 바로가기 - ' + name + '\\n';
-  urlContent += '; 생성일: ' + today + '\\n';
-  urlContent += '; ---------------------------------------------------------\\n';
-  urlContent += '; [사용 방법]\\n';
-  urlContent += '; 1. 이 파일을 USB에 복사\\n';
-  urlContent += '; 2. TV USB 포트에 연결\\n';
-  urlContent += '; 3. TV 파일 탐색기에서 이 파일 실행\\n';
-  urlContent += '; =========================================================\\n';
+  let urlContent = '[InternetShortcut]\n';
+  urlContent += 'URL=' + url + '\n';
+  urlContent += '; =========================================================\n';
+  urlContent += '; 치과 TV URL 바로가기 - ' + name + '\n';
+  urlContent += '; 생성일: ' + today + '\n';
+  urlContent += '; ---------------------------------------------------------\n';
+  urlContent += '; [사용 방법]\n';
+  urlContent += '; 1. 이 파일을 USB에 복사\n';
+  urlContent += '; 2. TV USB 포트에 연결\n';
+  urlContent += '; 3. TV 파일 탐색기에서 이 파일 실행\n';
+  urlContent += '; =========================================================\n';
   
-  const blob = new Blob([urlContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([urlContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3462,7 +3466,7 @@ function downloadUrlFile(name, url) {
   document.body.removeChild(a);
   URL.revokeObjectURL(downloadUrl);
   
-  showToast('📁 URL 바로가기 다운로드 완료!\\nUSB에 복사 후 TV에서 열기');
+  showToast('📁 URL 바로가기 다운로드 완료!\nUSB에 복사 후 TV에서 열기');
 }
 
 // =========================================================
@@ -3562,11 +3566,11 @@ function copyInstallLink() {
   const selected = getSelectedChairs();
   if (selected.length === 0) {
     // 선택된 체어가 없으면 모든 체어 URL 복사
-    const links = playlists.map(p => location.origin + '/' + p.short_code).join('\\n');
+    const links = playlists.map(p => location.origin + '/' + p.short_code).join('\n');
     navigator.clipboard.writeText(links);
     showToast('전체 URL 복사됨 (' + playlists.length + '개)');
   } else {
-    const links = selected.map(c => location.origin + '/' + c.code).join('\\n');
+    const links = selected.map(c => location.origin + '/' + c.code).join('\n');
     navigator.clipboard.writeText(links);
     showToast(selected.length + '개 URL 복사됨');
   }
@@ -3594,26 +3598,26 @@ function downloadInstallScript() {
 function downloadSingleScript(shortCode, name) {
   const today = new Date().toLocaleDateString('ko-KR');
   const url = location.origin + '/' + shortCode;
-  let batContent = '@echo off\\n';
-  batContent += 'chcp 65001 > nul\\n';
-  batContent += 'REM =========================================================\\n';
-  batContent += 'REM 치과 TV 개별 스크립트 - ' + name + '\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM 생성일: ' + today + '\\n';
-  batContent += 'REM URL: ' + url + '\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [사용 방법]\\n';
-  batContent += 'REM 1. 이 파일을 더블클릭하면 크롬 전체화면이 열립니다\\n';
-  batContent += 'REM 2. ESC 키로 전체화면 해제, 화면 클릭으로 다시 전체화면\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [자동 실행 설정]\\n';
-  batContent += 'REM Win+R -> shell:startup -> 이 파일을 복사\\n';
-  batContent += 'REM PC 부팅 시 자동으로 TV 화면이 실행됩니다\\n';
-  batContent += 'REM =========================================================\\n\\n';
-  batContent += 'echo ' + name + ' TV 화면을 실행합니다...\\n';
-  batContent += 'start "" chrome --kiosk "' + url + '"\\n';
+  let batContent = '@echo off\n';
+  batContent += 'chcp 65001 > nul\n';
+  batContent += 'REM =========================================================\n';
+  batContent += 'REM 치과 TV 개별 스크립트 - ' + name + '\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM 생성일: ' + today + '\n';
+  batContent += 'REM URL: ' + url + '\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [사용 방법]\n';
+  batContent += 'REM 1. 이 파일을 더블클릭하면 크롬 전체화면이 열립니다\n';
+  batContent += 'REM 2. ESC 키로 전체화면 해제, 화면 클릭으로 다시 전체화면\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [자동 실행 설정]\n';
+  batContent += 'REM Win+R -> shell:startup -> 이 파일을 복사\n';
+  batContent += 'REM PC 부팅 시 자동으로 TV 화면이 실행됩니다\n';
+  batContent += 'REM =========================================================\n\n';
+  batContent += 'echo ' + name + ' TV 화면을 실행합니다...\n';
+  batContent += 'start "" chrome --kiosk "' + url + '"\n';
   
-  const blob = new Blob([batContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([batContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3641,8 +3645,8 @@ function showIndividualInstall() {
           '<span class="font-bold text-orange-800">' + p.name + '</span>' +
         '</div>' +
         '<div class="flex gap-1">' +
-          '<button onclick="downloadSingleScript(\\'' + p.short_code + '\\', \\'' + p.name + '\\')" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600">BAT</button>' +
-          '<button onclick="downloadSingleVbs(\\'' + p.short_code + '\\', \\'' + p.name + '\\')" class="bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">VBS</button>' +
+          '<button onclick="downloadSingleScript(\'' + p.short_code + '\', \'' + p.name + '\')" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600">BAT</button>' +
+          '<button onclick="downloadSingleVbs(\'' + p.short_code + '\', \'' + p.name + '\')" class="bg-green-500 text-white text-xs px-3 py-1 rounded hover:bg-green-600">VBS</button>' +
         '</div>' +
       '</div>' +
       '<p class="text-xs text-gray-500 mt-2 break-all">' + url + '</p>' +
@@ -3656,22 +3660,22 @@ function showIndividualInstall() {
 function downloadSingleVbs(shortCode, name) {
   const today = new Date().toLocaleDateString('ko-KR');
   const url = location.origin + '/' + shortCode;
-  let vbsContent = "'=========================================================\\n";
-  vbsContent += "' 치과 TV 개별 스크립트 - " + name + "\\n";
-  vbsContent += "'---------------------------------------------------------\\n";
-  vbsContent += "' 생성일: " + today + "\\n";
-  vbsContent += "' URL: " + url + "\\n";
-  vbsContent += "'---------------------------------------------------------\\n";
-  vbsContent += "' [사용 방법]\\n";
-  vbsContent += "' 1. 이 파일을 더블클릭하면 크롬 전체화면이 열립니다\\n";
-  vbsContent += "' 2. ESC 키로 전체화면 해제, 화면 클릭으로 다시 전체화면\\n";
-  vbsContent += "'---------------------------------------------------------\\n";
-  vbsContent += "' [자동 실행 설정] Win+R -> shell:startup -> 이 파일 복사\\n";
-  vbsContent += "' (백신이 BAT 파일 차단 시 이 VBS 파일 사용)\\n";
-  vbsContent += "'=========================================================\\n\\n";
-  vbsContent += 'CreateObject("WScript.Shell").Run "chrome --kiosk ""' + url + '"""\\n';
+  let vbsContent = "'=========================================================\n";
+  vbsContent += "' 치과 TV 개별 스크립트 - " + name + "\n";
+  vbsContent += "'---------------------------------------------------------\n";
+  vbsContent += "' 생성일: " + today + "\n";
+  vbsContent += "' URL: " + url + "\n";
+  vbsContent += "'---------------------------------------------------------\n";
+  vbsContent += "' [사용 방법]\n";
+  vbsContent += "' 1. 이 파일을 더블클릭하면 크롬 전체화면이 열립니다\n";
+  vbsContent += "' 2. ESC 키로 전체화면 해제, 화면 클릭으로 다시 전체화면\n";
+  vbsContent += "'---------------------------------------------------------\n";
+  vbsContent += "' [자동 실행 설정] Win+R -> shell:startup -> 이 파일 복사\n";
+  vbsContent += "' (백신이 BAT 파일 차단 시 이 VBS 파일 사용)\n";
+  vbsContent += "'=========================================================\n\n";
+  vbsContent += 'CreateObject("WScript.Shell").Run "chrome --kiosk ""' + url + '"""\n';
   
-  const blob = new Blob([vbsContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([vbsContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3695,46 +3699,46 @@ function downloadNetworkManageBat() {
   const today = new Date().toLocaleDateString('ko-KR');
   const chairs = playlists;
   
-  let batContent = '@echo off\\n';
-  batContent += 'chcp 65001 > nul\\n';
-  batContent += 'REM =========================================================\\n';
-  batContent += 'REM 치과 TV 통합 관리 스크립트 (로컬 네트워크)\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM 생성일: ' + today + '\\n';
-  batContent += 'REM 체어 수: ' + chairs.length + '개\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [이 스크립트의 용도]\\n';
-  batContent += 'REM - 데스크 PC에서 모든 체어 TV URL을 한번에 열기\\n';
-  batContent += 'REM - 모니터링 및 테스트 용도\\n';
-  batContent += 'REM ---------------------------------------------------------\\n';
-  batContent += 'REM [실제 운영 시 주의]\\n';
-  batContent += 'REM - 실제로는 각 체어 PC에 개별 스크립트 설치 필요\\n';
-  batContent += 'REM - 이 스크립트는 데스크 PC에서 확인용\\n';
-  batContent += 'REM =========================================================\\n\\n';
-  batContent += 'echo =========================================================\\n';
-  batContent += 'echo   치과 TV 통합 관리 - 로컬 네트워크 모드\\n';
-  batContent += 'echo   ' + chairs.length + '개 체어 화면을 확인합니다...\\n';
-  batContent += 'echo =========================================================\\n\\n';
+  let batContent = '@echo off\n';
+  batContent += 'chcp 65001 > nul\n';
+  batContent += 'REM =========================================================\n';
+  batContent += 'REM 치과 TV 통합 관리 스크립트 (로컬 네트워크)\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM 생성일: ' + today + '\n';
+  batContent += 'REM 체어 수: ' + chairs.length + '개\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [이 스크립트의 용도]\n';
+  batContent += 'REM - 데스크 PC에서 모든 체어 TV URL을 한번에 열기\n';
+  batContent += 'REM - 모니터링 및 테스트 용도\n';
+  batContent += 'REM ---------------------------------------------------------\n';
+  batContent += 'REM [실제 운영 시 주의]\n';
+  batContent += 'REM - 실제로는 각 체어 PC에 개별 스크립트 설치 필요\n';
+  batContent += 'REM - 이 스크립트는 데스크 PC에서 확인용\n';
+  batContent += 'REM =========================================================\n\n';
+  batContent += 'echo =========================================================\n';
+  batContent += 'echo   치과 TV 통합 관리 - 로컬 네트워크 모드\n';
+  batContent += 'echo   ' + chairs.length + '개 체어 화면을 확인합니다...\n';
+  batContent += 'echo =========================================================\n\n';
   
   chairs.forEach((p, index) => {
     const url = location.origin + '/' + p.short_code;
-    batContent += 'REM ' + (index + 1) + '. ' + p.name + '\\n';
-    batContent += 'REM TV URL: ' + url + '\\n';
-    batContent += 'echo [' + (index + 1) + '/' + chairs.length + '] ' + p.name + ' 열기...\\n';
-    batContent += 'start "" chrome --new-window "' + url + '"\\n';
-    batContent += 'timeout /t 2 /nobreak > nul\\n\\n';
+    batContent += 'REM ' + (index + 1) + '. ' + p.name + '\n';
+    batContent += 'REM TV URL: ' + url + '\n';
+    batContent += 'echo [' + (index + 1) + '/' + chairs.length + '] ' + p.name + ' 열기...\n';
+    batContent += 'start "" chrome --new-window "' + url + '"\n';
+    batContent += 'timeout /t 2 /nobreak > nul\n\n';
   });
   
-  batContent += 'echo.\\n';
-  batContent += 'echo =========================================================\\n';
-  batContent += 'echo   모든 TV 화면이 열렸습니다!\\n';
-  batContent += 'echo   각 창에서 TV 화면을 확인하세요.\\n';
-  batContent += 'echo =========================================================\\n';
+  batContent += 'echo.\n';
+  batContent += 'echo =========================================================\n';
+  batContent += 'echo   모든 TV 화면이 열렸습니다!\n';
+  batContent += 'echo   각 창에서 TV 화면을 확인하세요.\n';
+  batContent += 'echo =========================================================\n';
   
-  batContent += 'echo.\\n';
-  batContent += 'pause\\n';
+  batContent += 'echo.\n';
+  batContent += 'pause\n';
   
-  const blob = new Blob([batContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([batContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3755,7 +3759,7 @@ function downloadNetworkManageHtml() {
   // 체어 정보를 텍스트로 생성
   let chairList = chairs.map((p, idx) => {
     return (idx + 1) + '. ' + p.name + ' - ' + location.origin + '/' + p.short_code;
-  }).join('\\n');
+  }).join('\n');
   
   // 간단한 HTML 생성
   const html = [
@@ -3782,8 +3786,8 @@ function downloadNetworkManageHtml() {
 
 // 카카오톡 공유
 function shareViaKakao() {
-  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\\n');
-  const text = '📺 치과 TV 링크\\n\\n' + links;
+  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\n');
+  const text = '📺 치과 TV 링크\n\n' + links;
   
   // 카카오톡 URL scheme (모바일 앱 열기)
   const kakaoUrl = 'kakaotalk://msg/text/' + encodeURIComponent(text);
@@ -3805,8 +3809,8 @@ function shareViaKakao() {
 
 // 문자 공유
 function shareViaSMS() {
-  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\\n');
-  const text = '치과 TV 링크\\n' + links;
+  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\n');
+  const text = '치과 TV 링크\n' + links;
   
   // SMS URL scheme
   window.location.href = 'sms:?body=' + encodeURIComponent(text);
@@ -3814,9 +3818,9 @@ function shareViaSMS() {
 
 // 이메일 공유
 function shareViaEmail() {
-  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\\n');
+  const links = playlists.map(p => p.name + ': ' + location.origin + '/' + p.short_code).join('\n');
   const subject = '치과 TV 체어별 링크';
-  const body = '안녕하세요,\\n\\n치과 TV 체어별 링크입니다:\\n\\n' + links + '\\n\\n각 체어 PC에서 해당 링크를 열어주세요.';
+  const body = '안녕하세요,\n\n치과 TV 체어별 링크입니다:\n\n' + links + '\n\n각 체어 PC에서 해당 링크를 열어주세요.';
   
   const mailUrl = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   window.open(mailUrl);
@@ -3848,17 +3852,17 @@ function printLinkSheet() {
 
 // BAT 파일 다운로드 (키오스크 모드)
 function downloadBatScript() {
-  let batContent = '@echo off\\n';
-  batContent += 'chcp 65001 > nul\\n';
-  batContent += 'echo 치과 TV 자동 실행 중...\\n';
+  let batContent = '@echo off\n';
+  batContent += 'chcp 65001 > nul\n';
+  batContent += 'echo 치과 TV 자동 실행 중...\n';
   
   playlists.forEach((p, index) => {
     const url = location.origin + '/' + p.short_code;
-    batContent += 'start "" chrome --kiosk --new-window "' + url + '"\\n';
-    batContent += 'timeout /t 3 /nobreak > nul\\n';
+    batContent += 'start "" chrome --kiosk --new-window "' + url + '"\n';
+    batContent += 'timeout /t 3 /nobreak > nul\n';
   });
   
-  const blob = new Blob([batContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([batContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3880,11 +3884,11 @@ function downloadVbsScript() {
   
   playlists.forEach((p, index) => {
     const url = location.origin + '/' + p.short_code;
-    vbsContent += 'CreateObject("WScript.Shell").Run "chrome --kiosk --new-window ""' + url + '"""\\n';
-    vbsContent += 'WScript.Sleep 3000\\n';
+    vbsContent += 'CreateObject("WScript.Shell").Run "chrome --kiosk --new-window ""' + url + '"""\n';
+    vbsContent += 'WScript.Sleep 3000\n';
   });
   
-  const blob = new Blob([vbsContent.replace(/\\\\n/g, '\\r\\n')], { type: 'text/plain' });
+  const blob = new Blob([vbsContent.replace(/\\n/g, '\r\n')], { type: 'text/plain' });
   const downloadUrl = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
@@ -3900,11 +3904,7 @@ function downloadVbsScript() {
   showAutoRunGuide();
 }
 
-// 바로가기 생성 안내
-function showShortcutGuide() {
-  closeModal('script-download-modal');
-  openModal('shortcut-guide-modal');
-}
+// 바로가기 생성 안내 (showShortcutGuide는 8841줄에 정의됨)
 
 // 자동 실행 가이드 모달
 function showAutoRunGuide() {
@@ -3963,7 +3963,7 @@ async function loadNotices() {
   }
 }
 
-let noticeSortableInstance = null;
+// noticeSortableInstance는 JS 블록 상단에 선언됨
 
 function renderNotices() {
   const container = document.getElementById('notices-container');
@@ -3975,13 +3975,13 @@ function renderNotices() {
   }
   
   if (notices.length === 0) {
-    container.innerHTML = \`
+    container.innerHTML = `
       <div class="bg-white rounded-xl shadow-sm p-8 text-center">
         <i class="fas fa-bullhorn text-4xl text-gray-300 mb-4"></i>
         <p class="text-gray-500">공지사항이 없습니다.</p>
         <p class="text-sm text-gray-400 mt-2">새 공지사항을 추가해보세요.</p>
       </div>
-    \`;
+    `;
     return;
   }
   
@@ -3993,16 +3993,16 @@ function renderNotices() {
   
   // 긴급공지 섹션
   if (urgentNotices.length > 0) {
-    html += \`
+    html += `
       <div class="mb-4">
         <h4 class="text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
-          <i class="fas fa-exclamation-circle"></i>긴급공지 (\${urgentNotices.length}개)
+          <i class="fas fa-exclamation-circle"></i>긴급공지 (${urgentNotices.length}개)
         </h4>
         <div class="bg-red-50 rounded-xl p-3 space-y-2">
-    \`;
+    `;
     urgentNotices.forEach((n, index) => {
-      html += \`
-        <div class="notice-item bg-white rounded-lg p-3 border-l-4 border-red-500" data-id="\${n.id}">
+      html += `
+        <div class="notice-item bg-white rounded-lg p-3 border-l-4 border-red-500" data-id="${n.id}">
           <div class="flex items-center justify-between">
             <div class="notice-drag-handle text-gray-400 hover:text-gray-600 p-1 cursor-grab active:cursor-grabbing mr-2">
               <i class="fas fa-grip-vertical"></i>
@@ -4010,80 +4010,80 @@ function renderNotices() {
             <div class="flex-1">
               <div class="flex items-center gap-2 mb-1">
                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600">긴급</span>
-                <span class="px-2 py-0.5 rounded text-xs font-medium \${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
-                  \${n.is_active ? '✓ TV에 표시중' : '숨김'}
+                <span class="px-2 py-0.5 rounded text-xs font-medium ${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
+                  ${n.is_active ? '✓ TV에 표시중' : '숨김'}
                 </span>
               </div>
-              <p class="text-gray-800 whitespace-pre-wrap">\${n.content}</p>
+              <p class="text-gray-800 whitespace-pre-wrap">${n.content}</p>
             </div>
             <div class="flex items-center gap-1 ml-4">
-              <button onclick="toggleUrgent(\${n.id}, 0)"
+              <button onclick="toggleUrgent(${n.id}, 0)"
                 class="px-2 py-1 rounded text-xs bg-red-100 text-red-600 hover:bg-red-200">
                 긴급해제
               </button>
-              <button onclick="toggleNotice(\${n.id}, \${n.is_active ? 0 : 1})"
-                class="px-2 py-1 rounded text-xs \${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
-                \${n.is_active ? '숨기기' : '표시'}
+              <button onclick="toggleNotice(${n.id}, ${n.is_active ? 0 : 1})"
+                class="px-2 py-1 rounded text-xs ${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
+                ${n.is_active ? '숨기기' : '표시'}
               </button>
-              <button onclick="editNotice(\${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
+              <button onclick="editNotice(${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
                 수정
               </button>
-              <button onclick="deleteNotice(\${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
+              <button onclick="deleteNotice(${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
         </div>
-      \`;
+      `;
     });
-    html += \`</div></div>\`;
+    html += `</div></div>`;
   }
   
   // 일반공지 섹션
   if (normalNotices.length > 0) {
-    html += \`
+    html += `
       <div>
         <h4 class="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2">
-          <i class="fas fa-bullhorn"></i>일반공지 (\${normalNotices.length}개)
+          <i class="fas fa-bullhorn"></i>일반공지 (${normalNotices.length}개)
         </h4>
         <div class="space-y-2">
-    \`;
+    `;
     normalNotices.forEach((n, index) => {
-      html += \`
-        <div class="notice-item bg-white rounded-xl shadow-sm p-3" data-id="\${n.id}">
+      html += `
+        <div class="notice-item bg-white rounded-xl shadow-sm p-3" data-id="${n.id}">
           <div class="flex items-center justify-between">
             <div class="notice-drag-handle text-gray-400 hover:text-gray-600 p-1 cursor-grab active:cursor-grabbing mr-2">
               <i class="fas fa-grip-vertical"></i>
             </div>
             <div class="flex-1">
               <div class="flex items-center gap-2 mb-1">
-                <span class="px-2 py-0.5 rounded text-xs font-medium \${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
-                  \${n.is_active ? '✓ TV에 표시중' : '숨김'}
+                <span class="px-2 py-0.5 rounded text-xs font-medium ${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
+                  ${n.is_active ? '✓ TV에 표시중' : '숨김'}
                 </span>
               </div>
-              <p class="text-gray-800 whitespace-pre-wrap">\${n.content}</p>
+              <p class="text-gray-800 whitespace-pre-wrap">${n.content}</p>
             </div>
             <div class="flex items-center gap-1 ml-4">
-              <button onclick="toggleUrgent(\${n.id}, 1)"
+              <button onclick="toggleUrgent(${n.id}, 1)"
                 class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-500 hover:bg-gray-200">
                 긴급설정
               </button>
-              <button onclick="toggleNotice(\${n.id}, \${n.is_active ? 0 : 1})"
-                class="px-2 py-1 rounded text-xs \${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
-                \${n.is_active ? '숨기기' : '표시'}
+              <button onclick="toggleNotice(${n.id}, ${n.is_active ? 0 : 1})"
+                class="px-2 py-1 rounded text-xs ${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
+                ${n.is_active ? '숨기기' : '표시'}
               </button>
-              <button onclick="editNotice(\${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
+              <button onclick="editNotice(${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
                 수정
               </button>
-              <button onclick="deleteNotice(\${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
+              <button onclick="deleteNotice(${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
           </div>
         </div>
-      \`;
+      `;
     });
-    html += \`</div></div>\`;
+    html += `</div></div>`;
   }
   
   container.innerHTML = html;
@@ -4343,9 +4343,9 @@ function showToast(message, type = 'success', duration = 3000) {
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
   
-  toastMessage.innerHTML = message.replace(/\\n/g, '<br>');
+  toastMessage.innerHTML = message.replace(/\n/g, '<br>');
   toast.style.display = 'block';
-  toast.querySelector('div').className = \`\${type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast\`;
+  toast.querySelector('div').className = `${type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast`;
   
   setTimeout(() => {
     toast.style.display = 'none';

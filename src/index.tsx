@@ -5475,6 +5475,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <script defer src="/static/admin.js"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
+    // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
+    let sortableInstance = null;
+    let playlistItemsSortableInstance = null;
+    let noticeSortableInstance = null;
+    
     let clinicName = INITIAL_DATA.clinicName || '';
     let playlists = INITIAL_DATA.playlists || [];
     let notices = INITIAL_DATA.notices || [];
@@ -7771,7 +7776,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
     
-    let sortableInstance = null;
+    // sortableInstance는 JS 블록 상단에 선언됨
     
     async function renderPlaylistItems() {
       const container = document.getElementById('playlist-items-container');
@@ -8688,8 +8693,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
     
-    // 플레이리스트 에디터 내 영상 순서 Sortable 초기화
-    let playlistItemsSortableInstance = null;
+    // 플레이리스트 에디터 내 영상 순서 Sortable 초기화 (playlistItemsSortableInstance는 JS 블록 상단에 선언됨)
     function initPlaylistItemsSortable() {
       const container = document.getElementById('playlist-items-container');
       if (playlistItemsSortableInstance) {
@@ -9377,11 +9381,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       showAutoRunGuide();
     }
     
-    // 바로가기 생성 안내
-    function showShortcutGuide() {
-      closeModal('script-download-modal');
-      openModal('shortcut-guide-modal');
-    }
+    // 바로가기 생성 안내 (showShortcutGuide는 8841줄에 정의됨)
     
     // 자동 실행 가이드 모달
     function showAutoRunGuide() {
@@ -9440,7 +9440,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
     
-    let noticeSortableInstance = null;
+    // noticeSortableInstance는 JS 블록 상단에 선언됨
     
     function renderNotices() {
       const container = document.getElementById('notices-container');

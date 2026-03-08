@@ -62,10 +62,18 @@ if (beginIdx === -1 || endIdx === -1) {
     .replace(/^\n/, '') // 첫 빈 줄 제거
 
   // 들여쓰기 4칸 제거 (template literal 안의 들여쓰기)
+  // src/index.tsx 의 큰 template literal 안에서 이스케이프된 문자 복원:
+  //   \\\\  →  \\   (이중 이스케이프된 백슬래시)
+  //   \\`    →  `    (이스케이프된 백틱)
+  //   \\${   →  ${   (이스케이프된 달러-중괄호)
+  // 순서 중요: 백슬래시를 먼저 처리해야 함
   const dedentedJs = jsContent
     .split('\n')
     .map(line => line.startsWith('    ') ? line.slice(4) : line)
     .join('\n')
+    .replace(/\\\\/g, '\\')   // \\\\ → \\
+    .replace(/\\`/g, '`')         // \\` → `
+    .replace(/\\\${/g, '${')     // \\${ → ${
 
   fs.mkdirSync(path.dirname(outJs), { recursive: true })
   fs.writeFileSync(outJs, dedentedJs)
