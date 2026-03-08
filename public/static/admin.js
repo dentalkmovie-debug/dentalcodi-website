@@ -728,6 +728,10 @@ async function loadPlaylists() {
 function renderPlaylists() {
   const container = document.getElementById('playlists-container');
   
+  // 초기 설정 섹션 열림 상태 미리 저장 (innerHTML 교체 전)
+  const exportSectionBefore = document.getElementById('export-section-content');
+  const wasExportOpen = exportSectionBefore && exportSectionBefore.style.display === 'block';
+  
   if (playlists.length === 0) {
     container.innerHTML = `
       <div class="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -1003,6 +1007,17 @@ function renderPlaylists() {
   // 임시 영상 상태 주기적 확인 (5초마다) - 자동복귀 감지용
   if (!window.tempStatusInterval) {
     window.tempStatusInterval = setInterval(checkTempVideoStatus, 5000);
+  }
+  
+  // 초기 설정 섹션 열림 상태 복원 (innerHTML 교체로 style이 리셋되기 때문)
+  const exportSectionAfter = document.getElementById('export-section-content');
+  const exportIconAfter = document.getElementById('export-toggle-icon');
+  if (exportSectionAfter && wasExportOpen) {
+    exportSectionAfter.style.display = 'block';
+    if (exportIconAfter) {
+      exportIconAfter.classList.remove('fa-chevron-down');
+      exportIconAfter.classList.add('fa-chevron-up');
+    }
   }
   
   // 드래그 정렬 초기화

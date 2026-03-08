@@ -5562,7 +5562,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308t"></script>
+  <script defer src="/static/admin.js?v=20260308u"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6295,6 +6295,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function renderPlaylists() {
       const container = document.getElementById('playlists-container');
       
+      // 초기 설정 섹션 열림 상태 미리 저장 (innerHTML 교체 전)
+      const exportSectionBefore = document.getElementById('export-section-content');
+      const wasExportOpen = exportSectionBefore && exportSectionBefore.style.display === 'block';
+      
       if (playlists.length === 0) {
         container.innerHTML = \`
           <div class="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -6570,6 +6574,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 임시 영상 상태 주기적 확인 (5초마다) - 자동복귀 감지용
       if (!window.tempStatusInterval) {
         window.tempStatusInterval = setInterval(checkTempVideoStatus, 5000);
+      }
+      
+      // 초기 설정 섹션 열림 상태 복원 (innerHTML 교체로 style이 리셋되기 때문)
+      const exportSectionAfter = document.getElementById('export-section-content');
+      const exportIconAfter = document.getElementById('export-toggle-icon');
+      if (exportSectionAfter && wasExportOpen) {
+        exportSectionAfter.style.display = 'block';
+        if (exportIconAfter) {
+          exportIconAfter.classList.remove('fa-chevron-down');
+          exportIconAfter.classList.add('fa-chevron-up');
+        }
       }
       
       // 드래그 정렬 초기화
