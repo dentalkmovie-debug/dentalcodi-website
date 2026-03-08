@@ -1843,12 +1843,12 @@ app.post('/api/tv/:shortCode/clear-temp', async (c) => {
   return c.json({ success: true })
 })
 
-// TV 비활성화 (탭 닫힘 시 즉시 last_active_at 초기화)
+// TV 비활성화 (탭 닫힘 시 last_active_at을 1시간 전으로 설정 → 사용중 해제, 설치필요 뱃지 유지)
 app.post('/api/tv/:shortCode/deactivate', async (c) => {
   const shortCode = c.req.param('shortCode')
   
   await c.env.DB.prepare(`
-    UPDATE playlists SET last_active_at = NULL WHERE short_code = ?
+    UPDATE playlists SET last_active_at = datetime('now', '-1 hour') WHERE short_code = ?
   `).bind(shortCode).run()
   
   return c.json({ success: true })
@@ -5562,7 +5562,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308s"></script>
+  <script defer src="/static/admin.js?v=20260308t"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6333,7 +6333,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="waitingroom-sortable-container" class="grid gap-3">
             \${waitingRooms.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 20000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-teal-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
@@ -6395,7 +6395,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </h3>
           <div id="chair-sortable-container" class="grid gap-3">
             \${chairs.map((p, idx) => {
-              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 10000;
+              const isActive = p.last_active_at && (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 20000;
               return \`
             <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-indigo-400'}" 
                  id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
