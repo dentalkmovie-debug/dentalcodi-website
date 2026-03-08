@@ -1086,7 +1086,7 @@ function getSelectedChairs() {
 function exportSelectedScripts() {
   const selected = getSelectedChairs();
   if (selected.length === 0) {
-    showToast('내보낼 대기실/체어를 선택하세요', 'error');
+    showToast('체어를 선택하세요', 'error', 3000, document.querySelector('[onclick="exportSelectedScripts()"]'));
     return;
   }
   
@@ -4395,15 +4395,33 @@ function copyToClipboard(text) {
   });
 }
 
-function showToast(message, type = 'success', duration = 3000) {
+function showToast(message, type = 'success', duration = 3000, anchorEl) {
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
   
   toastMessage.innerHTML = message.replace(/\n/g, '<br>');
-  toast.style.display = 'block';
   toast.querySelector('div').className = `${type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast`;
-  
-  setTimeout(() => {
+
+  if (anchorEl) {
+    var rect = anchorEl.getBoundingClientRect();
+    toast.style.position = 'fixed';
+    toast.style.bottom = '';
+    toast.style.transform = '';
+    toast.style.top = Math.max(8, rect.top - 52) + 'px';
+    toast.style.left = rect.left + 'px';
+    toast.style.right = '';
+  } else {
+    toast.style.position = 'fixed';
+    toast.style.top = '';
+    toast.style.right = '';
+    toast.style.left = '50%';
+    toast.style.bottom = '24px';
+    toast.style.transform = 'translateX(-50%)';
+  }
+
+  toast.style.display = 'block';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function() {
     toast.style.display = 'none';
   }, duration);
 }
