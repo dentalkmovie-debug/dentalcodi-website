@@ -1145,7 +1145,54 @@ app.get('/api/:adminCode/playlists', async (c) => {
     `).bind(user.id).all()
   }
   
-  return c.json({ playlists: playlists.results, clinic_name: user.clinic_name })
+  // playlist items와 activeItemIds도 함께 로드 (편집창 즉시 렌더링용)
+  const [allPlaylistItems, masterItemsForActive] = await Promise.all([
+    c.env.DB.prepare(`
+      SELECT pi.*
+      FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
+      ORDER BY pi.playlist_id, pi.sort_order ASC
+    `).bind(user.id).all(),
+    c.env.DB.prepare(`
+      SELECT pi.id
+      FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      JOIN users u ON p.user_id = u.id
+      WHERE u.is_master = 1 AND p.is_master_playlist = 1 AND p.is_active = 1
+      ORDER BY pi.sort_order
+    `).all()
+  ])
+  const masterIdsForActive = (masterItemsForActive.results || []).map((i: any) => i.id)
+
+  // playlist별로 items 그룹핑
+  const itemsByPlaylist: Record<number, any[]> = {}
+  for (const item of (allPlaylistItems.results || [])) {
+    const pid = (item as any).playlist_id
+    if (!itemsByPlaylist[pid]) itemsByPlaylist[pid] = []
+    itemsByPlaylist[pid].push({ ...(item as any), is_master: false })
+  }
+
+  const playlistsWithItems = (playlists.results || []).map((p: any) => {
+    const items = itemsByPlaylist[p.id] || []
+    let activeItemIds: number[] = []
+    try {
+      const raw = p.active_item_ids
+      if (raw === null || raw === undefined) {
+        activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
+      } else {
+        activeItemIds = JSON.parse(raw || '[]')
+        activeItemIds = Array.isArray(activeItemIds)
+          ? activeItemIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id))
+          : []
+      }
+    } catch (e) {
+      activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
+    }
+    return { ...p, items, activeItemIds }
+  })
+
+  return c.json({ playlists: playlistsWithItems, clinic_name: user.clinic_name })
 })
 
 app.post('/api/:adminCode/playlists', async (c) => {
