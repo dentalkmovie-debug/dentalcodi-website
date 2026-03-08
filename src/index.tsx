@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308d"></script>
+  <script defer src="/static/admin.js?v=20260308e"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9154,6 +9154,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (el.parentElement !== document.body) document.body.appendChild(el);
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
       document.body.classList.add('modal-open');
+      // iframe 높이만 확보 (scrollToTop 없이 즉시 표시)
+      try {
+        if (window.parent && window.parent !== window) {
+          const needH = Math.max(Math.round(window.screen.height * 0.92), 700);
+          window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+        }
+      } catch(e) {}
     }
     
     // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
