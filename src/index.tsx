@@ -4618,91 +4618,85 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto flex flex-col" style="max-height:92vh;">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <!-- 헤더 -->
-        <div class="p-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex-shrink-0">
-          <div class="flex justify-between items-center">
-            <h3 class="text-lg font-bold">유니트체어 모니터 설치 방법</h3>
-            <button onclick="closeModal('script-download-modal')" class="text-white/80 hover:text-white text-2xl">&times;</button>
-          </div>
+        <div class="px-4 py-3 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
+          <h3 class="font-bold text-sm">유니트체어 모니터 설치 방법</h3>
+          <button onclick="closeModal('script-download-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
         </div>
 
-        <div class="p-4 space-y-3 overflow-y-auto flex-1">
-          <!-- 설치 단계 -->
-          <div class="space-y-2">
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">1</span>
+        <div class="px-4 py-3 space-y-2.5">
+          <!-- 설치 단계 3개 가로 배치 -->
+          <div class="flex gap-2">
+            <div class="flex-1 flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+              <span class="bg-indigo-500 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">1</span>
               <div>
-                <p class="font-medium text-gray-800 text-sm">스크립트 파일 다운로드</p>
-                <p class="text-xs text-gray-500">BAT, VBS 파일을 선택하여 다운로드 합니다.</p>
+                <p class="font-medium text-gray-800 text-xs leading-tight">파일 다운로드</p>
+                <p class="text-xs text-gray-500 leading-tight mt-0.5">BAT 또는 VBS 선택</p>
               </div>
             </div>
-
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">2</span>
+            <div class="flex-1 flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+              <span class="bg-indigo-500 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">2</span>
               <div>
-                <p class="font-medium text-gray-800 text-sm">시작 프로그램 폴더에 복사</p>
-                <p class="text-xs text-gray-500">실행창(Win+R)에서 <span class="bg-yellow-100 px-1 rounded font-mono">shell:startup</span> 입력 → 시작 프로그램 폴더가 열리면 다운로드 파일을 드래그로 복사</p>
+                <p class="font-medium text-gray-800 text-xs leading-tight">시작 폴더에 복사</p>
+                <p class="text-xs text-gray-500 leading-tight mt-0.5">Win+R → <span class="bg-yellow-100 px-0.5 rounded font-mono">shell:startup</span></p>
               </div>
             </div>
-
-            <div class="flex items-start gap-3 p-2.5 bg-gray-50 rounded-lg">
-              <span class="bg-indigo-500 text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">3</span>
+            <div class="flex-1 flex items-start gap-1.5 p-2 bg-gray-50 rounded-lg">
+              <span class="bg-indigo-500 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">3</span>
               <div>
-                <p class="font-medium text-gray-800 text-sm">복사한 파일 더블 클릭 실행</p>
-                <p class="text-xs text-gray-500">복사한 파일을 더블 클릭하면 전체화면으로 재생 시작됩니다.</p>
+                <p class="font-medium text-gray-800 text-xs leading-tight">파일 더블클릭</p>
+                <p class="text-xs text-gray-500 leading-tight mt-0.5">전체화면 재생 시작</p>
               </div>
             </div>
           </div>
 
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p class="text-xs text-gray-700"><strong>참고.</strong> PC를 재부팅하면 자동으로 전체화면이 시작됩니다. 필요 시 브라우저 감추기 하시고 다른 창을 열면 됩니다.</p>
-          </div>
-
-          <!-- 파일 형식 선택 -->
-          <div class="border rounded-lg p-3 bg-white">
-            <p class="text-xs font-medium text-gray-500 mb-2">파일 형식 선택</p>
-            <div class="flex gap-2 mb-3">
+          <!-- 파일 형식 선택 + 버튼 -->  
+          <div class="border rounded-lg p-2.5 bg-white">
+            <p class="text-xs font-medium text-gray-500 mb-1.5">파일 형식 선택</p>
+            <div class="flex gap-2 mb-2">
               <label class="flex-1 cursor-pointer">
                 <input type="radio" name="script-type" value="bat" checked class="hidden peer">
-                <div class="p-2.5 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 text-sm transition-all">
-                  <p class="font-bold text-gray-800 peer-checked:text-indigo-700">BAT</p>
-                  <p class="text-xs text-gray-500">검정 창이 잠깐 표시됨</p>
-                  <p class="text-xs text-gray-400">문제 확인에 유리</p>
+                <div class="py-1.5 px-2 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all">
+                  <p class="font-bold text-gray-800 text-xs">BAT</p>
+                  <p class="text-xs text-gray-400">창이 잠깐 표시</p>
                 </div>
               </label>
               <label class="flex-1 cursor-pointer">
                 <input type="radio" name="script-type" value="vbs" class="hidden peer">
-                <div class="p-2.5 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 text-sm transition-all">
-                  <p class="font-bold text-gray-800 peer-checked:text-indigo-700">VBS</p>
-                  <p class="text-xs text-gray-500">창 없이 바로 실행</p>
-                  <p class="text-xs text-gray-400">깔끔한 시작</p>
+                <div class="py-1.5 px-2 text-center border-2 rounded-lg peer-checked:border-indigo-500 peer-checked:bg-indigo-50 transition-all">
+                  <p class="font-bold text-gray-800 text-xs">VBS</p>
+                  <p class="text-xs text-gray-400">창 없이 실행</p>
                 </div>
               </label>
             </div>
             <div class="flex gap-2">
-              <button onclick="copyInstallLink()" class="flex-1 bg-indigo-500 text-white py-2.5 rounded-lg hover:bg-indigo-600 text-sm font-medium">
+              <button onclick="copyInstallLink()" class="flex-1 bg-indigo-500 text-white py-2 rounded-lg hover:bg-indigo-600 text-sm font-medium">
                 링크 복사
               </button>
-              <button onclick="downloadInstallScript()" class="flex-1 bg-gray-400 text-white py-2.5 rounded-lg hover:bg-gray-500 text-sm font-medium">
+              <button onclick="downloadInstallScript()" class="flex-1 bg-gray-400 text-white py-2 rounded-lg hover:bg-gray-500 text-sm font-medium">
                 다운로드
               </button>
             </div>
           </div>
 
-          <!-- 링크 복사 설명 -->
-          <div class="bg-indigo-50 rounded-lg p-3">
-            <p class="text-xs font-medium text-indigo-800 mb-1">링크 복사 사용법</p>
-            <p class="text-xs text-indigo-600">• 복사된 URL을 <strong>PC 브라우저 주소창</strong>에 직접 입력하면 바로 재생됩니다</p>
-            <p class="text-xs text-indigo-600">• 즐겨찾기에 저장해두면 다음에 바로 실행할 수 있습니다</p>
+          <!-- 링크 복사 사용법 + 설치 후 사용법 가로 배치 -->
+          <div class="flex gap-2">
+            <div class="flex-1 bg-indigo-50 rounded-lg px-2.5 py-2">
+              <p class="text-xs font-medium text-indigo-800 mb-1">링크 복사 사용법</p>
+              <p class="text-xs text-indigo-600">• URL을 <strong>브라우저 주소창</strong>에 입력</p>
+              <p class="text-xs text-indigo-600">• 즐겨찾기 저장 후 재사용 가능</p>
+            </div>
+            <div class="flex-1 bg-blue-50 rounded-lg px-2.5 py-2">
+              <p class="text-xs font-medium text-blue-800 mb-1">설치 후 사용법</p>
+              <p class="text-xs text-blue-600">• 전체화면 해제: ESC 또는 F11</p>
+              <p class="text-xs text-blue-600">• 전체화면 복귀: 화면 아무곳 클릭</p>
+            </div>
           </div>
 
-          <!-- 사용법 -->
-          <div class="bg-blue-50 rounded-lg p-3">
-            <p class="text-xs font-medium text-blue-800 mb-1">설치 후 사용법</p>
-            <p class="text-xs text-blue-600">• 전체화면 해제: <span class="font-medium">ESC</span> 또는 <span class="font-medium">F11</span></p>
-            <p class="text-xs text-blue-600">• 전체화면 복귀: 화면 아무곳이나 클릭</p>
-            <p class="text-xs text-blue-600">• 창을 닫았을 때: <span class="font-medium">shell:startup</span> 폴더의 BAT/VBS를 더블클릭하거나 PC 재부팅</p>
+          <!-- 참고 -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+            <p class="text-xs text-gray-600"><strong>참고.</strong> PC 재부팅 시 자동으로 전체화면 시작. 필요 시 브라우저 감추기 후 다른 창 사용.</p>
           </div>
         </div>
       </div>
