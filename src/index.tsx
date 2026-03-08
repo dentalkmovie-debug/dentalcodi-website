@@ -4617,7 +4617,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
+    <div class="absolute inset-0 flex items-center justify-center px-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <!-- 헤더 -->
         <div class="px-4 py-3 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
@@ -6671,19 +6671,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           '</div>' +
           '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
         '</div>';
-      // 부모 창: iframe 높이 확보
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'setHeight', height: Math.max(Math.round(window.screen.height * 0.92), 700) }, '*');
-          // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
-          if (iframePageTop > 100) {
-            window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          }
-        }
-      } catch(e) {}
       // 모달 즉시 표시
-      var _m = modal;
-      _m.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
+      modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
     }
     
     // 선택된 체어 BAT 다운로드
@@ -9163,18 +9152,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const el = document.getElementById('script-download-modal');
       if (!el) return;
       if (el.parentElement !== document.body) document.body.appendChild(el);
-
-      // 부모 창: iframe 높이 확보
-      try {
-        if (window.parent && window.parent !== window) {
-          const needH = Math.max(Math.round(window.screen.height * 0.92), 700);
-          window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-          // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
-          if (iframePageTop > 100) {
-            window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          }
-        }
-      } catch(e) {}
 
       // 모달 즉시 표시
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
@@ -13094,7 +13071,7 @@ app.get('/', (c) => {
   // 창 리사이즈/스크롤 시 재전달
   window.addEventListener('resize', sendIframeTop);
   window.addEventListener('scroll', sendIframeTop);
-  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight') frame.style.height=(e.data.height+30)+'px'; if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight'){ var newH=(e.data.height+30)+'px'; if(frame.style.height!==newH) frame.style.height=newH; } if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
 })();
 &lt;/script&gt;</pre>
       <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>

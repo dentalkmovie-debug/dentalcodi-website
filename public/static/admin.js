@@ -1115,19 +1115,8 @@ function exportSelectedScripts() {
       '</div>' +
       '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
     '</div>';
-  // 부모 창: iframe 높이 확보
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'setHeight', height: Math.max(Math.round(window.screen.height * 0.92), 700) }, '*');
-      // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
-      if (iframePageTop > 100) {
-        window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      }
-    }
-  } catch(e) {}
   // 모달 즉시 표시
-  var _m = modal;
-  _m.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
+  modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
 }
 
 // 선택된 체어 BAT 다운로드
@@ -3607,18 +3596,6 @@ function showScriptDownloadModal() {
   const el = document.getElementById('script-download-modal');
   if (!el) return;
   if (el.parentElement !== document.body) document.body.appendChild(el);
-
-  // 부모 창: iframe 높이 확보
-  try {
-    if (window.parent && window.parent !== window) {
-      const needH = Math.max(Math.round(window.screen.height * 0.92), 700);
-      window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-      // 페이지가 스크롤된 상태일 때만 scrollToTop 전송 (깜박임 방지)
-      if (iframePageTop > 100) {
-        window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      }
-    }
-  } catch(e) {}
 
   // 모달 즉시 표시
   el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
