@@ -1999,23 +1999,10 @@ async function openPlaylistEditor(id) {
   if (isOpeningEditor) return;
   isOpeningEditor = true;
   
-  // 이전 플레이리스트 데이터 초기화
-  currentPlaylist = null;
-  
   // 즉시 모달 열기
   openModal('edit-playlist-modal');
-  document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
   
-  // 모달이 열리자마자 스켈레톤으로 높이 즉시 확보 (짧았다가 늘어나는 현상 방지)
-  const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
-  const playlistSkeletons = skeletonItem.repeat(4);
-  const libSkeleton = skeletonItem.repeat(5);
-  const playlistContainer = document.getElementById('playlist-items-container');
-  if (playlistContainer) playlistContainer.innerHTML = playlistSkeletons;
-  const libraryUserList = document.getElementById('library-user-list');
-  if (libraryUserList) libraryUserList.innerHTML = libSkeleton;
-  const libraryMasterList = document.getElementById('library-master-list');
-  if (libraryMasterList) libraryMasterList.innerHTML = libSkeleton;
+  // UI 초기화
   resetPlaylistEditorScroll();
   playlistSearchQuery = '';
   const librarySearchInput = document.getElementById('library-search');
@@ -2028,37 +2015,6 @@ async function openPlaylistEditor(id) {
     librarySearchResults.classList.add('hidden');
   }
 
-  const cachedPlaylist = playlistCacheById[id];
-  if (cachedPlaylist) {
-    currentPlaylist = cachedPlaylist;
-    playlistEditorSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-    document.getElementById('edit-playlist-title').textContent = currentPlaylist.name + ' 편집';
-    document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
-    document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
-    updateDurationLabel();
-    if (typeof renderLibraryAndPlaylist === 'function') {
-      renderLibraryAndPlaylist();
-    } else if (typeof renderPlaylistItems === 'function') {
-      renderPlaylistItems();
-    }
-    if (typeof loadPlaylistOrder === 'function') {
-      loadPlaylistOrder();
-    }
-  } else {
-    const playlistContainer = document.getElementById('playlist-items-container');
-    if (playlistContainer) {
-      playlistContainer.innerHTML = '<div class="flex items-center justify-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
-    }
-    const libraryUserList = document.getElementById('library-user-list');
-    if (libraryUserList) {
-      libraryUserList.innerHTML = '<div class="flex items-center justify-center py-4"><i class="fas fa-spinner fa-spin text-gray-400"></i></div>';
-    }
-    const libraryMasterList = document.getElementById('library-master-list');
-    if (libraryMasterList) {
-      libraryMasterList.innerHTML = '<div class="flex items-center justify-center py-4"><i class="fas fa-spinner fa-spin text-gray-400"></i></div>';
-    }
-  }
-  
   // sortable 인스턴스 제거
   if (sortableInstance) {
     sortableInstance.destroy();
@@ -2068,7 +2024,80 @@ async function openPlaylistEditor(id) {
     playlistSortableInstance.destroy();
     playlistSortableInstance = null;
   }
+
+  // ── 1단계: playlists 배열에서 기본 정보를 즉시 사용 ──
+  // playlists 배열(INITIAL_DATA)에서 해당 id의 playlist 기본 정보 탐색
+  const basePlaylist = playlists.find(p => p.id == id);
   
+  if (basePlaylist) {
+    // 기본 정보로 currentPlaylist 즉시 설정 (items는 빈 배열로 시작)
+    currentPlaylist = Object.assign({ items: [], activeItemIds: [] }, basePlaylist);
+    document.getElementById('edit-playlist-title').textContent = currentPlaylist.name + ' 편집';
+    document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
+    document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
+    updateDurationLabel();
+  } else {
+    // playlists 배열에 없으면 임시 객체로 설정
+    currentPlaylist = {
+      id: id,
+      name: '재생목록',
+      items: [],
+      activeItemIds: [],
+      transition_effect: 'fade',
+      transition_duration: 1000
+    };
+    document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
+  }
+
+  // ── 2단계: masterItemsCache로 라이브러리 즉시 렌더링 ──
+  // masterItemsCache는 INITIAL_DATA.masterItems에서 이미 초기화됨
+  // playlist items는 아직 없으므로 라이브러리(공용영상)만 즉시 표시
+  if (masterItemsCache && masterItemsCache.length > 0) {
+    // 라이브러리 공용영상 즉시 렌더링
+    const libraryMasterSection = document.getElementById('library-master-section');
+    const libraryMasterList = document.getElementById('library-master-list');
+    if (libraryMasterSection && libraryMasterList) {
+      libraryMasterSection.classList.remove('hidden');
+      libraryMasterList.innerHTML = masterItemsCache.map(item => `
+        <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
+             data-library-id="${item.id}" data-library-master="1"
+             onclick="addToPlaylistFromLibrary(${item.id})">
+          <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
+            ${item.thumbnail_url
+              ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover" loading="lazy">`
+              : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-purple-400"></i></div>`
+            }
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
+            <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+          </div>
+          <i class="fas fa-plus text-purple-400"></i>
+        </div>
+      `).join('');
+    }
+    // 내 영상 목록: items 로드 전까지 로딩 스피너
+    const libraryUserList = document.getElementById('library-user-list');
+    if (libraryUserList) {
+      libraryUserList.innerHTML = '<div class="flex items-center justify-center py-4 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>영상 목록 로드 중...</div>';
+    }
+    // 재생 플레이리스트: items 로드 전까지 로딩 스피너
+    const playlistContainer = document.getElementById('playlist-items-container');
+    if (playlistContainer) {
+      playlistContainer.innerHTML = '<div class="flex items-center justify-center py-8 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>재생목록 로드 중...</div>';
+    }
+  } else {
+    // masterItemsCache도 없으면 스켈레톤 표시
+    const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
+    const libraryMasterList = document.getElementById('library-master-list');
+    if (libraryMasterList) libraryMasterList.innerHTML = skeletonItem.repeat(4);
+    const libraryUserList = document.getElementById('library-user-list');
+    if (libraryUserList) libraryUserList.innerHTML = skeletonItem.repeat(3);
+    const playlistContainer = document.getElementById('playlist-items-container');
+    if (playlistContainer) playlistContainer.innerHTML = skeletonItem.repeat(4);
+  }
+
+  // ── 3단계: 백그라운드에서 playlist 상세(items) fetch ──
   try {
     const fetchWithTimeout = async (url, timeoutMs) => {
       const controller = new AbortController();
@@ -2080,70 +2109,47 @@ async function openPlaylistEditor(id) {
       }
     };
 
-    let res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?ts=' + Date.now(), 2000);
-    if (!res || !res.ok) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?retry=1', 2000);
+    // 캐시에 있으면 즉시 사용
+    const cachedPlaylist = playlistCacheById[id];
+    let fullPlaylist = cachedPlaylist || null;
+
+    if (!fullPlaylist) {
+      let res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?ts=' + Date.now(), 3000);
+      if (!res || !res.ok) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?retry=1', 3000);
+      }
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.playlist) {
+          fullPlaylist = data.playlist;
+          playlistCacheById[id] = fullPlaylist;
+        }
+      }
     }
 
-    let data = null;
-    if (res && res.ok) {
-      data = await res.json();
+    if (fullPlaylist) {
+      currentPlaylist = fullPlaylist;
+      document.getElementById('edit-playlist-title').textContent = (currentPlaylist.name || '재생목록') + ' 편집';
+      document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
+      document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
+      updateDurationLabel();
     }
 
-    if (data && data.playlist) {
-      currentPlaylist = data.playlist;
-      playlistCacheById[id] = currentPlaylist;
-    } else if (!currentPlaylist) {
-      currentPlaylist = {
-        name: '재생목록',
-        items: [],
-        activeItemIds: [],
-        transition_effect: 'fade',
-        transition_duration: 1000
-      };
-    }
-
+    // 완전한 데이터로 전체 렌더링
     const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-    const shouldRender = !playlistEditorSignature || newSignature !== playlistEditorSignature;
     playlistEditorSignature = newSignature;
-    
-    document.getElementById('edit-playlist-title').textContent = (currentPlaylist.name || '재생목록') + ' 편집';
-    
-    // 전환 효과 설정 로드
-    document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
-    document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
-    updateDurationLabel();
-    
-    // 설정 API에서 로고, 재생시간 로드
-    await loadPlaylistSettings();
-    
-    const playlistContainer = document.getElementById('playlist-items-container');
-    const hasSpinner = playlistContainer && playlistContainer.querySelector('.fa-spinner');
-    const forceRender = hasSpinner || !masterItemsCache || masterItemsCache.length === 0;
-
-    // 변경되었거나 스피너 상태면 강제 렌더링
-    if (shouldRender || forceRender) {
-      await renderLibraryAndPlaylist();
-    }
-    
-    // 플레이리스트 순서 로드 (masterItemsCache가 채워진 후)
+    await renderLibraryAndPlaylist();
     loadPlaylistOrder();
+
+    // 설정은 렌더링 완료 후 백그라운드에서 로드 (UI 블로킹 없음)
+    loadPlaylistSettings().catch(() => {});
 
     if (typeof startMasterItemsAutoRefresh === 'function') {
       startMasterItemsAutoRefresh();
     }
   } catch (e) {
     console.error('플레이리스트 편집기 오류:', e);
-    if (!currentPlaylist) {
-      currentPlaylist = {
-        name: '재생목록',
-        items: [],
-        activeItemIds: [],
-        transition_effect: 'fade',
-        transition_duration: 1000
-      };
-    }
     if (typeof renderLibraryAndPlaylist === 'function') {
       await renderLibraryAndPlaylist();
     }
