@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308g"></script>
+  <script defer src="/static/admin.js?v=20260308e"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -5575,9 +5575,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let masterItemsRefreshTimer = null;
     // 아임웹 iframe의 페이지 상단으로부터 top offset (헤더 높이 보정용)
     let iframePageTop = 0;
+    // 스크롤 완료 후 표시할 모달 콜백
+    let pendingModalShow = null;
     window.addEventListener('message', function(e) {
       if (e.data && e.data.type === 'iframeTop') {
         iframePageTop = e.data.top || 0;
+        // 스크롤 완료 후 대기 중인 모달 표시
+        if (pendingModalShow) {
+          var fn = pendingModalShow;
+          pendingModalShow = null;
+          fn();
+        }
       }
     });
 
@@ -6653,26 +6661,26 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         modal.id = 'script-type-modal';
         document.body.appendChild(modal);
       }
-      modal.innerHTML = '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'"></div>' +
+      modal.innerHTML = '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="closeModal(\'script-type-modal\')"></div>' +
         '<div style="position:relative;background:white;border-radius:12px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
           '<h3 style="font-size:17px;font-weight:700;margin-bottom:12px"><i class="fas fa-download" style="color:#6366f1;margin-right:8px"></i>스크립트 다운로드</h3>' +
           '<p style="font-size:13px;color:#666;margin-bottom:16px">선택된 ' + selected.length + '개 체어의 스크립트를 다운로드합니다.</p>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-            '<button onclick="downloadSelectedBat(); document.getElementById(\'script-type-modal\').style.display=\'none\'" style="background:#3b82f6;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
+            '<button onclick="downloadSelectedBat(); closeModal(\'script-type-modal\')" style="background:#3b82f6;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
               '<i class="fas fa-file-code" style="font-size:24px;display:block;margin-bottom:4px"></i>' +
               '<span style="font-weight:700;display:block">BAT 파일</span>' +
               '<span style="font-size:11px;color:#bfdbfe">일반적인 경우</span>' +
             '</button>' +
-            '<button onclick="downloadSelectedVbs(); document.getElementById(\'script-type-modal\').style.display=\'none\'" style="background:#22c55e;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
+            '<button onclick="downloadSelectedVbs(); closeModal(\'script-type-modal\')" style="background:#22c55e;color:white;padding:12px;border-radius:8px;border:none;cursor:pointer;text-align:center">' +
               '<i class="fas fa-shield-alt" style="font-size:24px;display:block;margin-bottom:4px"></i>' +
               '<span style="font-weight:700;display:block">VBS 파일</span>' +
               '<span style="font-size:11px;color:#bbf7d0">백신 차단 시</span>' +
             '</button>' +
           '</div>' +
-          '<button onclick="document.getElementById(\'script-type-modal\').style.display=\'none\'" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
+          '<button onclick="closeModal(\'script-type-modal\')" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
         '</div>';
-      // 모달 즉시 표시
-      modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;align-items:center;justify-content:center;padding:16px;';
+      // openModal 방식으로 표시 (iframePageTop 보정 + scrollToTop)
+      openModal('script-type-modal');
     }
     
     // 선택된 체어 BAT 다운로드
@@ -9147,15 +9155,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       showScriptDownloadModal();
     }
     
-    // 스크립트 다운로드 모달 표시 (설치 방법 안내용) - 즉시 표시 (scrollToTop 없음)
+    // 스크립트 다운로드 모달 표시 (설치 방법 안내용)
     function showScriptDownloadModal() {
-      const el = document.getElementById('script-download-modal');
-      if (!el) return;
-      if (el.parentElement !== document.body) document.body.appendChild(el);
-
-      // 모달 즉시 표시
-      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999;';
-      document.body.classList.add('modal-open');
+      openModal('script-download-modal');
     }
     
     // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
