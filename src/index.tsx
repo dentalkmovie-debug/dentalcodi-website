@@ -5537,9 +5537,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </div>
   
   <!-- 토스트 -->
-  <div id="toast" style="display:none" class="fixed z-[99999]">
+  <div id="admin-toast" style="display:none" class="fixed z-[99999]">
     <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg toast">
-      <span id="toast-message"></span>
+      <span id="admin-toast-message"></span>
     </div>
   </div>
 
@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308o"></script>
+  <script defer src="/static/admin.js?v=20260308p"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9998,8 +9998,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function showToast(message, type = 'success', duration = 1200, anchorEl) {
-      const toast = document.getElementById('toast');
-      const toastMessage = document.getElementById('toast-message');
+      const toast = document.getElementById('admin-toast');
+      const toastMessage = document.getElementById('admin-toast-message');
       
       toastMessage.innerHTML = message.replace(/\\n/g, '<br>');
       toast.querySelector('div').className = \`\${type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-gray-800'} text-white px-6 py-3 rounded-lg shadow-lg toast\`;
@@ -10009,7 +10009,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         var bottomVal = window.innerHeight - rect.top + 60;
         toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
       } else {
-        toast.style.cssText = 'display:block;position:fixed;top:80px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:999999;';
+        // iframePageTop: 위젯이 전달한 iframe의 페이지 내 top (= 아임웹 헤더 높이)
+        // position:fixed top값 = iframePageTop + 여백. iframePageTop이 없으면 80px
+        var topPx = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop + 16 : 80;
+        toast.style.cssText = 'display:block;position:fixed;top:' + topPx + 'px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:999999;';
       }
 
       clearTimeout(toast._timer);
