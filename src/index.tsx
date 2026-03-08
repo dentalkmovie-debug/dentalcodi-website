@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308m"></script>
+  <script defer src="/static/admin.js?v=20260308n"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9997,7 +9997,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         var bottomVal = window.innerHeight - rect.top + 60;
         toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
       } else {
-        toast.style.cssText = 'display:block;position:fixed;bottom:24px;left:50%;top:auto;right:auto;transform:translateX(-50%);z-index:99999;';
+        toast.style.cssText = 'display:block;position:fixed;top:24px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:99999;';
       }
 
       clearTimeout(toast._timer);

@@ -4441,7 +4441,7 @@ function showToast(message, type = 'success', duration = 1200, anchorEl) {
     var bottomVal = window.innerHeight - rect.top + 60;
     toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
   } else {
-    toast.style.cssText = 'display:block;position:fixed;bottom:24px;left:50%;top:auto;right:auto;transform:translateX(-50%);z-index:99999;';
+    toast.style.cssText = 'display:block;position:fixed;top:24px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:99999;';
   }
 
   clearTimeout(toast._timer);
