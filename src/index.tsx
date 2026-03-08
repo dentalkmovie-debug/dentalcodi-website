@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308h"></script>
+  <script defer src="/static/admin.js?v=20260308i"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6679,8 +6679,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           '</div>' +
           '<button onclick="closeModal(\'script-type-modal\')" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
         '</div>';
-      // openModal 방식으로 표시 (iframePageTop 보정 + scrollToTop)
-      openModal('script-type-modal');
+      // 스크립트 전용 표시 (openModal 사용 안 함)
+      _showScriptModal(modal);
     }
     
     // 선택된 체어 BAT 다운로드
@@ -9155,9 +9155,30 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       showScriptDownloadModal();
     }
     
+    // 스크립트 전용 모달 표시 (openModal 사용 안 함 - iframe 위치 독립적)
+    function _showScriptModal(el) {
+      if (!el) return;
+      if (el.parentElement !== document.body) document.body.appendChild(el);
+      // iframe 내부를 스크롤 최상단으로
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      // position:fixed + top:0 으로 표시 후 부모에 scrollToTop 요청
+      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:center; justify-content:center;';
+      document.body.classList.add('modal-open');
+      // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
+      try {
+        if (window.parent && window.parent !== window) {
+          var h = Math.max(Math.round(window.screen.height * 0.92), 700);
+          window.parent.postMessage({ type: 'setHeight', height: h }, '*');
+          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+        }
+      } catch(e) {}
+    }
+
     // 스크립트 다운로드 모달 표시 (설치 방법 안내용)
     function showScriptDownloadModal() {
-      openModal('script-download-modal');
+      _showScriptModal(document.getElementById('script-download-modal'));
     }
     
     // 선택된 체어의 링크 복사 (체크박스에서 선택된 체어들)
@@ -9861,6 +9882,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (isGuideModal) {
         const dashboard = document.getElementById('dashboard');
         if (dashboard) dashboard.style.display = 'none';
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       }
 
       // 모달을 body 직접 자식으로 이동
@@ -9872,33 +9896,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
       if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-      // ── 핵심 해결책 ──────────────────────────────────────────
-      // position:fixed는 iframe 뷰포트 기준이라 iframe이 페이지 아래에
-      // 있으면 top:0이 화면 밖에 렌더됨.
-      // → position:absolute + top = window.scrollY 로 현재 스크롤 위치에 고정
-      // body에 height:100% 없으면 absolute가 동작 안 할 수 있으므로
-      // body/html min-height 확보 후 적용
-      document.documentElement.style.minHeight = '100%';
-      document.body.style.minHeight = '100%';
-      document.body.style.position = 'relative';
+      // 아임웹 헤더 높이 계산
+      const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
-      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
-      el.style.cssText = [
-        'display:flex !important',
-        'position:absolute',
-        'top:' + scrollTop + 'px',
-        'left:0',
-        'right:0',
-        'height:100vh',
-        'width:100%',
-        'z-index:9999',
-        'align-items:center',
-        'justify-content:center',
-      ].join(';') + ';';
+      el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
       document.body.classList.add('modal-open');
-      // ─────────────────────────────────────────────────────────
 
-      // 부모에게 높이 확보 + 스크롤 요청 (구버전 위젯 무시해도 자체 동작)
       try {
         if (window.parent && window.parent !== window) {
           const needH = isGuideModal
@@ -9930,7 +9933,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
       
       // 열린 모달이 없을 때 공통 처리
-      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"], [style*="position:absolute"][style*="display:flex"]');
+      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"]');
       if (openModals.length === 0) {
         document.body.classList.remove('modal-open');
 
