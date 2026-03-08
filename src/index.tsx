@@ -5562,7 +5562,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308u"></script>
+  <script defer src="/static/admin.js?v=20260308v"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -6299,6 +6299,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const exportSectionBefore = document.getElementById('export-section-content');
       const wasExportOpen = exportSectionBefore && exportSectionBefore.style.display === 'block';
       
+      // 체크박스 선택 상태 미리 저장 (innerHTML 교체 후 복원용)
+      const checkedIds = new Set(
+        Array.from(document.querySelectorAll('.chair-checkbox:checked'))
+          .map(cb => cb.dataset.id)
+      );
+      
       if (playlists.length === 0) {
         container.innerHTML = \`
           <div class="bg-white rounded-xl shadow-sm p-8 text-center">
@@ -6585,6 +6591,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           exportIconAfter.classList.remove('fa-chevron-down');
           exportIconAfter.classList.add('fa-chevron-up');
         }
+      }
+      
+      // 체크박스 선택 상태 복원
+      if (checkedIds.size > 0) {
+        document.querySelectorAll('.chair-checkbox').forEach(cb => {
+          if (checkedIds.has(cb.dataset.id)) cb.checked = true;
+        });
       }
       
       // 드래그 정렬 초기화
