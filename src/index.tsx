@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js"></script>
+  <script defer src="/static/admin.js?v=20260308c"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9956,7 +9956,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       });
     }
     
-    function showToast(message, type = 'success', duration = 3000, anchorEl) {
+    function showToast(message, type = 'success', duration = 1200, anchorEl) {
       const toast = document.getElementById('toast');
       const toastMessage = document.getElementById('toast-message');
       
@@ -9965,22 +9965,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       if (anchorEl) {
         var rect = anchorEl.getBoundingClientRect();
-        toast.style.position = 'fixed';
-        toast.style.bottom = '';
-        toast.style.transform = '';
-        toast.style.top = Math.max(8, rect.top - 56) + 'px';
-        toast.style.left = rect.left + 'px';
-        toast.style.right = '';
+        var bottomVal = window.innerHeight - rect.top + 8;
+        toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
       } else {
-        toast.style.position = 'fixed';
-        toast.style.top = '';
-        toast.style.right = '';
-        toast.style.left = '50%';
-        toast.style.bottom = '24px';
-        toast.style.transform = 'translateX(-50%)';
+        toast.style.cssText = 'display:block;position:fixed;bottom:24px;left:50%;top:auto;right:auto;transform:translateX(-50%);z-index:99999;';
       }
 
-      toast.style.display = 'block';
       clearTimeout(toast._timer);
       toast._timer = setTimeout(function() {
         toast.style.display = 'none';

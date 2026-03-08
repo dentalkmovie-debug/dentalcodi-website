@@ -4400,7 +4400,7 @@ function copyToClipboard(text) {
   });
 }
 
-function showToast(message, type = 'success', duration = 3000, anchorEl) {
+function showToast(message, type = 'success', duration = 1200, anchorEl) {
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
   
@@ -4409,22 +4409,12 @@ function showToast(message, type = 'success', duration = 3000, anchorEl) {
 
   if (anchorEl) {
     var rect = anchorEl.getBoundingClientRect();
-    toast.style.position = 'fixed';
-    toast.style.bottom = '';
-    toast.style.transform = '';
-    toast.style.top = Math.max(8, rect.top - 56) + 'px';
-    toast.style.left = rect.left + 'px';
-    toast.style.right = '';
+    var bottomVal = window.innerHeight - rect.top + 8;
+    toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
   } else {
-    toast.style.position = 'fixed';
-    toast.style.top = '';
-    toast.style.right = '';
-    toast.style.left = '50%';
-    toast.style.bottom = '24px';
-    toast.style.transform = 'translateX(-50%)';
+    toast.style.cssText = 'display:block;position:fixed;bottom:24px;left:50%;top:auto;right:auto;transform:translateX(-50%);z-index:99999;';
   }
 
-  toast.style.display = 'block';
   clearTimeout(toast._timer);
   toast._timer = setTimeout(function() {
     toast.style.display = 'none';
