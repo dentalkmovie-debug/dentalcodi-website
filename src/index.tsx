@@ -5551,7 +5551,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308n"></script>
+  <script defer src="/static/admin.js?v=20260308o"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
@@ -9149,7 +9149,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 전체 자동 실행 스크립트 다운로드
     function downloadAutoRunScript() {
       if (playlists.length === 0) {
-        showToast('대기실/체어를 먼저 추가해주세요', 'error');
+        showToast('체어를 먼저 추가해주세요', 'error');
+        return;
+      }
+      // 체어만 필터링
+      const chairs = playlists.filter(p => p.playlist_type === 'chair' || p.type === 'chair' || (!p.playlist_type && !p.type));
+      const selected = getSelectedChairs();
+      if (selected.length === 0) {
+        showToast('체어를 먼저 선택하세요', 'error');
         return;
       }
       showScriptDownloadModal();
@@ -9187,15 +9194,20 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function copyInstallLink() {
       const selected = getSelectedChairs();
       if (selected.length === 0) {
-        // 선택된 체어가 없으면 모든 체어 URL 복사
-        const links = playlists.map(p => location.origin + '/' + p.short_code).join('\\n');
-        navigator.clipboard.writeText(links);
-        showToast('전체 URL 복사됨 (' + playlists.length + '개)');
-      } else {
-        const links = selected.map(c => location.origin + '/' + c.code).join('\\n');
-        navigator.clipboard.writeText(links);
-        showToast(selected.length + '개 URL 복사됨');
+        showToast('체어를 선택해주세요', 'error');
+        return;
       }
+      const links = selected.map(c => location.origin + '/' + c.code).join('\\n');
+      navigator.clipboard.writeText(links).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = links;
+        ta.style.cssText = 'position:fixed;top:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
+      });
+      showToast(selected.length + '개 체어 URL 복사됨');
     }
     
     // 선택된 체어의 스크립트 다운로드
@@ -9997,7 +10009,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         var bottomVal = window.innerHeight - rect.top + 60;
         toast.style.cssText = 'display:block;position:fixed;bottom:' + bottomVal + 'px;left:' + rect.left + 'px;right:auto;top:auto;transform:none;z-index:99999;';
       } else {
-        toast.style.cssText = 'display:block;position:fixed;top:24px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:99999;';
+        toast.style.cssText = 'display:block;position:fixed;top:80px;left:50%;bottom:auto;right:auto;transform:translateX(-50%);z-index:999999;';
       }
 
       clearTimeout(toast._timer);
