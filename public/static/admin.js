@@ -2005,6 +2005,17 @@ async function openPlaylistEditor(id) {
   // 즉시 모달 열기
   openModal('edit-playlist-modal');
   document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
+  
+  // 모달이 열리자마자 스켈레톤으로 높이 즉시 확보 (짧았다가 늘어나는 현상 방지)
+  const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
+  const playlistSkeletons = skeletonItem.repeat(4);
+  const libSkeleton = skeletonItem.repeat(5);
+  const playlistContainer = document.getElementById('playlist-items-container');
+  if (playlistContainer) playlistContainer.innerHTML = playlistSkeletons;
+  const libraryUserList = document.getElementById('library-user-list');
+  if (libraryUserList) libraryUserList.innerHTML = libSkeleton;
+  const libraryMasterList = document.getElementById('library-master-list');
+  if (libraryMasterList) libraryMasterList.innerHTML = libSkeleton;
   resetPlaylistEditorScroll();
   playlistSearchQuery = '';
   const librarySearchInput = document.getElementById('library-search');
