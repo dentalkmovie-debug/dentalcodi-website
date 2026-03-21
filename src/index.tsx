@@ -6636,8 +6636,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
             \${waitingRooms.map((p, idx) => {
               const isActive = p.is_tv_active === true;
-              const neverConnected = !p.last_active_at;
-              const isOffline = !isActive && !neverConnected;
+              const neverConnected = !p.last_active_at && !p.external_short_url;
+              const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
               return \`
             <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
                  style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#e5e7eb'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
@@ -6776,8 +6776,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           <div id="chair-sortable-container" style="display:grid;gap:10px">
             \${chairs.map((p, idx) => {
               const isActive = p.is_tv_active === true;
-              const neverConnected = !p.last_active_at;
-              const isOffline = !isActive && !neverConnected;
+              const neverConnected = !p.last_active_at && !p.external_short_url;
+              const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
               return \`
             <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
                  style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#c7d2fe'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
@@ -7889,6 +7889,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           } catch (clipErr) {
             showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
           }
+          
+          // 모달 자동 닫기 + 플레이리스트 새로고침 (배지 업데이트)
+          closeModal('guide-url-modal');
+          loadPlaylists();
         } else {
           showToast(data.error || '단축 URL 생성 실패', 'error');
         }
@@ -9538,6 +9542,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           } catch (clipErr) {
             showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
           }
+          
+          // 플레이리스트 새로고침 (배지 업데이트: TV 설정 필요 → 오프라인)
+          loadPlaylists();
         } else {
           showToast('단축 URL 생성 실패: ' + (data.error || ''), 'error');
         }
