@@ -7974,8 +7974,52 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (isOpeningEditor) return;
       isOpeningEditor = true;
       
-      // 즉시 모달 열기
-      openModal('edit-playlist-modal');
+      // ── 인라인 편집 모드: 대시보드 구조(헤더/탭) 유지, 콘텐츠 영역만 교체 ──
+      var editModal = document.getElementById('edit-playlist-modal');
+      var mainContent = document.getElementById('dtv-pg');
+      if (!editModal || !mainContent) { isOpeningEditor = false; return; }
+      
+      // 현재 탭 콘텐츠 숨기기
+      var tabContents = mainContent.querySelectorAll(':scope > div[id^="content-"]');
+      tabContents.forEach(function(el) { el._prevDisplay = el.style.display; el.style.display = 'none'; });
+      
+      // edit-playlist-modal을 main 콘텐츠 안으로 이동 & 인라인 표시
+      if (editModal.parentElement !== mainContent) {
+        mainContent.appendChild(editModal);
+      }
+      // fixed/모달 스타일 제거 → 인라인(일반 블록) 표시
+      editModal.style.cssText = 'display:block; position:relative; width:100%; z-index:auto;';
+      editModal.className = '';  // fixed, inset-0 등 Tailwind 클래스 제거
+      
+      // 내부 backdrop 숨기기 (인라인에서는 불필요)
+      var backdrop = editModal.querySelector('.modal-backdrop');
+      if (backdrop) backdrop.style.display = 'none';
+      
+      // 내부 wrapper를 일반 블록으로 변경
+      var innerWrapper = editModal.querySelector('.absolute.inset-0.flex');
+      if (innerWrapper) {
+        innerWrapper.style.cssText = 'position:relative; display:block; pointer-events:auto;';
+        innerWrapper.className = '';
+      }
+      
+      // 내부 컨텐츠 박스 (max-height/height 조정)
+      var contentBox = editModal.querySelector('.bg-white.rounded-xl');
+      if (contentBox) {
+        contentBox.style.cssText = 'width:100%; max-height:none; height:auto; overflow:visible; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); border:1px solid #e5e7eb;';
+      }
+      
+      // 2칸 레이아웃 높이 조정 (화면에 맞게)
+      var flexContainer = editModal.querySelector('.flex.flex-1.overflow-hidden');
+      if (flexContainer) {
+        flexContainer.style.cssText = 'display:flex; overflow:hidden; height:70vh; min-height:400px;';
+      }
+      
+      // 스크롤 위치 초기화
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      var dashboard = document.getElementById('dashboard');
+      if (dashboard) dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
+      // body scroll 잠금 하지 않음 (인라인이므로)
       
       // UI 초기화
       resetPlaylistEditorScroll();
@@ -10277,6 +10321,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     var _openModalSet = new Set();
 
     function openModal(id) {
+      // edit-playlist-modal은 인라인으로 표시 (openPlaylistEditor에서 처리)
+      if (id === 'edit-playlist-modal') return;
+      
       const el = document.getElementById(id);
       if (!el) return;
 
@@ -10369,27 +10416,37 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           clearInterval(masterItemsRefreshTimer);
           masterItemsRefreshTimer = null;
         }
+        
+        // ── 인라인 편집 패널 닫기: 원래 탭 콘텐츠 복원 ──
+        var mainContent = document.getElementById('dtv-pg');
+        if (mainContent) {
+          var tabContents = mainContent.querySelectorAll(':scope > div[id^="content-"]');
+          tabContents.forEach(function(tc) {
+            // _prevDisplay가 저장되어 있으면 복원, 아니면 'none' 유지
+            if (tc._prevDisplay !== undefined) {
+              tc.style.display = tc._prevDisplay;
+              delete tc._prevDisplay;
+            }
+          });
+        }
+        
         loadPlaylists();
-        // 모달 닫으면 헤더(상단)로 스크롤 + 높이 복원
+        // 스크롤 복원
         setTimeout(function() {
-          // 1) iframe 내부 스크롤
           window.scrollTo({ top: 0, behavior: 'smooth' });
           document.documentElement.scrollTop = 0;
           document.body.scrollTop = 0;
-          // 2) dashboard 요소로 스크롤
           var dashboard = document.getElementById('dashboard');
           if (dashboard) {
             dashboard.style.display = '';
             dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
-          // 3) 아임웹 iframe 환경: 부모에게 스크롤 요청 + 높이 재계산
           try {
             if (window.parent && window.parent !== window) {
               window.parent.postMessage({ type: 'scrollToTop' }, '*');
               window.parent.postMessage({ type: 'scrollTo', top: 0 }, '*');
             }
           } catch(e) {}
-          // 4) iframe 높이 재계산
           modalHeightLocked = false;
           if (typeof postParentHeight === 'function') {
             postParentHeight();
