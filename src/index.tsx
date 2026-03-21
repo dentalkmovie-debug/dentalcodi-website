@@ -2370,7 +2370,7 @@ app.get('/embed/:memberCode', async (c) => {
     const finalEmail = ADMIN_EMAILS.includes(rawEmail) ? '' : rawEmail
     const isMasterAdmin = adminCode === 'master_admin'
     const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
-    return handleAdminPage(c, adminCode, finalEmail, isAdminFlag)
+    return handleAdminPage(c, adminCode, finalEmail, isAdminFlag, memberName)
   }
 
   // ── 신규 사용자: 아임웹 API로 이메일/이름 검증 후 계정 생성 ──
@@ -2445,7 +2445,8 @@ app.get('/embed/:memberCode', async (c) => {
   const isMasterAdmin = adminCode === 'master_admin'
   const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
   // 신규 사용자도 redirect 없이 직접 handleAdminPage 호출
-  return handleAdminPage(c, adminCode, finalEmail, isAdminFlag)
+  const resolvedMemberName = apiMemberName || memberName || ''
+  return handleAdminPage(c, adminCode, finalEmail, isAdminFlag, resolvedMemberName)
 })
 
 // 아임웹 임베드용 - 이전 코드 (사용하지 않음)
@@ -4209,9 +4210,10 @@ app.get('/embed-old/:memberCode', async (c) => {
 // 관리자 페이지 통합 핸들러 함수
 // /admin/ 과 /embed/ 모두 이 함수를 직접 호출 (redirect 없음)
 // ============================================
-async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, isAdminFlagIn: boolean) {
+async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, isAdminFlagIn: boolean, memberNameIn?: string) {
   let emailParam = normalizeEmail(emailParamIn)
   const isAdminQuery = isAdminFlagIn
+  const memberName = memberNameIn || ''
 
   try {
     // 사용자 조회
@@ -4352,7 +4354,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     playlists: playlistsWithItems,
     notices: noticesData.results || [],
     masterItems: masterItemsData.results || [],
-    clinicName: finalUser?.clinic_name || finalUser?.imweb_email || adminCode || '내 치과',
+    clinicName: finalUser?.clinic_name || '',
+    memberName: memberName || '',
     userEmail: finalUser?.imweb_email || emailParam || '',
     isOwnerAdmin: isOwnerAdmin,
     isSuperAdmin: isSuperAdmin,
@@ -5783,6 +5786,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let noticeSortableInstance = null;
     
     let clinicName = INITIAL_DATA.clinicName || '';
+    let memberDisplayName = INITIAL_DATA.memberName || '';
     let playlists = INITIAL_DATA.playlists || [];
     let notices = INITIAL_DATA.notices || [];
     let masterItems = INITIAL_DATA.masterItems || [];
@@ -6090,19 +6094,23 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (loadingDiv) loadingDiv.style.display = 'none';
 
       // 헤더에 실제 계정 이름 표시 (포인트관리 동일 패턴)
-      var displayName = clinicName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+      // 우선순위: clinicName(치과명) → memberName(아임웹 회원명) → userEmail → adminCode
+      var displayName = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
       document.getElementById('clinic-name-text').textContent = displayName;
       if (INITIAL_DATA.isOwnerAdmin) {
         document.getElementById('clinic-name-text').style.cursor = 'default';
         document.getElementById('clinic-name-text').onclick = null;
       }
 
-      // 서브타이틀: 역할 + 이메일
+      // 서브타이틀: 역할 + 이메일 (항상 표시)
       var subtitle = document.getElementById('clinic-subtitle');
       if (subtitle) {
         var role = INITIAL_DATA.isSuperAdmin ? '최고관리자' : (INITIAL_DATA.isOwnerAdmin ? '관리자' : '대기실 TV 관리자');
         var email = INITIAL_DATA.userEmail || '';
-        subtitle.textContent = email ? role + ' · ' + email : role;
+        var parts = [role];
+        if (email) parts.push(email);
+        if (memberDisplayName && displayName !== memberDisplayName) parts.push(memberDisplayName);
+        subtitle.textContent = parts.join(' · ');
       }
       
       // 최고관리자 탭 표시
@@ -6546,8 +6554,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         const res = await fetch(API_BASE + '/playlists');
         const data = await res.json();
         playlists = data.playlists || [];
-        clinicName = data.clinic_name || '내 치과';
-        document.getElementById('clinic-name-text').textContent = clinicName;
+        clinicName = data.clinic_name || '';
+        var updatedDisplay = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+        document.getElementById('clinic-name-text').textContent = updatedDisplay;
         renderPlaylists();
       } catch (e) {
         console.error('Load playlists error:', e);
@@ -10890,7 +10899,8 @@ app.get('/admin/:adminCode', async (c) => {
   const adminCode = c.req.param('adminCode')
   const isAdminFlag = c.req.query('is_admin') === '1'
   const emailParam = (c.req.query('email') || '').trim().toLowerCase()
-  return handleAdminPage(c, adminCode, emailParam, isAdminFlag)
+  const nameParam = c.req.query('name') || ''
+  return handleAdminPage(c, adminCode, emailParam, isAdminFlag, nameParam)
 })
 
 // ============================================
