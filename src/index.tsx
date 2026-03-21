@@ -5035,16 +5035,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 대기실/체어 추가 모달 -->
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
-          <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
-          <p class="text-blue-100 text-sm mt-1">대기실 또는 체어를 추가하세요</p>
+    <div class="absolute inset-0 flex items-center justify-center p-2 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[95vh] overflow-y-auto">
+        <div class="px-5 py-3 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
+          <h3 class="text-base font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
         </div>
         
         <!-- Step 1: 타입 선택 -->
-        <div id="create-step-1" class="p-6">
-          <p class="text-sm text-gray-600 mb-4">어떤 TV를 추가할까요?</p>
+        <div id="create-step-1" class="p-4">
+          <p class="text-sm text-gray-600 mb-3">어떤 TV를 추가할까요?</p>
           <div class="grid grid-cols-2 gap-3">
             <button type="button" onclick="selectCreateType('waiting')"
               class="p-4 border-2 border-gray-200 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition group">
@@ -5064,97 +5063,93 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </button>
           </div>
           <button type="button" onclick="closeModal('create-playlist-modal')"
-            class="w-full mt-4 px-4 py-2 text-gray-500 hover:text-gray-700">취소</button>
+            class="w-full mt-3 px-4 py-2 text-gray-500 hover:text-gray-700 text-sm">취소</button>
         </div>
         
         <!-- Step 2: 대기실 설정 -->
-        <div id="create-step-waiting" class="hidden p-6">
-          <button onclick="backToStep1()" class="text-gray-500 hover:text-gray-700 mb-4 text-sm">
+        <div id="create-step-waiting" class="hidden p-4">
+          <button onclick="backToStep1()" class="text-gray-500 hover:text-gray-700 mb-2 text-sm">
             <i class="fas fa-arrow-left mr-1"></i>뒤로
           </button>
           
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-              <i class="fas fa-couch text-teal-600"></i>
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
+              <i class="fas fa-couch text-teal-600 text-sm"></i>
             </div>
             <div>
-              <h4 class="font-bold text-gray-800">대기실 추가</h4>
+              <h4 class="font-bold text-gray-800 text-sm">대기실 추가</h4>
               <p class="text-xs text-gray-500">스마트 TV에서 재생됩니다</p>
             </div>
           </div>
           
-          <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-medium mb-2">대기실 이름</label>
+          <div class="mb-3">
+            <label class="block text-gray-700 text-sm font-medium mb-1">대기실 이름</label>
             <input type="text" id="new-waiting-name" 
-              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-teal-500"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 text-sm"
               placeholder="예: 대기실1, 로비">
           </div>
           
-          <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-medium mb-2">TV 연결 방식</label>
-            <p class="text-xs text-gray-500 mb-3">USB 인식 문제가 있어 <strong>URL 직접 입력 방식</strong>만 제공합니다.</p>
-            <div class="p-4 border-2 border-blue-200 rounded-xl bg-blue-50">
-              <p class="font-bold text-gray-800">
+          <div class="mb-3">
+            <label class="block text-gray-700 text-sm font-medium mb-1">TV 연결 방식</label>
+            <div class="p-3 border-2 border-blue-200 rounded-lg bg-blue-50">
+              <p class="font-bold text-gray-800 text-sm">
                 단축 URL 직접 입력
                 <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded ml-2">권장</span>
               </p>
-              <div class="mt-2 text-sm text-gray-600 space-y-1">
+              <div class="mt-1 text-xs text-gray-600 space-y-0.5">
                 <p><i class="fas fa-check text-green-500 mr-1"></i>TV 리모컨으로 짧은 주소 입력</p>
-                <p><i class="fas fa-check text-green-500 mr-1"></i>USB 없이 바로 연결 가능</p>
+                <p><i class="fas fa-check text-green-500 mr-1"></i>USB 없이 바로 연결</p>
                 <p><i class="fas fa-check text-green-500 mr-1"></i>인터넷만 되면 OK</p>
               </div>
-              <div class="mt-2 p-2 bg-white rounded text-xs text-gray-600 border border-blue-100">
-                <i class="fas fa-info-circle mr-1"></i>사용법: TV 인터넷 브라우저 → 주소창에 URL 입력 → 전체화면
-              </div>
+              <p class="mt-1 text-xs text-gray-500"><i class="fas fa-info-circle mr-1"></i>TV 브라우저 → URL 입력 → 전체화면</p>
             </div>
           </div>
           
           <div class="flex gap-3">
             <button type="button" onclick="closeModal('create-playlist-modal')"
-              class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">취소</button>
+              class="flex-1 px-4 py-2.5 border rounded-lg hover:bg-gray-50 text-sm">취소</button>
             <button type="button" onclick="createWaitingRoom()"
-              class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">
+              class="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm">
               <i class="fas fa-plus mr-1"></i>추가하기
             </button>
           </div>
         </div>
         
         <!-- Step 2: 체어 설정 -->
-        <div id="create-step-chair" class="hidden p-6">
-          <button onclick="backToStep1()" class="text-gray-500 hover:text-gray-700 mb-4 text-sm">
+        <div id="create-step-chair" class="hidden p-4">
+          <button onclick="backToStep1()" class="text-gray-500 hover:text-gray-700 mb-2 text-sm">
             <i class="fas fa-arrow-left mr-1"></i>뒤로
           </button>
           
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-              <i class="fas fa-tv text-indigo-600"></i>
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+              <i class="fas fa-tv text-indigo-600 text-sm"></i>
             </div>
             <div>
-              <h4 class="font-bold text-gray-800">체어 추가</h4>
+              <h4 class="font-bold text-gray-800 text-sm">체어 추가</h4>
               <p class="text-xs text-gray-500">PC 모니터에서 재생됩니다</p>
             </div>
           </div>
           
-          <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-medium mb-2">체어 이름</label>
+          <div class="mb-3">
+            <label class="block text-gray-700 text-sm font-medium mb-1">체어 이름</label>
             <input type="text" id="new-chair-name" 
-              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
               placeholder="예: 체어1, 진료실1">
           </div>
           
-          <div class="bg-indigo-50 p-3 rounded-lg mb-4">
-            <p class="text-sm text-indigo-700">
+          <div class="bg-indigo-50 p-2.5 rounded-lg mb-3">
+            <p class="text-xs text-indigo-700">
               <i class="fas fa-info-circle mr-1"></i>
-              체어는 <strong>자동 실행 스크립트</strong>로 설정합니다.<br>
-              <span class="text-xs">추가 후 스크립트를 다운로드하세요.</span>
+              체어는 <strong>자동 실행 스크립트</strong>로 설정합니다. 추가 후 스크립트를 다운로드하세요.
             </p>
           </div>
           
           <div class="flex gap-3">
             <button type="button" onclick="closeModal('create-playlist-modal')"
-              class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">취소</button>
+              class="flex-1 px-4 py-2.5 border rounded-lg hover:bg-gray-50 text-sm">취소</button>
             <button type="button" onclick="createChair()"
-              class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">
+              class="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm">
               <i class="fas fa-plus mr-1"></i>추가하기
             </button>
           </div>
