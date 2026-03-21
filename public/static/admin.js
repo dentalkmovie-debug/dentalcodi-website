@@ -311,10 +311,11 @@ function init() {
   const loadingDiv = document.getElementById('loading');
   if (loadingDiv) loadingDiv.style.display = 'none';
 
-  // 헤더에 실제 계정 이름 표시 (포인트관리 동일 패턴)
+  // 헤더에 실제 계정 이름 표시 (이메일은 메인이름으로 사용하지 않음)
   // '내 치과'는 기본값이므로 의미있는 이름이 아님 → 폴백 계속 진행
   var effectiveName = (clinicName && clinicName !== '내 치과') ? clinicName : '';
-  var displayName = effectiveName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+  var defaultName = INITIAL_DATA.isSuperAdmin ? '관리자' : '내 치과';
+  var displayName = effectiveName || memberDisplayName || defaultName;
   document.getElementById('clinic-name-text').textContent = displayName;
   if (INITIAL_DATA.isOwnerAdmin) {
     document.getElementById('clinic-name-text').style.cursor = 'default';
@@ -579,7 +580,7 @@ function showTab(tab) {
       tabBtn.style.borderBottomColor = isActive ? '#2563eb' : 'transparent';
     }
   });
-  if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; renderAdminClinics(); }
+  if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; renderAdminPush(); }
   if (tab === 'settings') initSettingsTab();
   if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
 }
@@ -775,7 +776,8 @@ async function loadPlaylists() {
     playlists = data.playlists || [];
     clinicName = data.clinic_name || '';
     var effectiveUpdated = (clinicName && clinicName !== '내 치과') ? clinicName : '';
-    var updatedDisplay = effectiveUpdated || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+    var updatedDefaultName = INITIAL_DATA.isSuperAdmin ? '관리자' : '내 치과';
+    var updatedDisplay = effectiveUpdated || memberDisplayName || updatedDefaultName;
     document.getElementById('clinic-name-text').textContent = updatedDisplay;
     renderPlaylists();
   } catch (e) {
@@ -4788,22 +4790,22 @@ function saveClinicNameFromSettings() {
 // ============================================
 function showAdminSubTab(sub) {
   _adminSubTab = sub;
-  ['clinics', 'master-items', 'push'].forEach(s => {
+  // 모바일코디 스타일 2탭: push / overview
+  ['push', 'overview'].forEach(s => {
     const btn = document.getElementById('admin-sub-' + s);
     if (btn) {
       if (s === sub) {
-        btn.style.cssText = 'padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+        btn.style.cssText = 'padding:10px 20px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:' + (s === 'push' ? '8px 0 0 8px' : '0 8px 8px 0');
       } else {
-        btn.style.cssText = 'padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit';
+        btn.style.cssText = 'padding:10px 20px;border:1px solid #e5e7eb;' + (s === 'overview' ? 'border-left:none;' : 'border-right:none;') + 'background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border-radius:' + (s === 'push' ? '8px 0 0 8px' : '0 8px 8px 0');
       }
     }
   });
   const body = document.getElementById('admin-body');
   if (!body) return;
   body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>\uB85C\uB529 \uC911...</div>';
-  if (sub === 'clinics') renderAdminClinics();
-  else if (sub === 'master-items') renderAdminMasterItems();
-  else if (sub === 'push') renderAdminPush();
+  if (sub === 'push') renderAdminPush();
+  else if (sub === 'overview') renderAdminOverview();
 }
 
 function renderAdminClinics() {
@@ -4876,7 +4878,7 @@ async function refreshAdminClinics() {
     if (res.ok) {
       const data = await res.json();
       _allClinics = (data.users || []).filter(u => !u.is_master);
-      renderAdminClinics();
+      renderAdminOverview();
       showToast('\uC0C8\uB85C\uACE0\uCE68 \uC644\uB8CC');
     }
   } catch(e) { showToast('\uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error'); }
@@ -4902,6 +4904,94 @@ async function adminActivateClinic(adminCode) {
     });
     if (res.ok) { showToast('\uD65C\uC131\uD654 \uC644\uB8CC'); await refreshAdminClinics(); }
   } catch(e) { showToast('\uCC98\uB9AC \uC2E4\uD328', 'error'); }
+}
+
+// 전체 현황 탭 (치과 관리 + 공용 영상 통합)
+function renderAdminOverview() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  
+  // 치과 목록
+  const q = _adminSearchQuery.toLowerCase().trim();
+  const allC = _allClinics || [];
+  const clinics = allC.filter(function(c) {
+    if (!q) return true;
+    return (c.clinic_name || '').toLowerCase().includes(q) ||
+           (c.imweb_email || '').toLowerCase().includes(q) ||
+           (c.admin_code || '').toLowerCase().includes(q);
+  });
+  const totalCount = allC.length;
+  const activeCount = clinics.filter(function(c){ return c.is_active !== 0; }).length;
+  const suspendedCount = clinics.filter(function(c){ return c.is_active === 0; }).length;
+  const imwebCount = clinics.filter(function(c){ return !!c.imweb_member_id; }).length;
+  const unregCount = clinics.filter(function(c){ return !c.imweb_member_id; }).length;
+  
+  var clinicsHtml = clinics.length === 0
+    ? '<p style="color:#9ca3af;text-align:center;padding:16px 0">' + (q ? '\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.' : '\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.') + '</p>'
+    : '<div style="max-height:50vh;overflow-y:auto;display:grid;gap:6px">' + clinics.map(function(c) {
+        var statusBadge = c.is_active === 0 
+          ? '<span style="padding:2px 6px;background:#fee2e2;color:#dc2626;font-size:10px;border-radius:4px;font-weight:600">\uC815\uC9C0</span>'
+          : '<span style="padding:2px 6px;background:#dcfce7;color:#16a34a;font-size:10px;border-radius:4px;font-weight:600">\uD65C\uC131</span>';
+        var imwebBadge = c.imweb_member_id
+          ? '<span style="padding:2px 6px;background:#dbeafe;color:#2563eb;font-size:10px;border-radius:4px;font-weight:600">\uC784\uC6F9</span>'
+          : '<span style="padding:2px 6px;background:#fef3c7;color:#92400e;font-size:10px;border-radius:4px;font-weight:600">\uBBF8\uB4F1\uB85D</span>';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+              '<span style="font-size:13px;font-weight:600;color:#1f2937">' + (c.clinic_name || '\uC774\uB984\uC5C6\uC74C') + '</span>' +
+              statusBadge + ' ' + imwebBadge +
+            '</div>' +
+            '<p style="font-size:11px;color:#9ca3af;margin:3px 0 0">' + (c.imweb_email || c.admin_code || '') + ' | \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 ' + (c.playlist_count || 0) + '\uAC1C | \uACF5\uC9C0 ' + (c.notice_count || 0) + '\uAC1C</p>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;flex-shrink:0">' +
+            '<button onclick="window.open(\'/admin/' + c.admin_code + '\',\'_blank\')" style="padding:4px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit" title="\uAD00\uB9AC\uC790 \uD398\uC774\uC9C0 \uC5F4\uAE30"><i class="fas fa-external-link-alt"></i></button>' +
+            (c.is_active !== 0 
+              ? '<button onclick="adminSuspendClinic(\'' + c.admin_code + '\')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit">\uC815\uC9C0</button>'
+              : '<button onclick="adminActivateClinic(\'' + c.admin_code + '\')" style="padding:4px 8px;font-size:11px;background:#dcfce7;color:#16a34a;border-radius:6px;border:none;cursor:pointer;font-family:inherit">\uD65C\uC131\uD654</button>') +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+  
+  // 공용 영상
+  var masterHtml = (masterItems || []).map(function(item) {
+    var thumb = item.thumbnail_url 
+      ? '<img src="' + item.thumbnail_url + '" style="width:56px;height:36px;object-fit:cover;border-radius:6px">'
+      : '<div style="width:56px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:11px"></i></div>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">' +
+      thumb +
+      '<div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + (item.title || item.url || '') + '</p><p style="font-size:11px;color:#9ca3af;margin:2px 0 0">' + (item.item_type || '') + '</p></div>' +
+      '<button onclick="adminDeleteMasterItem(' + item.id + ')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit"><i class="fas fa-trash"></i></button>' +
+    '</div>';
+  }).join('');
+  
+  body.innerHTML = 
+    // 치과 관리 섹션
+    '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0">\uCE58\uACFC \uAD00\uB9AC (' + totalCount + '\uAC1C)</h3>' +
+        '<button onclick="refreshAdminClinics()" style="font-size:12px;color:#3b82f6;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button>' +
+      '</div>' +
+      '<input type="text" id="admin-clinic-search" placeholder="\uCE58\uACFC\uBA85, \uC774\uBA54\uC77C, \uCF54\uB4DC \uAC80\uC0C9..." value="' + q.replace(/"/g, '&quot;') + '" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:10px" oninput="_adminSearchQuery=this.value; renderAdminOverview()">' +
+      '<div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px;flex-wrap:wrap">' +
+        '<span style="padding:3px 8px;background:#dcfce7;color:#15803d;border-radius:20px;font-weight:600">\uD65C\uC131 ' + activeCount + '</span>' +
+        '<span style="padding:3px 8px;background:#fee2e2;color:#991b1b;border-radius:20px;font-weight:600">\uC815\uC9C0 ' + suspendedCount + '</span>' +
+        '<span style="padding:3px 8px;background:#dbeafe;color:#1d4ed8;border-radius:20px;font-weight:600">\uC784\uC6F9\uC5F0\uB3D9 ' + imwebCount + '</span>' +
+        '<span style="padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:20px;font-weight:600">\uBBF8\uB4F1\uB85D ' + unregCount + '</span>' +
+      '</div>' +
+      clinicsHtml +
+    '</div>' +
+    
+    // 공용 영상 섹션
+    '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">' +
+      '<h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0 0 14px">\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC (' + (masterItems || []).length + '\uAC1C)</h3>' +
+      '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:14px">' +
+        '<div style="display:flex;gap:8px">' +
+          '<input type="text" id="admin-new-url" placeholder="YouTube \uB610\uB294 Vimeo URL" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit">' +
+          '<button onclick="adminAddMasterItem()" style="padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-plus" style="margin-right:4px"></i>\uCD94\uAC00</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="admin-master-items-list" style="display:grid;gap:6px">' + masterHtml + '</div>' +
+    '</div>';
 }
 
 function renderAdminMasterItems() {
@@ -4949,7 +5039,7 @@ async function adminAddMasterItem() {
       urlInput.value = '';
       const itemsRes = await fetch('/api/master/items');
       if (itemsRes.ok) { const data = await itemsRes.json(); masterItems = data.items || []; cachedMasterItems = masterItems; masterItemsCache = masterItems; }
-      renderAdminMasterItems();
+      if (_adminSubTab === 'overview') renderAdminOverview(); else renderAdminMasterItems();
       showToast('\uC601\uC0C1 \uCD94\uAC00 \uC644\uB8CC');
     } else { const err = await res.json(); showToast(err.error || '\uCD94\uAC00 \uC2E4\uD328', 'error'); }
   } catch(e) { showToast('\uCD94\uAC00 \uC2E4\uD328', 'error'); }
@@ -4961,7 +5051,7 @@ async function adminDeleteMasterItem(itemId) {
     const res = await fetch('/api/master/items/' + itemId, { method: 'DELETE' });
     if (res.ok) {
       masterItems = masterItems.filter(i => i.id !== itemId); cachedMasterItems = masterItems; masterItemsCache = masterItems;
-      renderAdminMasterItems();
+      if (_adminSubTab === 'overview') renderAdminOverview(); else renderAdminMasterItems();
       showToast('\uC0AD\uC81C \uC644\uB8CC');
     }
   } catch(e) { showToast('\uC0AD\uC81C \uC2E4\uD328', 'error'); }
@@ -4970,159 +5060,210 @@ async function adminDeleteMasterItem(itemId) {
 function renderAdminPush() {
   const body = document.getElementById('admin-body');
   if (!body) return;
-  const clinics = (_allClinics || []).filter(c => c.is_active !== 0);
+  const allClinics = _allClinics || [];
+  const totalCount = allClinics.length;
+  const activeCount = allClinics.filter(c => c.is_active !== 0).length;
   
-  body.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-    <h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0 0 14px;display:flex;align-items:center;gap:8px">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-paper-plane"></i></span>
-      \uB9C1\uD06C \uBC30\uD3EC
-    </h3>
-    <p style="font-size:12px;color:#9ca3af;margin:0 0 10px">\uC120\uD0DD\uD55C \uCE58\uACFC\uC758 \uCCAB \uBC88\uC9F8 \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8\uC5D0 \uC601\uC0C1 \uB9C1\uD06C\uB97C \uCD94\uAC00\uD569\uB2C8\uB2E4.</p>
+  body.innerHTML = 
+    // STEP 1: 대상 클리닉 선택
+    '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+        '<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#3b82f6;color:#fff;font-size:12px;font-weight:700;flex-shrink:0">1</span>' +
+        '<h3 style="font-size:15px;font-weight:700;color:#1f2937;margin:0">\ub300\uc0c1 \ud074\ub9ac\ub2c9 \uc120\ud0dd <span style="font-size:12px;font-weight:500;color:#6b7280">(\ud65c\uc131 ' + activeCount + ' / \uc804\uccb4 ' + totalCount + ')</span></h3>' +
+      '</div>' +
+      '<div style="margin-bottom:10px">' +
+        '<div style="position:relative">' +
+          '<i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:12px"></i>' +
+          '<input type="text" id="push-clinic-search" placeholder="\uce58\uacfc\uba85 \ub610\ub294 \uc774\uba54\uc77c\ub85c \uac80\uc0c9..." oninput="filterPushClinics()" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px 9px 32px;font-size:13px;font-family:inherit;box-sizing:border-box">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="push-select-all" onchange="togglePushSelectAll()" style="width:16px;height:16px;accent-color:#3b82f6"><span style="font-size:13px;color:#374151;font-weight:500">\uc804\uccb4\uc120\ud0dd</span></label>' +
+        '<span id="push-selected-count" style="font-size:12px;color:#3b82f6;font-weight:600">0/' + totalCount + '\uac1c</span>' +
+      '</div>' +
+      '<div id="push-clinics-grid" style="display:flex;flex-wrap:wrap;gap:6px;max-height:240px;overflow-y:auto;padding:4px 0"></div>' +
+    '</div>' +
     
-    <!-- STEP 1 -->
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">1</span>
-        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC \uB300\uC0C1 \uC120\uD0DD (${clinics.length}\uAC1C \uCE58\uACFC)</label>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <input type="checkbox" id="push-select-all" onchange="togglePushSelectAll()" style="width:16px;height:16px;accent-color:#7c3aed">
-        <label for="push-select-all" style="font-size:12px;color:#6b7280">\uC804\uCCB4 \uC120\uD0DD</label>
-        <span id="push-selected-count" style="font-size:11px;color:#7c3aed;font-weight:600;margin-left:auto">0\uAC1C \uC120\uD0DD</span>
-      </div>
-      <div style="max-height:160px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px;display:grid;gap:4px">
-        ${clinics.map(c => 
-          '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .1s" onmouseover="this.style.background=\'#f5f3ff\'" onmouseout="this.style.background=\'transparent\'">' +
-          '<input type="checkbox" class="push-clinic-cb" style="width:14px;height:14px;accent-color:#7c3aed" value="' + c.admin_code + '" onchange="updatePushCount()">' +
-          '<span style="font-size:12px;color:#1f2937">' + (c.clinic_name || c.admin_code) + '</span>' +
-          '<span style="font-size:10px;color:#9ca3af;margin-left:auto">' + (c.imweb_email || '') + '</span></label>'
-        ).join('')}
-      </div>
-    </div>
+    // STEP 2: 배포할 링크 입력
+    '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+        '<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#3b82f6;color:#fff;font-size:12px;font-weight:700;flex-shrink:0">2</span>' +
+        '<h3 style="font-size:15px;font-weight:700;color:#1f2937;margin:0">\ubc30\ud3ec\ud560 \ub9c1\ud06c</h3>' +
+      '</div>' +
+      '<div id="push-templates-area" style="margin-bottom:12px"></div>' +
+      '<div style="display:grid;gap:8px">' +
+        '<input type="text" id="push-link-name" placeholder="\ub9c1\ud06c \uc774\ub984 (\uc608: \uce58\uc544\uad50\uc815 \uc548\ub0b4)" style="border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit">' +
+        '<input type="text" id="push-link-url" placeholder="URL (https://...)" style="border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit">' +
+        '<div style="display:flex;gap:8px">' +
+          '<input type="text" id="push-link-thumb" placeholder="\uc378\ub124\uc77c URL (\uc120\ud0dd)" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit">' +
+          '<button onclick="addPushTemplate()" style="padding:9px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap"><i class="fas fa-plus" style="margin-right:4px"></i>\ucd94\uac00</button>' +
+        '</div>' +
+        '<input type="text" id="push-link-memo" placeholder="\uae30\ubcf8 \uba54\ubaa8 (\ub9c1\ud06c \uc120\ud0dd \uc2dc \uc790\ub3d9 \uc785\ub825, \uc120\ud0dd)" style="border:1px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit">' +
+      '</div>' +
+    '</div>' +
     
-    <!-- STEP 2 -->
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">2</span>
-        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC\uD560 \uB9C1\uD06C</label>
-      </div>
-      
-      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-        <button onclick="selectPushTemplate('master')" style="padding:5px 12px;background:#e0e7ff;color:#4338ca;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
-          <i class="fas fa-list" style="margin-right:4px"></i>\uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD
-        </button>
-        <button onclick="selectPushTemplate('youtube')" style="padding:5px 12px;background:#fee2e2;color:#dc2626;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
-          <i class="fab fa-youtube" style="margin-right:4px"></i>YouTube URL
-        </button>
-        <button onclick="selectPushTemplate('custom')" style="padding:5px 12px;background:#f3f4f6;color:#374151;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
-          <i class="fas fa-edit" style="margin-right:4px"></i>\uC9C1\uC811 \uC785\uB825
-        </button>
-      </div>
-      
-      <div id="push-master-select" style="display:none;margin-bottom:10px;border:1px solid #c7d2fe;border-radius:8px;padding:10px;background:#eef2ff">
-        <p style="font-size:11px;color:#4f46e5;margin:0 0 8px"><i class="fas fa-info-circle" style="margin-right:4px"></i>\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694</p>
-        <div style="max-height:128px;overflow-y:auto;display:grid;gap:4px" id="push-master-items-list">
-          ${(masterItems || []).map(item => 
-            '<label style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px;cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'#fff\'" onmouseout="this.style.background=\'transparent\'">' +
-            '<input type="checkbox" class="push-master-item-cb" style="width:14px;height:14px;accent-color:#6366f1" value="' + item.id + '" data-url="' + (item.url || '') + '" data-title="' + ((item.title || '').replace(/"/g, '&amp;quot;')) + '">' +
-            (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" style="width:40px;height:24px;object-fit:cover;border-radius:4px">' : '<div style="width:40px;height:24px;background:#e5e7eb;border-radius:4px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:9px"></i></div>') +
-            '<span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (item.title || item.url || '') + '</span></label>'
-          ).join('')}
-        </div>
-      </div>
-      
-      <div id="push-custom-input" style="display:flex;gap:8px">
-        <input type="text" id="push-link-name" placeholder="\uB9C1\uD06C \uC774\uB984" style="width:33%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit">
-        <input type="text" id="push-link-url" placeholder="URL (https://...)" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit">
-      </div>
-    </div>
-    
-    <!-- STEP 3 -->
-    <div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">3</span>
-        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC \uC2E4\uD589</label>
-      </div>
-      <button onclick="executePush()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(124,58,237,.3);transition:opacity .15s"
-        onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-        <i class="fas fa-paper-plane" style="margin-right:8px"></i>\uC120\uD0DD \uCE58\uACFC\uC5D0 \uBC30\uD3EC
-      </button>
-    </div>
-  </div>`;
+    // 배포 버튼
+    '<button onclick="executePush()" style="width:100%;padding:14px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(59,130,246,.3);transition:opacity .15s" onmouseover="this.style.opacity=\'0.9\'" onmouseout="this.style.opacity=\'1\'">' +
+      '<i class="fas fa-paper-plane" style="margin-right:8px"></i>\uc120\ud0dd \ub300\uc0c1\uc5d0 \ubc30\ud3ec' +
+    '</button>';
+  
+  renderPushClinicsGrid();
+  renderPushTemplates();
 }
 
-function updatePushCount() {
-  const count = document.querySelectorAll('.push-clinic-cb:checked').length;
-  const el = document.getElementById('push-selected-count');
-  if (el) el.textContent = count + '\uAC1C \uC120\uD0DD';
+var _pushSearchQuery = '';
+var _pushTemplates = [];
+
+function filterPushClinics() {
+  var el = document.getElementById('push-clinic-search');
+  _pushSearchQuery = el ? el.value.toLowerCase().trim() : '';
+  renderPushClinicsGrid();
 }
 
-function selectPushTemplate(type) {
-  const masterSelect = document.getElementById('push-master-select');
-  const customInput = document.getElementById('push-custom-input');
-  if (!masterSelect || !customInput) return;
+function renderPushClinicsGrid() {
+  var grid = document.getElementById('push-clinics-grid');
+  if (!grid) return;
+  var allClinics = _allClinics || [];
+  var q = _pushSearchQuery;
+  var filtered = allClinics.filter(function(c) {
+    if (!q) return true;
+    return (c.clinic_name || '').toLowerCase().includes(q) ||
+           (c.imweb_email || '').toLowerCase().includes(q) ||
+           (c.admin_code || '').toLowerCase().includes(q);
+  });
   
-  if (type === 'master') {
-    masterSelect.style.display = '';
-    customInput.style.display = 'none';
+  if (filtered.length === 0) {
+    grid.innerHTML = '<p style="width:100%;text-align:center;color:#9ca3af;font-size:13px;padding:12px 0">' + (q ? '\uac80\uc0c9 \uacb0\uacfc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.' : '\ub4f1\ub85d\ub41c \uce58\uacfc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.') + '</p>';
+    updatePushCount();
+    return;
+  }
+  
+  grid.innerHTML = filtered.map(function(c) {
+    var name = c.clinic_name || c.admin_code || '\uc774\ub984\uc5c6\uc74c';
+    var isActive = c.is_active !== 0;
+    var statusDot = isActive 
+      ? '<span style="width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>' 
+      : '<span style="width:6px;height:6px;border-radius:50%;background:#ef4444;flex-shrink:0"></span>';
+    var chipBorder = isActive ? '#e5e7eb' : '#fecaca';
+    var chipBg = isActive ? '#fff' : '#fef2f2';
+    return '<label style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid ' + chipBorder + ';border-radius:20px;cursor:pointer;font-size:12px;background:' + chipBg + ';transition:all .15s;white-space:nowrap;user-select:none" onmouseover="if(!this.querySelector(\'input\').checked){this.style.borderColor=\'#93c5fd\';this.style.background=\'#eff6ff\'}" onmouseout="if(!this.querySelector(\'input\').checked){this.style.borderColor=\'' + chipBorder + '\';this.style.background=\'' + chipBg + '\'}">' +
+      '<input type="checkbox" class="push-clinic-cb" value="' + c.admin_code + '" onchange="updatePushCount();updatePushChipStyle(this)" style="width:14px;height:14px;accent-color:#3b82f6">' +
+      statusDot +
+      '<span style="font-weight:500">' + name + '</span>' +
+    '</label>';
+  }).join('');
+  
+  updatePushCount();
+}
+
+function updatePushChipStyle(cb) {
+  var label = cb.closest('label');
+  if (!label) return;
+  if (cb.checked) {
+    label.style.borderColor = '#3b82f6';
+    label.style.background = '#dbeafe';
+    label.style.boxShadow = '0 0 0 1px #3b82f6';
   } else {
-    masterSelect.style.display = 'none';
-    customInput.style.display = '';
-    if (type === 'youtube') {
-      const nameEl = document.getElementById('push-link-name');
-      const urlEl = document.getElementById('push-link-url');
-      if (nameEl) nameEl.placeholder = '\uC601\uC0C1 \uC81C\uBAA9';
-      if (urlEl) { urlEl.placeholder = 'YouTube URL (https://youtube.com/...)'; urlEl.value = ''; }
-    } else {
-      const nameEl = document.getElementById('push-link-name');
-      const urlEl = document.getElementById('push-link-url');
-      if (nameEl) nameEl.placeholder = '\uB9C1\uD06C \uC774\uB984';
-      if (urlEl) { urlEl.placeholder = 'URL (https://...)'; urlEl.value = ''; }
-    }
+    label.style.borderColor = '#e5e7eb';
+    label.style.background = '#fff';
+    label.style.boxShadow = 'none';
   }
 }
 
+function addPushTemplate() {
+  var nameEl = document.getElementById('push-link-name');
+  var urlEl = document.getElementById('push-link-url');
+  var thumbEl = document.getElementById('push-link-thumb');
+  var memoEl = document.getElementById('push-link-memo');
+  if (!urlEl || !urlEl.value.trim()) { showToast('URL\uC744 \uC785\uB825\uD558\uC138\uC694', 'error'); return; }
+  _pushTemplates.push({
+    name: nameEl ? nameEl.value.trim() : '',
+    url: urlEl.value.trim(),
+    thumb: thumbEl ? thumbEl.value.trim() : '',
+    memo: memoEl ? memoEl.value.trim() : ''
+  });
+  if (nameEl) nameEl.value = '';
+  if (urlEl) urlEl.value = '';
+  if (thumbEl) thumbEl.value = '';
+  if (memoEl) memoEl.value = '';
+  renderPushTemplates();
+}
+
+function removePushTemplate(idx) {
+  _pushTemplates.splice(idx, 1);
+  renderPushTemplates();
+}
+
+function renderPushTemplates() {
+  var area = document.getElementById('push-templates-area');
+  if (!area) return;
+  if (_pushTemplates.length === 0) {
+    area.innerHTML = '';
+    return;
+  }
+  area.innerHTML = '<div style="margin-bottom:8px;font-size:12px;color:#6b7280;font-weight:500">\uc608\uc57d\ub41c \ub9c1\ud06c (' + _pushTemplates.length + '\uac1c)</div>' +
+    _pushTemplates.map(function(t, i) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:6px">' +
+      '<i class="fas fa-link" style="color:#3b82f6;font-size:12px;flex-shrink:0"></i>' +
+      '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (t.name || 'Untitled') + '</div><div style="font-size:11px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.url + '</div></div>' +
+      '<button onclick="removePushTemplate(' + i + ')" style="border:none;background:#fee2e2;color:#ef4444;cursor:pointer;font-size:11px;padding:4px 8px;border-radius:6px"><i class="fas fa-times"></i></button>' +
+    '</div>';
+  }).join('');
+}
+
+function updatePushCount() {
+  var checked = document.querySelectorAll('.push-clinic-cb:checked').length;
+  var total = document.querySelectorAll('.push-clinic-cb').length;
+  var el = document.getElementById('push-selected-count');
+  if (el) el.textContent = checked + '/' + total + '\uAC1C';
+  // sync select-all checkbox
+  var sa = document.getElementById('push-select-all');
+  if (sa) sa.checked = (total > 0 && checked === total);
+}
+
+function selectPushTemplate(type) {
+  // legacy compat - no longer used in new UI but keep for safety
+}
+
 function togglePushSelectAll() {
-  const checked = document.getElementById('push-select-all').checked;
-  document.querySelectorAll('.push-clinic-cb').forEach(cb => { cb.checked = checked; });
+  var checked = document.getElementById('push-select-all').checked;
+  document.querySelectorAll('.push-clinic-cb').forEach(function(cb) { 
+    cb.checked = checked; 
+    updatePushChipStyle(cb);
+  });
   updatePushCount();
 }
 
 async function executePush() {
-  const selectedCodes = Array.from(document.querySelectorAll('.push-clinic-cb:checked')).map(cb => cb.value);
+  var selectedCodes = Array.from(document.querySelectorAll('.push-clinic-cb:checked')).map(function(cb){ return cb.value; });
   if (selectedCodes.length === 0) { showToast('\uBC30\uD3EC \uB300\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694', 'error'); return; }
   
-  // \uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD \uBAA8\uB4DC \uD655\uC778
-  const masterSelect = document.getElementById('push-master-select');
-  const isMasterMode = masterSelect && masterSelect.style.display !== 'none';
-  
-  let pushItems = [];
-  if (isMasterMode) {
-    const checked = document.querySelectorAll('.push-master-item-cb:checked');
-    if (checked.length === 0) { showToast('\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694', 'error'); return; }
-    checked.forEach(cb => {
-      pushItems.push({ url: cb.dataset.url, title: cb.dataset.title || cb.dataset.url });
-    });
+  // 템플릿이 있으면 사용, 없으면 입력 필드에서 직접 가져오기
+  var pushItems = [];
+  if (_pushTemplates.length > 0) {
+    pushItems = _pushTemplates.map(function(t) { return { url: t.url, title: t.name || t.url }; });
   } else {
-    const linkName = (document.getElementById('push-link-name') || {}).value || '';
-    const linkUrl = (document.getElementById('push-link-url') || {}).value || '';
+    var linkName = (document.getElementById('push-link-name') || {}).value || '';
+    var linkUrl = (document.getElementById('push-link-url') || {}).value || '';
     if (!linkUrl.trim()) { showToast('URL\uC744 \uC785\uB825\uD558\uC138\uC694', 'error'); return; }
     pushItems.push({ url: linkUrl.trim(), title: linkName.trim() || linkUrl.trim() });
   }
   
-  const itemNames = pushItems.map(i => i.title).join(', ');
+  var itemNames = pushItems.map(function(i){ return i.title; }).join(', ');
   if (!confirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?\n\n' + itemNames)) return;
   
-  let successCount = 0;
-  let failCount = 0;
-  for (const code of selectedCodes) {
+  var successCount = 0;
+  var failCount = 0;
+  for (var i = 0; i < selectedCodes.length; i++) {
+    var code = selectedCodes[i];
     try {
-      const pRes = await fetch('/api/' + code + '/playlists');
-      const pData = await pRes.json();
-      const firstPlaylist = (pData.playlists || [])[0];
+      var pRes = await fetch('/api/' + code + '/playlists');
+      var pData = await pRes.json();
+      var firstPlaylist = (pData.playlists || [])[0];
       if (firstPlaylist) {
-        for (const item of pushItems) {
-          const addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
+        for (var j = 0; j < pushItems.length; j++) {
+          var item = pushItems[j];
+          var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: item.url, title: item.title })
@@ -5139,12 +5280,13 @@ async function executePush() {
   } else {
     showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
   }
-  // \uC785\uB825 \uCD08\uAE30\uD654
-  const nameEl = document.getElementById('push-link-name');
-  const urlEl = document.getElementById('push-link-url');
+  // 입력 초기화
+  _pushTemplates = [];
+  var nameEl = document.getElementById('push-link-name');
+  var urlEl = document.getElementById('push-link-url');
   if (nameEl) nameEl.value = '';
   if (urlEl) urlEl.value = '';
-  document.querySelectorAll('.push-master-item-cb').forEach(cb => { cb.checked = false; });
+  renderPushTemplates();
 }
 
 init();
