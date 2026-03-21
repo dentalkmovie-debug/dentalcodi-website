@@ -4259,7 +4259,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
 
     // email이 있을 때만 DB 값과 비교 (없으면 member_id 기반으로 허용)
-    if (emailParam && user.imweb_email && normalizeEmail(user.imweb_email) !== emailParam) {
+    // ADMIN_EMAILS 사용자는 어떤 계정이든 접속 가능 (사이트 관리자)
+    if (emailParam && user.imweb_email && normalizeEmail(user.imweb_email) !== emailParam && !isAdminEmail(emailParam)) {
       return c.html(getBlockedPageHtml('로그인이 필요합니다', '이메일이 일치하지 않습니다.', '아임웹 페이지에서 다시 접속해주세요.'))
     }
 
