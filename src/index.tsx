@@ -4512,13 +4512,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         <!-- 공지사항 관리 -->
         <div id="content-notices" style="display:none">
           <!-- 공지 전체 ON/OFF -->
-          <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-4">
-            <label class="flex items-center justify-between cursor-pointer">
-              <div class="flex items-center gap-3">
-                <i class="fas fa-bullhorn text-green-500 text-xl"></i>
+          <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:14px"><i class="fas fa-bullhorn"></i></span>
                 <div>
-                  <span class="font-bold text-gray-800">공지창 표시</span>
-                  <p class="text-xs text-gray-500">TV 화면에 공지를 표시합니다</p>
+                  <span style="font-size:14px;font-weight:700;color:#1f2937">공지창 표시</span>
+                  <p style="font-size:11px;color:#9ca3af;margin:2px 0 0">TV 화면에 공지를 표시합니다</p>
                 </div>
               </div>
               <div class="relative">
@@ -4530,78 +4530,75 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
           
           <!-- 공통 공지 스타일 설정 -->
-          <div id="notice-style-settings" class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-6 mb-6">
-            <div class="flex items-center gap-2 mb-4">
-              <i class="fas fa-palette text-indigo-500"></i>
-              <span class="font-bold text-gray-800">공지 스타일 설정 (공통)</span>
-              <span class="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">모든 공지에 적용</span>
+          <div id="notice-style-settings" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff);border:1px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:11px"><i class="fas fa-palette"></i></span>
+              <span style="font-size:14px;font-weight:700;color:#1f2937">공지 스타일 설정 (공통)</span>
+              <span style="font-size:10px;background:#e0e7ff;color:#4f46e5;padding:3px 8px;border-radius:20px;font-weight:600">모든 공지에 적용</span>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
               <div>
-                <label class="block text-sm text-gray-600 mb-2">글자 크기</label>
-                <div class="flex items-center gap-2">
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">글자 크기</label>
+                <div style="display:flex;align-items:center;gap:6px">
                   <input type="number" id="global-notice-font-size" value="32" min="16" max="300"
-                    class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit"
                     onchange="saveGlobalNoticeSettings()">
-                  <span class="text-sm text-gray-500">px</span>
+                  <span style="font-size:12px;color:#9ca3af">px</span>
                 </div>
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">자간</label>
-                <div class="flex items-center gap-2">
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">자간</label>
+                <div style="display:flex;align-items:center;gap:6px">
                   <input type="number" id="global-notice-letter-spacing" value="0" min="-5" max="30" step="0.5"
-                    class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit"
                     oninput="updateNoticePreview(); scheduleSaveNoticeSettings()" onchange="saveGlobalNoticeSettings()">
-                  <span class="text-sm text-gray-500">px</span>
+                  <span style="font-size:12px;color:#9ca3af">px</span>
                 </div>
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">스크롤 속도 <span id="scroll-speed-label" class="text-indigo-600 font-medium">보통</span></label>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">스크롤 속도 <span id="scroll-speed-label" style="color:#6366f1;font-weight:600">보통</span></label>
                 <input type="range" id="global-notice-scroll-speed" value="50" min="10" max="500" step="10"
-                  class="w-full h-10 accent-indigo-500"
+                  style="width:100%;height:36px;accent-color:#6366f1"
                   oninput="updateScrollSpeedLabel()" onchange="saveGlobalNoticeSettings()">
-                <div class="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>느림</span>
-                  <span>보통</span>
-                  <span>빠름</span>
-                  <span>매우빠름</span>
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;margin-top:2px">
+                  <span>느림</span><span>보통</span><span>빠름</span><span>매우빠름</span>
                 </div>
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">글자 색상</label>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">글자 색상</label>
                 <input type="color" id="global-notice-text-color" value="#ffffff"
-                  class="w-full h-10 border rounded-lg cursor-pointer"
+                  style="width:100%;height:36px;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer"
                   onchange="saveGlobalNoticeSettings()">
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">배경 색상</label>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">배경 색상</label>
                 <input type="color" id="global-notice-bg-color" value="#1a1a2e"
-                  class="w-full h-10 border rounded-lg cursor-pointer"
+                  style="width:100%;height:36px;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer"
                   onchange="saveGlobalNoticeSettings()">
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">배경 투명도 <span id="notice-opacity-label">100%</span></label>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">배경 투명도 <span id="notice-opacity-label">100%</span></label>
                 <input type="range" id="global-notice-bg-opacity" value="100" min="0" max="100" step="5"
-                  class="w-full h-10"
+                  style="width:100%;height:36px"
                   onchange="updateNoticeOpacityLabel(); saveGlobalNoticeSettings()">
               </div>
               <div>
-                <label class="block text-sm text-gray-600 mb-2">공지 위치</label>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:6px">공지 위치</label>
                 <input type="hidden" id="global-notice-position" value="bottom">
-                <div class="flex gap-2">
+                <div style="display:flex;gap:6px">
                   <button type="button" id="position-top-btn" onclick="setNoticePosition('top')"
-                    class="flex-1 px-3 py-2 border rounded-lg text-sm font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200">
-                    <i class="fas fa-arrow-up mr-1"></i>상단
+                    style="flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:#f3f4f6;color:#6b7280;font-family:inherit;transition:background .15s">
+                    <i class="fas fa-arrow-up" style="margin-right:4px"></i>상단
                   </button>
                   <button type="button" id="position-bottom-btn" onclick="setNoticePosition('bottom')"
-                    class="flex-1 px-3 py-2 border rounded-lg text-sm font-medium transition-colors bg-indigo-500 text-white">
-                    <i class="fas fa-arrow-down mr-1"></i>하단
+                    style="flex:1;padding:8px 10px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#6366f1;color:#fff;font-family:inherit">
+                    <i class="fas fa-arrow-down" style="margin-right:4px"></i>하단
                   </button>
                 </div>
               </div>
             </div>
-            <div class="mt-3 p-2 rounded-lg overflow-hidden" id="notice-preview-bar" style="background: #1a1a2e; max-height: 60px;">
-              <span id="notice-preview-text" style="color: #ffffff; font-size: 16px; font-weight: bold;">공지 미리보기</span>
+            <div id="notice-preview-bar" style="margin-top:12px;padding:8px;border-radius:8px;overflow:hidden;background:#1a1a2e;max-height:60px">
+              <span id="notice-preview-text" style="color:#ffffff;font-size:16px;font-weight:bold">공지 미리보기</span>
             </div>
           </div>
           
@@ -4614,122 +4611,146 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </button>
           </div>
           
-          <div id="notices-container" class="grid gap-4">
+          <div id="notices-container" style="display:grid;gap:12px">
           </div>
         </div>
         
         <!-- 설정 탭 -->
         <div id="content-settings" style="display:none">
           <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-            <i class="fas fa-cog" style="color:#2563eb"></i>TV 설정
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px"><i class="fas fa-cog"></i></span>
+            TV 설정
           </div>
           
           <!-- 치과명 -->
-          <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            <h3 class="font-bold text-gray-700 mb-3"><i class="fas fa-hospital mr-2 text-blue-500"></i>치과 정보</h3>
-            <div class="flex gap-2">
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-hospital"></i></span>
+              치과 정보
+            </h3>
+            <div style="display:flex;gap:8px">
               <input type="text" id="settings-clinic-name" value="" 
-                class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="치과명을 입력하세요">
+                style="flex:1;padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" placeholder="치과명을 입력하세요">
               <button onclick="saveClinicNameFromSettings()" 
-                class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium">저장</button>
+                style="padding:8px 16px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">저장</button>
             </div>
           </div>
           
           <!-- TV 바로가기 URL -->
-          <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            <h3 class="font-bold text-gray-700 mb-3"><i class="fas fa-link mr-2 text-blue-500"></i>TV 바로가기 URL</h3>
-            <div id="settings-tv-urls" class="space-y-2">
-              <p class="text-sm text-gray-500">플레이리스트가 없습니다.</p>
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-link"></i></span>
+              TV 바로가기 URL
+            </h3>
+            <div id="settings-tv-urls" style="display:grid;gap:8px">
+              <p style="font-size:13px;color:#9ca3af">플레이리스트가 없습니다.</p>
             </div>
           </div>
           
           <!-- 로고 설정 -->
-          <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            <h3 class="font-bold text-gray-700 mb-3"><i class="fas fa-image mr-2 text-blue-500"></i>로고 설정</h3>
-            <div class="space-y-3">
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-image"></i></span>
+              로고 설정
+            </h3>
+            <div style="display:grid;gap:10px">
               <div>
-                <label class="block text-sm text-gray-600 mb-1">로고 URL</label>
-                <div class="flex gap-2">
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">로고 URL</label>
+                <div style="display:flex;gap:8px">
                   <input type="text" id="settings-logo-url" placeholder="https://example.com/logo.png"
-                    class="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                  <button onclick="saveLogoSettings()" class="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">저장</button>
+                    style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">
+                  <button onclick="saveLogoSettings()" 
+                    style="padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">저장</button>
                 </div>
               </div>
-              <div class="flex items-center gap-4">
-                <label class="text-sm text-gray-600">로고 크기</label>
-                <input type="range" id="settings-logo-size" min="50" max="300" value="150" class="flex-1 accent-blue-500"
+              <div style="display:flex;align-items:center;gap:12px">
+                <label style="font-size:12px;color:#6b7280">로고 크기</label>
+                <input type="range" id="settings-logo-size" min="50" max="300" value="150" style="flex:1;accent-color:#2563eb"
                   oninput="document.getElementById('logo-size-label').textContent=this.value+'px'">
-                <span id="logo-size-label" class="text-sm text-gray-500 w-12">150px</span>
+                <span id="logo-size-label" style="font-size:12px;color:#9ca3af;width:40px">150px</span>
               </div>
-              <div id="settings-logo-preview" class="hidden">
-                <p class="text-xs text-gray-500 mb-1">미리보기</p>
-                <img id="logo-preview-img" src="" class="max-h-20 rounded border">
+              <div id="settings-logo-preview" style="display:none">
+                <p style="font-size:11px;color:#9ca3af;margin:0 0 4px">미리보기</p>
+                <img id="logo-preview-img" src="" style="max-height:60px;border-radius:6px;border:1px solid #e5e7eb">
               </div>
             </div>
           </div>
           
           <!-- 자막 설정 -->
-          <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
-            <h3 class="font-bold text-gray-700 mb-3"><i class="fas fa-closed-captioning mr-2 text-blue-500"></i>자막 설정</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-closed-captioning"></i></span>
+              자막 설정
+            </h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">
               <div>
-                <label class="block text-xs text-gray-600 mb-1">자막 글자 크기</label>
+                <label style="display:block;font-size:11px;color:#6b7280;margin-bottom:4px">자막 글자 크기</label>
                 <input type="number" id="settings-subtitle-font" value="28" min="12" max="100"
-                  class="w-full px-3 py-2 border rounded-lg text-sm" onchange="saveSubtitleSettings()">
+                  style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" onchange="saveSubtitleSettings()">
               </div>
               <div>
-                <label class="block text-xs text-gray-600 mb-1">배경 투명도</label>
+                <label style="display:block;font-size:11px;color:#6b7280;margin-bottom:4px">배경 투명도</label>
                 <input type="range" id="settings-subtitle-opacity" value="80" min="0" max="100"
-                  class="w-full accent-blue-500" onchange="saveSubtitleSettings()">
+                  style="width:100%;accent-color:#2563eb" onchange="saveSubtitleSettings()">
               </div>
               <div>
-                <label class="block text-xs text-gray-600 mb-1">위치</label>
-                <select id="settings-subtitle-position" class="w-full px-3 py-2 border rounded-lg text-sm" onchange="saveSubtitleSettings()">
+                <label style="display:block;font-size:11px;color:#6b7280;margin-bottom:4px">위치</label>
+                <select id="settings-subtitle-position" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" onchange="saveSubtitleSettings()">
                   <option value="bottom">하단</option>
                   <option value="top">상단</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-gray-600 mb-1">하단 여백</label>
+                <label style="display:block;font-size:11px;color:#6b7280;margin-bottom:4px">하단 여백</label>
                 <input type="number" id="settings-subtitle-offset" value="80" min="0" max="300"
-                  class="w-full px-3 py-2 border rounded-lg text-sm" onchange="saveSubtitleSettings()">
+                  style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" onchange="saveSubtitleSettings()">
               </div>
             </div>
           </div>
           
           <!-- 계정 정보 -->
-          <div class="bg-white rounded-xl shadow-sm p-6">
-            <h3 class="font-bold text-gray-700 mb-3"><i class="fas fa-user mr-2 text-blue-500"></i>계정 정보</h3>
-            <div class="text-sm text-gray-600 space-y-1" id="settings-account-info">
-              <p>관리자 코드: <span class="font-mono bg-gray-100 px-2 py-0.5 rounded" id="settings-admin-code"></span></p>
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-user"></i></span>
+              계정 정보
+            </h3>
+            <div id="settings-account-info" style="font-size:13px;color:#6b7280">
+              <p style="margin:0">관리자 코드: <span id="settings-admin-code" style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:4px;font-size:12px"></span></p>
             </div>
           </div>
         </div>
         
         <!-- 관리 탭 (최고관리자 전용) -->
         <div id="content-admin" style="display:none">
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-crown mr-2 text-purple-500"></i>최고관리자</h2>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 style="font-size:18px;font-weight:700;color:#1f2937;display:flex;align-items:center;gap:8px;margin:0">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px"><i class="fas fa-crown"></i></span>
+              최고관리자
+            </h2>
           </div>
           
           <!-- 관리 서브탭 -->
-          <div class="flex gap-2 mb-4">
+          <div style="display:flex;gap:8px;margin-bottom:14px">
             <button onclick="showAdminSubTab('clinics')" id="admin-sub-clinics" 
-              class="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium">
-              <i class="fas fa-hospital mr-1"></i>치과 관리
+              style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+              <i class="fas fa-hospital" style="margin-right:4px"></i>치과 관리
             </button>
             <button onclick="showAdminSubTab('master-items')" id="admin-sub-master-items" 
-              class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">
-              <i class="fas fa-video mr-1"></i>공용 영상
+              style="padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+              onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+              <i class="fas fa-video" style="margin-right:4px"></i>공용 영상
             </button>
             <button onclick="showAdminSubTab('push')" id="admin-sub-push" 
-              class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">
-              <i class="fas fa-paper-plane mr-1"></i>링크 배포
+              style="padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+              onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+              <i class="fas fa-paper-plane" style="margin-right:4px"></i>링크 배포
             </button>
           </div>
           
-          <div id="admin-body" class="min-h-[200px]">
-            <div class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>로딩 중...</div>
+          <div id="admin-body" style="min-height:200px">
+            <div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>로딩 중...</div>
           </div>
         </div>
         
@@ -6038,20 +6059,20 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const loadingDiv = document.getElementById('loading');
       if (loadingDiv) loadingDiv.style.display = 'none';
 
+      // 헤더에 실제 계정 이름 표시 (포인트관리 동일 패턴)
+      var displayName = clinicName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+      document.getElementById('clinic-name-text').textContent = displayName;
       if (INITIAL_DATA.isOwnerAdmin) {
-        document.getElementById('clinic-name-text').textContent = '관리자';
         document.getElementById('clinic-name-text').style.cursor = 'default';
         document.getElementById('clinic-name-text').onclick = null;
-      } else {
-        document.getElementById('clinic-name-text').textContent = clinicName;
       }
 
-      // 서브타이틀에 이메일/역할 표시
+      // 서브타이틀: 역할 + 이메일
       var subtitle = document.getElementById('clinic-subtitle');
       if (subtitle) {
+        var role = INITIAL_DATA.isSuperAdmin ? '최고관리자' : (INITIAL_DATA.isOwnerAdmin ? '관리자' : '대기실 TV 관리자');
         var email = INITIAL_DATA.userEmail || '';
-        var role = INITIAL_DATA.isSuperAdmin ? '최고관리자' : '대기실 TV 관리자';
-        subtitle.textContent = email ? email + ' · ' + role : role;
+        subtitle.textContent = email ? role + ' · ' + email : role;
       }
       
       // 최고관리자 탭 표시
@@ -6518,11 +6539,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       if (playlists.length === 0) {
         container.innerHTML = \`
-          <div class="bg-white rounded-xl shadow-sm p-8 text-center">
-            <i class="fas fa-folder-open text-4xl text-gray-300 mb-4"></i>
-            <p class="text-gray-500 mb-4">등록된 대기실/체어가 없습니다.</p>
-            <button onclick="showCreatePlaylistModal()" class="text-blue-500 hover:text-blue-600">
-              <i class="fas fa-plus mr-2"></i>대기실/체어 추가
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center">
+            <i class="fas fa-folder-open" style="font-size:32px;color:#d1d5db;margin-bottom:12px;display:block"></i>
+            <p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 대기실/체어가 없습니다.</p>
+            <button onclick="showCreatePlaylistModal()" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              <i class="fas fa-plus" style="margin-right:6px"></i>대기실/체어 추가
             </button>
           </div>
         \`;
@@ -6547,54 +6568,61 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
              대기실 목록
              ========================================================= -->
         \${waitingRooms.length > 0 ? \`
-        <div class="mb-6">
-          <h3 class="text-sm font-bold text-teal-600 mb-3 flex items-center">
-            <i class="fas fa-couch mr-2"></i>대기실 (\${waitingRooms.length}개)
-            <span class="ml-2 text-xs text-gray-400 font-normal">드래그하여 순서 변경</span>
-          </h3>
-          <div id="waitingroom-sortable-container" class="grid gap-3">
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:11px"><i class="fas fa-couch"></i></span>
+            <span style="font-size:13px;font-weight:700;color:#1f2937">대기실</span>
+            <span style="font-size:11px;color:#0d9488;background:#ccfbf1;padding:2px 8px;border-radius:20px;font-weight:600">\${waitingRooms.length}개</span>
+          </div>
+          <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
             \${waitingRooms.map((p, idx) => {
               const isActive = p.is_tv_active === true;
+              const needsSetup = !p.external_short_url;
               return \`
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-teal-400'}" 
-                 id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
-              <div class="p-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 flex items-center justify-center text-gray-300 cursor-grab drag-handle">
+            <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
+                 style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#e5e7eb'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
+                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.04)'">
+              <div style="padding:14px 16px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                  <div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0">
                     <i class="fas fa-grip-vertical"></i>
                   </div>
-                  <div class="w-10 h-10 \${isActive ? 'bg-green-100' : 'bg-teal-100'} rounded-lg flex items-center justify-center relative">
-                    <i class="fas fa-couch \${isActive ? 'text-green-500' : 'text-teal-500'}"></i>
-                    \${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
+                  <div style="width:36px;height:36px;border-radius:10px;background:\${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#14b8a6,#0d9488)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+                    <i class="fas fa-couch" style="color:#fff;font-size:14px"></i>
+                    \${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
                   </div>
-                  <div>
-                    <h3 class="font-bold text-gray-800">
-                      \${p.name}
-                      \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                      \${!p.external_short_url ? '<span id="badge-setup-' + p.id + '" class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">TV 설정 필요</span>' : ''}
-                    </h3>
-                    <p class="text-xs text-gray-500">
-                      <span class="text-teal-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
-                      <span class="mx-2">•</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                      <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
+                      \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
+                      \${needsSetup ? '<span id="badge-setup-' + p.id + '" style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                    </div>
+                    <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#0d9488;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
+                      <span style="margin:0 6px;color:#d1d5db">·</span>
                       \${p.item_count || 0}개 미디어
                     </p>
                   </div>
                 </div>
-                <div class="flex items-center gap-1">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px">
                   <button onclick="openPlaylistEditor(\${p.id})" 
-                    class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs">
+                    style="padding:5px 12px;border-radius:8px;border:none;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
                     플레이리스트
                   </button>
                   <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
-                    class="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 rounded text-xs">
+                    style="padding:5px 12px;border-radius:8px;border:none;background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
                     TV로 내보내기
                   </button>
                   <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
-                    class="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded text-xs">
+                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
                     URL 복사
                   </button>
                   <button onclick="deletePlaylist(\${p.id})" 
-                    class="p-2 text-red-400 hover:text-red-600" title="삭제">
+                    style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px;transition:color .15s"
+                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#d1d5db'" title="삭제">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -6609,64 +6637,72 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
              체어 목록
              ========================================================= -->
         \${chairs.length > 0 ? \`
-        <div class="mb-4">
-          <h3 class="text-sm font-bold text-indigo-600 mb-3 flex items-center">
-            <i class="fas fa-tv mr-2"></i>체어 (\${chairs.length}개)
-            <span class="ml-2 text-xs text-gray-400 font-normal">드래그하여 순서 변경</span>
-          </h3>
-          <div id="chair-sortable-container" class="grid gap-3">
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:11px"><i class="fas fa-tv"></i></span>
+            <span style="font-size:13px;font-weight:700;color:#1f2937">체어</span>
+            <span style="font-size:11px;color:#6366f1;background:#e0e7ff;padding:2px 8px;border-radius:20px;font-weight:600">\${chairs.length}개</span>
+            <span style="font-size:10px;color:#9ca3af;margin-left:4px">드래그하여 순서 변경</span>
+          </div>
+          <div id="chair-sortable-container" style="display:grid;gap:10px">
             \${chairs.map((p, idx) => {
               const isActive = p.is_tv_active === true;
               return \`
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden playlist-sortable-item cursor-move border-l-4 \${isActive ? 'border-green-500' : 'border-indigo-400'}" 
-                 id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true">
-              <div class="p-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 flex items-center justify-center text-gray-300 cursor-grab drag-handle">
+            <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
+                 style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#c7d2fe'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
+                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.04)'">
+              <div style="padding:14px 16px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                  <div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0">
                     <i class="fas fa-grip-vertical"></i>
                   </div>
-                  <div class="w-10 h-10 \${isActive ? 'bg-green-100' : 'bg-indigo-100'} rounded-lg flex items-center justify-center relative">
-                    <i class="fas fa-tv \${isActive ? 'text-green-500' : 'text-indigo-500'}"></i>
-                    \${isActive ? '<span class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" title="TV 사용중"></span>' : ''}
-                    <span id="temp-indicator-\${p.id}" class="hidden absolute -top-1 -left-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" title="임시 영상 재생 중"></span>
+                  <div style="width:36px;height:36px;border-radius:10px;background:\${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#6366f1,#818cf8)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+                    <i class="fas fa-tv" style="color:#fff;font-size:14px"></i>
+                    \${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
+                    <span id="temp-indicator-\${p.id}" style="display:none;position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
                   </div>
-                  <div>
-                    <h3 class="font-bold text-gray-800">
-                      \${p.name}
-                      \${isActive ? '<span class="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">사용중</span>' : ''}
-                      \${!p.last_active_at ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">체어 설치 필요</span>' : ''}
-                    </h3>
-                    <p class="text-xs text-gray-500">
-                      <span class="text-indigo-600 font-mono">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
-                      <span class="mx-2">•</span>
+                  <div style="min-width:0;flex:1">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                      <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
+                      \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
+                      \${!p.last_active_at ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;font-size:10px;font-weight:700">체어 설치 필요</span>' : ''}
+                    </div>
+                    <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                      <span style="color:#6366f1;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
+                      <span style="margin:0 6px;color:#d1d5db">·</span>
                       \${p.item_count || 0}개 미디어
                     </p>
                   </div>
                 </div>
-                <div class="flex items-center gap-1">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px">
                   <button onclick="openPlaylistEditor(\${p.id})" 
-                    class="px-3 py-1.5 w-[110px] bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs text-center">
+                    style="padding:5px 12px;border-radius:8px;border:none;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
                     플레이리스트
                   </button>
                   <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
-                    class="px-3 py-1.5 w-[110px] bg-green-50 hover:bg-green-100 text-green-600 rounded text-xs text-center">
+                    style="padding:5px 12px;border-radius:8px;border:none;background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
                     TV로 내보내기
                   </button>
                   <button onclick="showTempVideoModal(\${p.id}, '\${p.name}', '\${p.short_code}')" 
-                    class="px-3 py-1.5 w-[110px] bg-orange-50 hover:bg-orange-100 text-orange-600 rounded text-xs text-center">
+                    style="padding:5px 12px;border-radius:8px;border:none;background:#fff7ed;color:#ea580c;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
                     임시 영상 전송
                   </button>
                   <button id="stop-temp-btn-\${p.id}" onclick="stopTempVideoForPlaylist(\${p.id})" 
-                    class="px-3 py-1.5 w-[110px] bg-gray-50 text-gray-600 border border-gray-200 rounded text-xs font-medium text-center cursor-not-allowed inline-flex items-center justify-center gap-1 opacity-100 visible whitespace-nowrap" aria-disabled="true">
+                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280;font-size:11px;font-weight:500;cursor:not-allowed;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" aria-disabled="true">
                     <i class="fas fa-stop"></i>
                     <span>기본으로 복귀</span>
                   </button>
                   <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
-                    class="px-3 py-1.5 w-[110px] bg-gray-50 hover:bg-gray-100 text-gray-600 rounded text-xs text-center">
+                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
                     URL 복사
                   </button>
                   <button onclick="deletePlaylist(\${p.id})" 
-                    class="p-2 text-red-400 hover:text-red-600" title="삭제">
+                    style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px;transition:color .15s"
+                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#d1d5db'" title="삭제">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -6680,47 +6716,52 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         <!-- =========================================================
              초기 설정 섹션 (접기/펼치기)
              ========================================================= -->
-        <div class="border border-gray-300 rounded-xl overflow-hidden bg-gray-50">
-          <button onclick="toggleExportSection()" class="w-full p-4 bg-gray-100 flex items-center justify-between hover:bg-gray-200 transition">
-            <span class="font-bold text-gray-700 flex items-center gap-2">
-              <i class="fas fa-cog"></i>초기 설정 (TV 연결)
+        <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#f9fafb">
+          <button onclick="toggleExportSection()" style="width:100%;padding:14px 16px;background:#f3f4f6;display:flex;align-items:center;justify-content:space-between;border:none;cursor:pointer;font-family:inherit;transition:background .15s"
+            onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+            <span style="font-weight:700;color:#374151;display:flex;align-items:center;gap:8px;font-size:13px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#6b7280,#9ca3af);color:#fff;font-size:11px"><i class="fas fa-cog"></i></span>
+              초기 설정 (TV 연결)
             </span>
-            <i id="export-toggle-icon" class="fas fa-chevron-down text-gray-400"></i>
+            <i id="export-toggle-icon" class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px"></i>
           </button>
-          <div id="export-section-content" style="display:none" class="bg-gray-50 p-4">
+          <div id="export-section-content" style="display:none;padding:16px">
             
             <!-- 체어 설정 -->
-            <div class="mb-4">
-              <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-indigo-400">
-                <i class="fas fa-tv text-indigo-500"></i>
-                <span class="font-bold text-gray-800">체어 설정</span>
-                <span class="text-xs text-gray-500">(PC 모니터 자동 실행)</span>
+            <div style="margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #818cf8">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#6366f1;color:#fff;font-size:10px"><i class="fas fa-tv"></i></span>
+                <span style="font-size:13px;font-weight:700;color:#1f2937">체어 설정</span>
+                <span style="font-size:11px;color:#9ca3af">(PC 모니터 자동 실행)</span>
               </div>
               
               \${chairs.length > 0 ? \`
-              <div class="bg-white rounded-lg p-4 border border-gray-200">
-                <div class="flex flex-wrap gap-2 mb-3">
+              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
                   \${chairs.map(p => \`
-                    <label class="flex items-center gap-2 bg-gray-100 hover:bg-indigo-50 px-3 py-2 rounded-lg cursor-pointer transition border border-gray-200">
-                      <input type="checkbox" class="chair-checkbox rounded text-indigo-500" data-id="\${p.id}" data-code="\${p.short_code}" data-name="\${p.name}">
-                      <span class="text-sm text-gray-700">\${p.name}</span>
-                      <span class="text-xs text-gray-400">(\${p.item_count || 0})</span>
-                      \${!p.last_active_at ? '<span class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded">미설치</span>' : '<span class="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded">연결됨</span>'}
+                    <label style="display:flex;align-items:center;gap:6px;background:#f9fafb;padding:8px 12px;border-radius:8px;cursor:pointer;border:1px solid #e5e7eb;font-size:13px;transition:background .15s"
+                      onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f9fafb'">
+                      <input type="checkbox" class="chair-checkbox" data-id="\${p.id}" data-code="\${p.short_code}" data-name="\${p.name}" style="accent-color:#6366f1">
+                      <span style="color:#374151;font-weight:500">\${p.name}</span>
+                      <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0})</span>
+                      \${!p.last_active_at ? '<span style="padding:2px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:600">미설치</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#dcfce7;color:#16a34a;font-size:10px;font-weight:600">연결됨</span>'}
                     </label>
                   \`).join('')}
                 </div>
-                <div class="flex flex-wrap gap-2">
-                  <button onclick="exportSelectedScripts()" class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 text-sm">
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <button onclick="exportSelectedScripts()" style="padding:8px 16px;border-radius:8px;border:none;background:#6b7280;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#4b5563'" onmouseout="this.style.background='#6b7280'">
                     스크립트 다운로드
                   </button>
-                  <button onclick="downloadAutoRunScript(this)" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 text-sm">
+                  <button onclick="downloadAutoRunScript(this)" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                    onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                     설치 방법
                   </button>
                 </div>
               </div>
               \` : \`
-              <div class="bg-white rounded-lg p-4 border border-gray-200 text-center text-gray-500">
-                <i class="fas fa-info-circle mr-1"></i>
+              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
+                <i class="fas fa-info-circle" style="margin-right:4px"></i>
                 등록된 체어가 없습니다. 위에서 체어를 추가하세요.
               </div>
               \`}
@@ -6728,54 +6769,57 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             
             <!-- 대기실 설정 -->
             <div>
-              <div class="flex items-center gap-2 mb-3 pb-2 border-b-2 border-teal-400">
-                <i class="fas fa-couch text-teal-500"></i>
-                <span class="font-bold text-gray-800">대기실 설정</span>
-                <span class="text-xs text-gray-500">(스마트 TV 연결)</span>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #14b8a6">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#0d9488;color:#fff;font-size:10px"><i class="fas fa-couch"></i></span>
+                <span style="font-size:13px;font-weight:700;color:#1f2937">대기실 설정</span>
+                <span style="font-size:11px;color:#9ca3af">(스마트 TV 연결)</span>
               </div>
               
               \${waitingRooms.length > 0 ? \`
-              <div class="space-y-3">
+              <div style="display:grid;gap:10px">
                 \${waitingRooms.map(p => \`
-                <div class="bg-white rounded-lg p-4 border border-gray-200">
-                  <div class="flex items-center gap-2 mb-3">
-                    <span class="font-medium text-gray-800">\${p.name}</span>
-                    <span class="text-xs text-gray-400">(\${p.item_count || 0}개 미디어)</span>
+                <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                    <span style="font-size:13px;font-weight:600;color:#1f2937">\${p.name}</span>
+                    <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0}개 미디어)</span>
                   </div>
                   
                   <!-- URL 복사 -->
-                  <div class="flex items-center gap-2 mb-3">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
                     <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
-                      class="flex-1 bg-gray-100 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700 font-mono" readonly>
+                      style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;color:#374151;font-family:monospace" readonly>
                     <button onclick="copySettingUrl(\${p.id})" 
-                      class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm text-gray-600">
+                      style="padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+                      onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
                       복사
                     </button>
                     \${!p.external_short_url ? \`
                     <button id="btn-shorten-\${p.id}" onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
-                      class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded text-sm">
+                      style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                      onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                       단축 URL 생성
                     </button>
                     \` : ''}
                   </div>
                   
                   <!-- 사용법 안내 -->
-                  <div class="flex flex-wrap gap-2">
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
                     <button onclick="showTvExportModal(\${p.id}, '\${p.name}', '\${p.short_code}')"
-                      class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded text-xs">
+                      style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                      onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                       사용법 (URL 직접 입력)
                     </button>
                   </div>
-                  <p class="mt-2 text-xs text-blue-700">
-                    <i class="fas fa-info-circle mr-1"></i>
+                  <p style="margin:8px 0 0;font-size:11px;color:#2563eb">
+                    <i class="fas fa-info-circle" style="margin-right:4px"></i>
                     USB 인식 문제로 <strong>URL 직접 입력 방식</strong>만 제공합니다.
                   </p>
                 </div>
                 \`).join('')}
               </div>
               \` : \`
-              <div class="bg-white rounded-lg p-4 border border-gray-200 text-center text-gray-500">
-                <i class="fas fa-info-circle mr-1"></i>
+              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
+                <i class="fas fa-info-circle" style="margin-right:4px"></i>
                 등록된 대기실이 없습니다. 위에서 대기실을 추가하세요.
               </div>
               \`}
