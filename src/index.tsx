@@ -13760,6 +13760,12 @@ app.get('/tv/:shortCode', async (c) => {
 
 // 기본 페이지
 app.get('/', (c) => {
+  const rawUrl = new URL(c.req.url)
+  // 프록시 뒤에서 프로토콜 판별
+  const forwardedProto = c.req.header('x-forwarded-proto')
+  const isSecureHost = rawUrl.host.includes('.pages.dev') || rawUrl.host.includes('.sandbox.') || rawUrl.host.includes('.e2b.')
+  const proto = forwardedProto || (isSecureHost ? 'https' : rawUrl.protocol.replace(':', ''))
+  const origin = proto + '://' + rawUrl.host
   return c.html(`
 <!DOCTYPE html>
 <html lang="ko">
@@ -13778,10 +13784,14 @@ app.get('/', (c) => {
     
     <div class="bg-blue-50 rounded-xl p-6 text-left mb-4">
       <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-code mr-2 text-blue-500"></i>아임웹 위젯 코드 (아임웹 로그인 자동 연동)</h2>
-      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
+      <div class="flex gap-2 mb-2">
+        <button onclick="copyWidget('imweb')" class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"><i class="fas fa-copy mr-1"></i>위젯 코드 복사</button>
+        <span id="copy-status-imweb" class="text-xs text-green-600 self-center hidden">복사됨!</span>
+      </div>
+      <pre id="widget-imweb-code" class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
 &lt;script&gt;
 (function() {
-  var host = 'https://dental-tv.pages.dev';
+  var host = '${origin}';
   var frame = document.getElementById('dental-tv-frame');
   var launched = false;
 
@@ -13804,7 +13814,7 @@ app.get('/', (c) => {
             }
           }
           // browser_session_id 패턴 매칭
-          var match = JSON.stringify(data).match(/m\d{8,}[a-f0-9]+/);
+          var match = JSON.stringify(data).match(/m\\d{8,}[a-f0-9]+/);
           if (match) return { mc: match[0], em: '' };
         }
       }
@@ -13855,8 +13865,12 @@ app.get('/', (c) => {
     
     <div class="bg-purple-50 rounded-xl p-6 text-left mb-4">
       <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-crown mr-2 text-purple-500"></i>마스터 관리자 위젯 코드</h2>
-      <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe 
-  src="${c.req.url.replace(/\/$/, '')}/master"
+      <div class="flex gap-2 mb-2">
+        <button onclick="copyWidget('master')" class="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-xs font-medium hover:bg-purple-600"><i class="fas fa-copy mr-1"></i>위젯 코드 복사</button>
+        <span id="copy-status-master" class="text-xs text-green-600 self-center hidden">복사됨!</span>
+      </div>
+      <pre id="widget-master-code" class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe 
+  src="${origin}/master"
   width="100%" 
   height="800"
   frameborder="0"
@@ -13864,10 +13878,23 @@ app.get('/', (c) => {
       <p class="text-xs text-gray-500 mt-2">* 마스터 관리자 비밀번호: dental2024master</p>
     </div>
     
-    <a href="${c.req.url.replace(/\/$/, '')}/master" class="inline-block bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition">
+    <a href="${origin}/master" class="inline-block bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition">
       <i class="fas fa-crown mr-2"></i>마스터 관리자 바로가기
     </a>
   </div>
+  
+  <script>
+    function copyWidget(type) {
+      var el = document.getElementById('widget-' + type + '-code');
+      if (!el) return;
+      var text = el.textContent
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      navigator.clipboard.writeText(text).then(function() {
+        var status = document.getElementById('copy-status-' + type);
+        if (status) { status.classList.remove('hidden'); setTimeout(function(){ status.classList.add('hidden'); }, 2000); }
+      });
+    }
+  </script>
 </body>
 </html>
   `)
