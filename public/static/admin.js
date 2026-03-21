@@ -821,9 +821,9 @@ function renderPlaylists() {
     ${waitingRooms.length > 0 ? `
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:11px"><i class="fas fa-couch"></i></span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:11px"><i class="fas fa-couch"></i></span>
         <span style="font-size:13px;font-weight:700;color:#1f2937">대기실</span>
-        <span style="font-size:11px;color:#0d9488;background:#ccfbf1;padding:2px 8px;border-radius:20px;font-weight:600">${waitingRooms.length}개</span>
+        <span style="font-size:11px;color:#2563eb;background:#dbeafe;padding:2px 8px;border-radius:20px;font-weight:600">${waitingRooms.length}개</span>
       </div>
       <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
         ${waitingRooms.map((p, idx) => {
@@ -838,7 +838,7 @@ function renderPlaylists() {
               <div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0">
                 <i class="fas fa-grip-vertical"></i>
               </div>
-              <div style="width:36px;height:36px;border-radius:10px;background:${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#14b8a6,#0d9488)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+              <div style="width:36px;height:36px;border-radius:10px;background:${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
                 <i class="fas fa-couch" style="color:#fff;font-size:14px"></i>
                 ${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
               </div>
@@ -849,7 +849,7 @@ function renderPlaylists() {
                   ${needsSetup ? '<span id="badge-setup-' + p.id + '" style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
                 </div>
                 <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-                  <span style="color:#0d9488;font-family:monospace;font-size:10px">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
+                  <span style="color:#2563eb;font-family:monospace;font-size:10px">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
                   <span style="margin:0 6px;color:#d1d5db">·</span>
                   ${p.item_count || 0}개 미디어
                 </p>
@@ -1020,8 +1020,8 @@ function renderPlaylists() {
         
         <!-- 대기실 설정 -->
         <div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #14b8a6">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#0d9488;color:#fff;font-size:10px"><i class="fas fa-couch"></i></span>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #3b82f6">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#2563eb;color:#fff;font-size:10px"><i class="fas fa-couch"></i></span>
             <span style="font-size:13px;font-weight:700;color:#1f2937">대기실 설정</span>
             <span style="font-size:11px;color:#9ca3af">(스마트 TV 연결)</span>
           </div>
@@ -1046,7 +1046,7 @@ function renderPlaylists() {
                 </button>
                 ${!p.external_short_url ? `
                 <button id="btn-shorten-${p.id}" onclick="generateShortUrl(${p.id}, '${p.short_code}')" 
-                  style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                  style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
                   onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                   단축 URL 생성
                 </button>
@@ -1056,7 +1056,7 @@ function renderPlaylists() {
               <!-- 사용법 안내 -->
               <div style="display:flex;flex-wrap:wrap;gap:6px">
                 <button onclick="showTvExportModal(${p.id}, '${p.name}', '${p.short_code}')"
-                  style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                  style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
                   onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                   사용법 (URL 직접 입력)
                 </button>
@@ -4722,14 +4722,16 @@ function showAdminSubTab(sub) {
   ['clinics', 'master-items', 'push'].forEach(s => {
     const btn = document.getElementById('admin-sub-' + s);
     if (btn) {
-      btn.className = s === sub 
-        ? 'px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium'
-        : 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300';
+      if (s === sub) {
+        btn.style.cssText = 'padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+      } else {
+        btn.style.cssText = 'padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit';
+      }
     }
   });
   const body = document.getElementById('admin-body');
   if (!body) return;
-  body.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>\uB85C\uB529 \uC911...</div>';
+  body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>\uB85C\uB529 \uC911...</div>';
   if (sub === 'clinics') renderAdminClinics();
   else if (sub === 'master-items') renderAdminMasterItems();
   else if (sub === 'push') renderAdminPush();
@@ -4751,47 +4753,48 @@ function renderAdminClinics() {
   const imwebCount = clinics.filter(c => c.imweb_member_id).length;
   const unregCount = clinics.filter(c => !c.imweb_member_id).length;
   
-  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
-    <div class="flex justify-between items-center mb-3">
-      <h3 class="font-bold text-gray-800"><i class="fas fa-hospital mr-2 text-purple-500"></i>\uCE58\uACFC \uAD00\uB9AC (${totalCount}\uAC1C)</h3>
-      <button onclick="refreshAdminClinics()" class="text-sm text-purple-500 hover:text-purple-700"><i class="fas fa-sync-alt mr-1"></i>\uC0C8\uB85C\uACE0\uCE68</button>
+  body.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0;display:flex;align-items:center;gap:8px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-hospital"></i></span>
+        \uCE58\uACFC \uAD00\uB9AC (${totalCount}\uAC1C)
+      </h3>
+      <button onclick="refreshAdminClinics()" style="font-size:12px;color:#7c3aed;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button>
     </div>
-    <!-- \uAC80\uC0C9 -->
-    <div class="mb-3">
+    <div style="margin-bottom:10px">
       <input type="text" id="admin-clinic-search" placeholder="\uCE58\uACFC\uBA85, \uC774\uBA54\uC77C, \uCF54\uB4DC \uAC80\uC0C9..." value="${q.replace(/"/g, '&quot;')}"
-        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300"
+        style="width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;box-sizing:border-box"
         oninput="_adminSearchQuery=this.value; renderAdminClinics()">
     </div>
-    <!-- \uC694\uC57D \uBC30\uC9C0 -->
-    <div class="flex gap-2 mb-3 text-xs flex-wrap">
-      <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full">\uD65C\uC131 ${activeCount}</span>
-      <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full">\uC815\uC9C0 ${suspendedCount}</span>
-      <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">\uC784\uC6F9\uC5F0\uB3D9 ${imwebCount}</span>
-      <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uB294 \uBBF8\uB4F1\uB85D \uC0C1\uD0DC">\uBBF8\uB4F1\uB85D ${unregCount}</span>
+    <div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px;flex-wrap:wrap">
+      <span style="padding:3px 8px;background:#dcfce7;color:#15803d;border-radius:20px;font-weight:600">\uD65C\uC131 ${activeCount}</span>
+      <span style="padding:3px 8px;background:#fee2e2;color:#991b1b;border-radius:20px;font-weight:600">\uC815\uC9C0 ${suspendedCount}</span>
+      <span style="padding:3px 8px;background:#dbeafe;color:#1d4ed8;border-radius:20px;font-weight:600">\uC784\uC6F9\uC5F0\uB3D9 ${imwebCount}</span>
+      <span style="padding:3px 8px;background:#fef3c7;color:#92400e;border-radius:20px;font-weight:600" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uB294 \uBBF8\uB4F1\uB85D \uC0C1\uD0DC">\uBBF8\uB4F1\uB85D ${unregCount}</span>
     </div>
-    ${clinics.length === 0 ? '<p class="text-gray-400 text-center py-4">' + (q ? '\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.' : '\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.') + '</p>' :
-    '<div class="space-y-2 max-h-[60vh] overflow-y-auto">' + clinics.map(c => {
+    ${clinics.length === 0 ? '<p style="color:#9ca3af;text-align:center;padding:16px 0">' + (q ? '\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.' : '\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.') + '</p>' :
+    '<div style="max-height:60vh;overflow-y:auto;display:grid;gap:6px">' + clinics.map(c => {
       const statusBadge = c.is_active === 0 
-        ? '<span class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded">\uC815\uC9C0</span>'
-        : '<span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded">\uD65C\uC131</span>';
+        ? '<span style="padding:2px 6px;background:#fee2e2;color:#dc2626;font-size:10px;border-radius:4px;font-weight:600">\uC815\uC9C0</span>'
+        : '<span style="padding:2px 6px;background:#dcfce7;color:#16a34a;font-size:10px;border-radius:4px;font-weight:600">\uD65C\uC131</span>';
       const imwebBadge = c.imweb_member_id
-        ? '<span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded">\uC784\uC6F9</span>'
-        : '<span class="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC74C">\uBBF8\uB4F1\uB85D</span>';
-      return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-medium text-sm">${c.clinic_name || '\uC774\uB984\uC5C6\uC74C'}</span>
+        ? '<span style="padding:2px 6px;background:#dbeafe;color:#2563eb;font-size:10px;border-radius:4px;font-weight:600">\uC784\uC6F9</span>'
+        : '<span style="padding:2px 6px;background:#fef3c7;color:#92400e;font-size:10px;border-radius:4px;font-weight:600" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC74C">\uBBF8\uB4F1\uB85D</span>';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:600;color:#1f2937">${c.clinic_name || '\uC774\uB984\uC5C6\uC74C'}</span>
             ${statusBadge} ${imwebBadge}
           </div>
-          <p class="text-xs text-gray-500 mt-0.5">
+          <p style="font-size:11px;color:#9ca3af;margin:3px 0 0">
             ${c.imweb_email || c.admin_code || ''} | \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 ${c.playlist_count || 0}\uAC1C | \uACF5\uC9C0 ${c.notice_count || 0}\uAC1C
           </p>
         </div>
-        <div class="flex gap-1 flex-shrink-0">
-          <button onclick="window.open('/admin/${c.admin_code}','_blank')" class="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="\uAD00\uB9AC\uC790 \uD398\uC774\uC9C0 \uC5F4\uAE30"><i class="fas fa-external-link-alt"></i></button>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="window.open('/admin/${c.admin_code}','_blank')" style="padding:4px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit" title="\uAD00\uB9AC\uC790 \uD398\uC774\uC9C0 \uC5F4\uAE30"><i class="fas fa-external-link-alt"></i></button>
           ${c.is_active !== 0 
-            ? '<button onclick="adminSuspendClinic(\'' + c.admin_code + '\')" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100">\uC815\uC9C0</button>'
-            : '<button onclick="adminActivateClinic(\'' + c.admin_code + '\')" class="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100">\uD65C\uC131\uD654</button>'}
+            ? '<button onclick="adminSuspendClinic(\'' + c.admin_code + '\')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit">\uC815\uC9C0</button>'
+            : '<button onclick="adminActivateClinic(\'' + c.admin_code + '\')" style="padding:4px 8px;font-size:11px;background:#dcfce7;color:#16a34a;border-radius:6px;border:none;cursor:pointer;font-family:inherit">\uD65C\uC131\uD654</button>'}
         </div>
       </div>`;
     }).join('') + '</div>'}
@@ -4836,25 +4839,28 @@ function renderAdminMasterItems() {
   const body = document.getElementById('admin-body');
   if (!body) return;
   
-  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-gray-800"><i class="fas fa-video mr-2 text-purple-500"></i>\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC (${(masterItems || []).length}\uAC1C)</h3>
+  body.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0;display:flex;align-items:center;gap:8px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-video"></i></span>
+        \uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC (${(masterItems || []).length}\uAC1C)
+      </h3>
     </div>
-    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-      <div class="flex gap-2">
-        <input type="text" id="admin-new-url" placeholder="YouTube \uB610\uB294 Vimeo URL" class="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500">
-        <button onclick="adminAddMasterItem()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600"><i class="fas fa-plus mr-1"></i>\uCD94\uAC00</button>
+    <div style="background:#f5f3ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;gap:8px">
+        <input type="text" id="admin-new-url" placeholder="YouTube \uB610\uB294 Vimeo URL" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit">
+        <button onclick="adminAddMasterItem()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-plus" style="margin-right:4px"></i>\uCD94\uAC00</button>
       </div>
     </div>
-    <div id="admin-master-items-list" class="space-y-2">
+    <div id="admin-master-items-list" style="display:grid;gap:6px">
       ${(masterItems || []).map(item => {
         const thumb = item.thumbnail_url 
-          ? '<img src="' + item.thumbnail_url + '" class="w-16 h-10 object-cover rounded">'
-          : '<div class="w-16 h-10 bg-gray-200 rounded flex items-center justify-center"><i class="fas fa-video text-gray-400"></i></div>';
-        return '<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">' +
+          ? '<img src="' + item.thumbnail_url + '" style="width:56px;height:36px;object-fit:cover;border-radius:6px">'
+          : '<div style="width:56px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:11px"></i></div>';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">' +
           thumb +
-          '<div class="flex-1 min-w-0"><p class="text-sm font-medium truncate">' + (item.title || item.url || '') + '</p><p class="text-xs text-gray-400">' + (item.item_type || '') + '</p></div>' +
-          '<button onclick="adminDeleteMasterItem(' + item.id + ')" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"><i class="fas fa-trash"></i></button>' +
+          '<div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + (item.title || item.url || '') + '</p><p style="font-size:11px;color:#9ca3af;margin:2px 0 0">' + (item.item_type || '') + '</p></div>' +
+          '<button onclick="adminDeleteMasterItem(' + item.id + ')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit"><i class="fas fa-trash"></i></button>' +
           '</div>';
       }).join('')}
     </div>
@@ -4897,79 +4903,80 @@ function renderAdminPush() {
   if (!body) return;
   const clinics = (_allClinics || []).filter(c => c.is_active !== 0);
   
-  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
-    <h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-paper-plane mr-2 text-purple-500"></i>\uB9C1\uD06C \uBC30\uD3EC</h3>
-    <p class="text-sm text-gray-500 mb-2">\uC120\uD0DD\uD55C \uCE58\uACFC\uC758 \uCCAB \uBC88\uC9F8 \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8\uC5D0 \uC601\uC0C1 \uB9C1\uD06C\uB97C \uCD94\uAC00\uD569\uB2C8\uB2E4.</p>
+  body.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+    <h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0 0 14px;display:flex;align-items:center;gap:8px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-paper-plane"></i></span>
+      \uB9C1\uD06C \uBC30\uD3EC
+    </h3>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 10px">\uC120\uD0DD\uD55C \uCE58\uACFC\uC758 \uCCAB \uBC88\uC9F8 \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8\uC5D0 \uC601\uC0C1 \uB9C1\uD06C\uB97C \uCD94\uAC00\uD569\uB2C8\uB2E4.</p>
     
-    <!-- STEP 1: \uCE58\uACFC \uC120\uD0DD -->
-    <div class="mb-5">
-      <div class="flex items-center gap-2 mb-2">
-        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
-        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC \uB300\uC0C1 \uC120\uD0DD (${clinics.length}\uAC1C \uCE58\uACFC)</label>
+    <!-- STEP 1 -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">1</span>
+        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC \uB300\uC0C1 \uC120\uD0DD (${clinics.length}\uAC1C \uCE58\uACFC)</label>
       </div>
-      <div class="flex items-center gap-2 mb-2">
-        <input type="checkbox" id="push-select-all" onchange="togglePushSelectAll()" class="w-4 h-4 accent-purple-500">
-        <label for="push-select-all" class="text-sm text-gray-600">\uC804\uCCB4 \uC120\uD0DD</label>
-        <span id="push-selected-count" class="text-xs text-purple-500 font-medium ml-auto">0\uAC1C \uC120\uD0DD</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input type="checkbox" id="push-select-all" onchange="togglePushSelectAll()" style="width:16px;height:16px;accent-color:#7c3aed">
+        <label for="push-select-all" style="font-size:12px;color:#6b7280">\uC804\uCCB4 \uC120\uD0DD</label>
+        <span id="push-selected-count" style="font-size:11px;color:#7c3aed;font-weight:600;margin-left:auto">0\uAC1C \uC120\uD0DD</span>
       </div>
-      <div class="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+      <div style="max-height:160px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px;display:grid;gap:4px">
         ${clinics.map(c => 
-          '<label class="flex items-center gap-2 p-1.5 hover:bg-purple-50 rounded cursor-pointer">' +
-          '<input type="checkbox" class="push-clinic-cb w-4 h-4 accent-purple-500" value="' + c.admin_code + '" onchange="updatePushCount()">' +
-          '<span class="text-sm">' + (c.clinic_name || c.admin_code) + '</span>' +
-          '<span class="text-xs text-gray-400 ml-auto">' + (c.imweb_email || '') + '</span></label>'
+          '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .1s" onmouseover="this.style.background=\'#f5f3ff\'" onmouseout="this.style.background=\'transparent\'">' +
+          '<input type="checkbox" class="push-clinic-cb" style="width:14px;height:14px;accent-color:#7c3aed" value="' + c.admin_code + '" onchange="updatePushCount()">' +
+          '<span style="font-size:12px;color:#1f2937">' + (c.clinic_name || c.admin_code) + '</span>' +
+          '<span style="font-size:10px;color:#9ca3af;margin-left:auto">' + (c.imweb_email || '') + '</span></label>'
         ).join('')}
       </div>
     </div>
     
-    <!-- STEP 2: \uB9C1\uD06C \uD15C\uD50C\uB9BF \uC120\uD0DD -->
-    <div class="mb-5">
-      <div class="flex items-center gap-2 mb-2">
-        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
-        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC\uD560 \uB9C1\uD06C</label>
+    <!-- STEP 2 -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">2</span>
+        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC\uD560 \uB9C1\uD06C</label>
       </div>
       
-      <!-- \uD15C\uD50C\uB9BF \uBC84\uD2BC -->
-      <div class="flex gap-2 mb-3 flex-wrap">
-        <button onclick="selectPushTemplate('master')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-200 transition">
-          <i class="fas fa-list mr-1"></i>\uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button onclick="selectPushTemplate('master')" style="padding:5px 12px;background:#e0e7ff;color:#4338ca;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
+          <i class="fas fa-list" style="margin-right:4px"></i>\uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD
         </button>
-        <button onclick="selectPushTemplate('youtube')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200 transition">
-          <i class="fab fa-youtube mr-1"></i>YouTube URL
+        <button onclick="selectPushTemplate('youtube')" style="padding:5px 12px;background:#fee2e2;color:#dc2626;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
+          <i class="fab fa-youtube" style="margin-right:4px"></i>YouTube URL
         </button>
-        <button onclick="selectPushTemplate('custom')" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
-          <i class="fas fa-edit mr-1"></i>\uC9C1\uC811 \uC785\uB825
+        <button onclick="selectPushTemplate('custom')" style="padding:5px 12px;background:#f3f4f6;color:#374151;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;font-family:inherit">
+          <i class="fas fa-edit" style="margin-right:4px"></i>\uC9C1\uC811 \uC785\uB825
         </button>
       </div>
       
-      <!-- \uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD \uC601\uC5ED (\uAE30\uBCF8 \uC228\uAE40) -->
-      <div id="push-master-select" style="display:none" class="mb-3 border rounded-lg p-3 bg-indigo-50">
-        <p class="text-xs text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i>\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694</p>
-        <div class="max-h-32 overflow-y-auto space-y-1" id="push-master-items-list">
+      <div id="push-master-select" style="display:none;margin-bottom:10px;border:1px solid #c7d2fe;border-radius:8px;padding:10px;background:#eef2ff">
+        <p style="font-size:11px;color:#4f46e5;margin:0 0 8px"><i class="fas fa-info-circle" style="margin-right:4px"></i>\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694</p>
+        <div style="max-height:128px;overflow-y:auto;display:grid;gap:4px" id="push-master-items-list">
           ${(masterItems || []).map(item => 
-            '<label class="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer">' +
-            '<input type="checkbox" class="push-master-item-cb w-4 h-4 accent-indigo-500" value="' + item.id + '" data-url="' + (item.url || '') + '" data-title="' + ((item.title || '').replace(/"/g, '&amp;quot;')) + '">' +
-            (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-10 h-6 object-cover rounded">' : '<div class="w-10 h-6 bg-gray-200 rounded flex items-center justify-center"><i class="fas fa-video text-gray-400 text-xs"></i></div>') +
-            '<span class="text-xs truncate">' + (item.title || item.url || '') + '</span></label>'
+            '<label style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:6px;cursor:pointer;transition:background .1s" onmouseover="this.style.background=\'#fff\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<input type="checkbox" class="push-master-item-cb" style="width:14px;height:14px;accent-color:#6366f1" value="' + item.id + '" data-url="' + (item.url || '') + '" data-title="' + ((item.title || '').replace(/"/g, '&amp;quot;')) + '">' +
+            (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" style="width:40px;height:24px;object-fit:cover;border-radius:4px">' : '<div style="width:40px;height:24px;background:#e5e7eb;border-radius:4px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:9px"></i></div>') +
+            '<span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (item.title || item.url || '') + '</span></label>'
           ).join('')}
         </div>
       </div>
       
-      <!-- \uC9C1\uC811 \uC785\uB825 \uC601\uC5ED -->
-      <div id="push-custom-input" class="flex gap-2">
-        <input type="text" id="push-link-name" placeholder="\uB9C1\uD06C \uC774\uB984" class="w-1/3 border rounded-lg px-3 py-2 text-sm">
-        <input type="text" id="push-link-url" placeholder="URL (https://...)" class="flex-1 border rounded-lg px-3 py-2 text-sm">
+      <div id="push-custom-input" style="display:flex;gap:8px">
+        <input type="text" id="push-link-name" placeholder="\uB9C1\uD06C \uC774\uB984" style="width:33%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit">
+        <input type="text" id="push-link-url" placeholder="URL (https://...)" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;font-family:inherit">
       </div>
     </div>
     
-    <!-- STEP 3: \uBC30\uD3EC \uC2E4\uD589 -->
+    <!-- STEP 3 -->
     <div>
-      <div class="flex items-center gap-2 mb-3">
-        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">3</span>
-        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC \uC2E4\uD589</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">3</span>
+        <label style="font-size:12px;font-weight:700;color:#374151">\uBC30\uD3EC \uC2E4\uD589</label>
       </div>
-      <button onclick="executePush()" class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 rounded-lg font-bold hover:from-purple-600 hover:to-indigo-600 transition shadow-lg">
-        <i class="fas fa-paper-plane mr-2"></i>\uC120\uD0DD \uCE58\uACFC\uC5D0 \uBC30\uD3EC
+      <button onclick="executePush()" style="width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(124,58,237,.3);transition:opacity .15s"
+        onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+        <i class="fas fa-paper-plane" style="margin-right:8px"></i>\uC120\uD0DD \uCE58\uACFC\uC5D0 \uBC30\uD3EC
       </button>
     </div>
   </div>`;
