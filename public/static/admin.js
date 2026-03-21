@@ -329,6 +329,7 @@ function loadFromCache() {
 
 function init() {
   const t0 = performance.now();
+  console.log('[DentalTV] init start, masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length, 'INITIAL_DATA.masterItems:', INITIAL_DATA?.masterItems?.length);
   // 초기 데이터로 즉시 렌더링 (API 호출 없이)
   const loadingDiv = document.getElementById('loading');
   if (loadingDiv) loadingDiv.style.display = 'none';
@@ -402,6 +403,15 @@ if (document.readyState === 'loading') {
 } else {
   runInit();
 }
+// 디버그: hash에 auto-open-{id}가 있으면 자동으로 편집창 열기
+try {
+  const hash = window.location.hash;
+  const autoMatch = hash.match(/auto-open-(\d+)/);
+  if (autoMatch) {
+    const autoId = parseInt(autoMatch[1]);
+    setTimeout(() => { openPlaylistEditor(autoId); }, 1500);
+  }
+} catch(e) {}
 
 // 공용자료 로드 (관리자 페이지용)
 async function loadMasterItemsForAdmin() {
@@ -2239,6 +2249,7 @@ function resetPlaylistEditorScroll() {
 async function openPlaylistEditor(id) {
   if (isOpeningEditor) return;
   isOpeningEditor = true;
+  console.log('[Editor] openPlaylistEditor id:', id, 'masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length);
   
   // ── 인라인 편집 모드: 대시보드 구조(헤더/탭) 유지, 콘텐츠 영역만 교체 ──
   var editModal = document.getElementById('edit-playlist-modal');
