@@ -312,10 +312,10 @@ function init() {
 
   if (INITIAL_DATA.isOwnerAdmin) {
     document.getElementById('clinic-name-text').textContent = '관리자';
-    document.getElementById('clinic-name-text').classList.remove('cursor-pointer');
+    document.getElementById('clinic-name-text').style.cursor = 'default';
     document.getElementById('clinic-name-text').onclick = null;
   } else {
-    document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+    document.getElementById('clinic-name-text').textContent = clinicName;
   }
   
   // 최고관리자 탭 표시
@@ -557,17 +557,12 @@ function showTab(tab) {
   ['playlists', 'notices', 'settings', 'admin', 'master'].forEach(t => {
     const content = document.getElementById('content-' + t);
     const tabBtn = document.getElementById('tab-' + t);
-    if (content) content.classList.toggle('hidden', t !== tab);
+    if (content) content.style.display = (t === tab) ? '' : 'none';
     if (tabBtn) {
-      if (t === 'master' || t === 'admin') {
-        tabBtn.classList.toggle('border-purple-500', t === tab);
-        tabBtn.classList.toggle('text-purple-600', t === tab);
-      } else {
-        tabBtn.classList.toggle('border-blue-500', t === tab);
-        tabBtn.classList.toggle('text-blue-500', t === tab);
-      }
-      tabBtn.classList.toggle('border-transparent', t !== tab);
-      tabBtn.classList.toggle('text-gray-500', t !== tab);
+      const isActive = (t === tab);
+      tabBtn.style.color = isActive ? '#2563eb' : '#6b7280';
+      tabBtn.style.fontWeight = isActive ? '700' : '500';
+      tabBtn.style.borderBottomColor = isActive ? '#2563eb' : 'transparent';
     }
   });
   if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; renderAdminClinics(); }
@@ -765,7 +760,7 @@ async function loadPlaylists() {
     const data = await res.json();
     playlists = data.playlists || [];
     clinicName = data.clinic_name || '내 치과';
-    document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+    document.getElementById('clinic-name-text').textContent = clinicName;
     renderPlaylists();
   } catch (e) {
     console.error('Load playlists error:', e);
@@ -4395,7 +4390,7 @@ async function saveClinicName(e) {
     });
     
     clinicName = newName;
-    document.getElementById('clinic-name-text').innerHTML = newName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+    document.getElementById('clinic-name-text').textContent = newName;
     closeModal('clinic-name-modal');
     showToast('저장되었습니다.');
   } catch (e) {
@@ -4682,7 +4677,7 @@ function saveClinicNameFromSettings() {
   }).then(res => {
     if (res.ok) {
       clinicName = newName;
-      document.getElementById('clinic-name-text').innerHTML = newName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+      document.getElementById('clinic-name-text').textContent = newName;
       showToast('\uCE58\uACFC\uBA85\uC774 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
     }
   }).catch(() => showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'));

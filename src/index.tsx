@@ -4386,6 +4386,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
+  <!-- Noto Sans KR 폰트 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- Tailwind CSS: 빌드타임 purge (407KB CDN → 38KB 캐시 가능 파일) -->
   <link rel="stylesheet" href="/static/admin.css">
   <!-- SortableJS: defer로 렌더링 비차단 -->
@@ -4419,6 +4423,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       from { transform: translateY(-100%); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
     }
+    @keyframes dtvFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     .preview-frame {
       aspect-ratio: 16/9;
       background: #000;
@@ -4439,62 +4447,52 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
   </style>
 </head>
-<body class="bg-white">
-  <div id="app">
+<body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
+  <div id="app" style="display:block;width:100%">
     <!-- 로딩 (기본 숨김) -->
-    <div id="loading" style="display:none" class="fixed inset-0 bg-white flex items-center justify-center z-50">
-      <div class="text-center">
-        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
-        <p class="text-gray-600">로딩 중...</p>
+    <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
+      <div style="text-align:center">
+        <i class="fas fa-spinner fa-spin" style="font-size:28px;color:#2563eb;margin-bottom:12px;display:block"></i>
+        <p style="font-size:13px;color:#6b7280">로딩 중...</p>
       </div>
     </div>
     
-    <!-- 메인 대시보드 (기본 표시) -->
-    <div id="dashboard">
-      <!-- 헤더 -->
-      <header class="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
-              <i class="fas fa-tv text-2xl text-white"></i>
-            </div>
-            <div>
-              <h1 id="clinic-name-text" class="text-2xl font-bold text-white cursor-pointer hover:text-blue-100" onclick="editClinicName()">
-                내 치과
-                <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>
-              </h1>
-              <p class="text-blue-100 text-sm">대기실 TV 관리자</p>
-            </div>
-          </div>
-        </div>
-      </header>
-      
-      <!-- 탭 네비게이션 -->
-      <div class="bg-white border-b">
-        <div class="max-w-7xl mx-auto px-4">
-          <div class="flex gap-4 overflow-x-auto" id="tab-nav">
-            <button id="tab-playlists" class="py-4 border-b-2 border-blue-500 text-blue-500 font-medium whitespace-nowrap"
-              onclick="showTab('playlists')">
-              <i class="fas fa-list mr-1"></i>플레이리스트
-            </button>
-            <button id="tab-notices" class="py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap"
-              onclick="showTab('notices')">
-              <i class="fas fa-bullhorn mr-1"></i>공지사항
-            </button>
-            <button id="tab-settings" class="py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap"
-              onclick="showTab('settings')">
-              <i class="fas fa-cog mr-1"></i>설정
-            </button>
-            <button id="tab-admin" class="py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap" style="display:none"
-              onclick="showTab('admin')">
-              <i class="fas fa-crown mr-1 text-purple-500"></i>관리
-            </button>
-          </div>
+    <!-- 메인 대시보드 -->
+    <div id="dashboard" style="font-family:'Noto Sans KR',sans-serif">
+      <!-- 헤더 (포인트관리 스타일) -->
+      <div style="background:linear-gradient(135deg,#2563eb 0%,#3b82f6 100%);padding:16px 20px;color:#fff;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div id="clinic-name-text" style="font-size:18px;font-weight:700;cursor:pointer" onclick="editClinicName()">내 치과</div>
+          <div style="font-size:12px;opacity:.8;margin-top:2px">대기실 TV 관리자</div>
         </div>
       </div>
       
-      <!-- 콘텐츠 영역 -->
-      <main class="max-w-7xl mx-auto px-4 py-6">
+      <!-- 탭 네비게이션 (포인트관리 스타일) -->
+      <div id="tab-nav" style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 8px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch">
+        <button id="tab-playlists" class="dtv-nb" data-tab="playlists"
+          style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;color:#2563eb;border-bottom:2px solid #2563eb;font-family:inherit;white-space:nowrap"
+          onclick="showTab('playlists')">
+          플레이리스트
+        </button>
+        <button id="tab-notices" class="dtv-nb" data-tab="notices"
+          style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          onclick="showTab('notices')">
+          공지사항
+        </button>
+        <button id="tab-settings" class="dtv-nb" data-tab="settings"
+          style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          onclick="showTab('settings')">
+          설정
+        </button>
+        <button id="tab-admin" class="dtv-nb" data-tab="admin"
+          style="display:none;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          onclick="showTab('admin')">
+          관리
+        </button>
+      </div>
+      
+      <!-- 콘텐츠 영역 (포인트관리 스타일) -->
+      <main id="dtv-pg" style="background:#f9fafb;padding:16px;border-radius:0 0 12px 12px;min-height:400px;border:1px solid #e5e7eb;border-top:none">
         <!-- 플레이리스트 관리 -->
         <div id="content-playlists">
           <div class="flex justify-between items-center mb-6">
@@ -4510,7 +4508,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         </div>
         
         <!-- 공지사항 관리 -->
-        <div id="content-notices" class="hidden">
+        <div id="content-notices" style="display:none">
           <!-- 공지 전체 ON/OFF -->
           <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-4">
             <label class="flex items-center justify-between cursor-pointer">
@@ -4618,7 +4616,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         </div>
         
         <!-- 설정 탭 -->
-        <div id="content-settings" class="hidden">
+        <div id="content-settings" style="display:none">
           <h2 class="text-xl font-bold text-gray-800 mb-6"><i class="fas fa-cog mr-2 text-blue-500"></i>TV 설정</h2>
           
           <!-- 치과명 -->
@@ -4704,7 +4702,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         </div>
         
         <!-- 관리 탭 (최고관리자 전용) -->
-        <div id="content-admin" class="hidden">
+        <div id="content-admin" style="display:none">
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-crown mr-2 text-purple-500"></i>최고관리자</h2>
           </div>
@@ -5706,8 +5704,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </div>
   
   <!-- 토스트 -->
-  <div id="admin-toast" style="display:none" class="fixed z-[99999]">
-    <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg toast">
+  <div id="admin-toast" style="display:none;position:fixed;z-index:99999">
+    <div style="background:#1f2937;color:#fff;padding:12px 20px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.15);font-size:14px;font-weight:500">
       <span id="admin-toast-message"></span>
     </div>
   </div>
@@ -6037,10 +6035,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       if (INITIAL_DATA.isOwnerAdmin) {
         document.getElementById('clinic-name-text').textContent = '관리자';
-        document.getElementById('clinic-name-text').classList.remove('cursor-pointer');
+        document.getElementById('clinic-name-text').style.cursor = 'default';
         document.getElementById('clinic-name-text').onclick = null;
       } else {
-        document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+        document.getElementById('clinic-name-text').textContent = clinicName;
       }
       
       // 최고관리자 탭 표시
@@ -6282,17 +6280,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       ['playlists', 'notices', 'settings', 'admin', 'master'].forEach(t => {
         const content = document.getElementById('content-' + t);
         const tabBtn = document.getElementById('tab-' + t);
-        if (content) content.classList.toggle('hidden', t !== tab);
+        if (content) content.style.display = (t === tab) ? '' : 'none';
         if (tabBtn) {
-          if (t === 'master' || t === 'admin') {
-            tabBtn.classList.toggle('border-purple-500', t === tab);
-            tabBtn.classList.toggle('text-purple-600', t === tab);
-          } else {
-            tabBtn.classList.toggle('border-blue-500', t === tab);
-            tabBtn.classList.toggle('text-blue-500', t === tab);
-          }
-          tabBtn.classList.toggle('border-transparent', t !== tab);
-          tabBtn.classList.toggle('text-gray-500', t !== tab);
+          const isActive = (t === tab);
+          tabBtn.style.color = isActive ? '#2563eb' : '#6b7280';
+          tabBtn.style.fontWeight = isActive ? '700' : '500';
+          tabBtn.style.borderBottomColor = isActive ? '#2563eb' : 'transparent';
         }
       });
       if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; renderAdminClinics(); }
@@ -6490,7 +6483,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         const data = await res.json();
         playlists = data.playlists || [];
         clinicName = data.clinic_name || '내 치과';
-        document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+        document.getElementById('clinic-name-text').textContent = clinicName;
         renderPlaylists();
       } catch (e) {
         console.error('Load playlists error:', e);
@@ -10120,7 +10113,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         });
         
         clinicName = newName;
-        document.getElementById('clinic-name-text').innerHTML = newName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+        document.getElementById('clinic-name-text').textContent = newName;
         closeModal('clinic-name-modal');
         showToast('저장되었습니다.');
       } catch (e) {
@@ -10407,7 +10400,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }).then(res => {
         if (res.ok) {
           clinicName = newName;
-          document.getElementById('clinic-name-text').innerHTML = newName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+          document.getElementById('clinic-name-text').textContent = newName;
           showToast('\uCE58\uACFC\uBA85\uC774 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
         }
       }).catch(() => showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'));
