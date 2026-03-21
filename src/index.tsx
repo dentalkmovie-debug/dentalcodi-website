@@ -2367,10 +2367,10 @@ app.get('/embed/:memberCode', async (c) => {
     // 기존 사용자 → redirect 없이 handleAdminPage 직접 호출 (네트워크 왕복 1회 절약)
     const adminCode = existingUser.admin_code
     const rawEmail = normalizedEmail || existingUser.imweb_email || ''
-    const finalEmail = ADMIN_EMAILS.includes(rawEmail) ? '' : rawEmail
+    // 이메일은 그대로 전달 (DB 저장 방지는 handleAdminPage 내부에서 처리)
     const isMasterAdmin = adminCode === 'master_admin'
     const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
-    return handleAdminPage(c, adminCode, finalEmail, isAdminFlag, memberName)
+    return handleAdminPage(c, adminCode, rawEmail, isAdminFlag, memberName)
   }
 
   // ── 신규 사용자: 아임웹 API로 이메일/이름 검증 후 계정 생성 ──
@@ -2441,12 +2441,12 @@ app.get('/embed/:memberCode', async (c) => {
 
   const adminCode = (user as any).admin_code
   const rawFinalEmail = resolvedEmail || (user as any).imweb_email || ''
-  const finalEmail = ADMIN_EMAILS.includes(rawFinalEmail) ? '' : rawFinalEmail
+  // 이메일은 그대로 전달 (DB 저장 방지는 handleAdminPage 내부에서 처리)
   const isMasterAdmin = adminCode === 'master_admin'
   const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
   // 신규 사용자도 redirect 없이 직접 handleAdminPage 호출
   const resolvedMemberName = apiMemberName || memberName || ''
-  return handleAdminPage(c, adminCode, finalEmail, isAdminFlag, resolvedMemberName)
+  return handleAdminPage(c, adminCode, rawFinalEmail, isAdminFlag, resolvedMemberName)
 })
 
 // 아임웹 임베드용 - 이전 코드 (사용하지 않음)
@@ -4333,8 +4333,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     return { ...p, items, activeItemIds }
   })
 
-  // 최고관리자(super_admin) 판단: ADMIN_EMAILS에 포함되거나 is_master=1
-  const isSuperAdmin = isAdminEmail(finalUser?.imweb_email) || finalUser?.is_master === 1
+  // 최고관리자(super_admin) 판단:
+  // 1. ADMIN_EMAILS에 포함 (하드코딩된 관리자 이메일)
+  // 2. DB에서 is_master=1 (마스터 관리자)
+  // 3. 아임웹 사이트 관리자로 접속 (is_admin=1 파라미터) - 사이트 주인
+  const isSuperAdmin = isAdminEmail(finalUser?.imweb_email) || finalUser?.is_master === 1 || isAdminQuery
 
   // 최고관리자일 때 전체 치과 목록 로드
   let allClinicsData: any[] = []
@@ -4356,7 +4359,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     masterItems: masterItemsData.results || [],
     clinicName: finalUser?.clinic_name || '',
     memberName: memberName || '',
-    userEmail: finalUser?.imweb_email || emailParam || '',
+    userEmail: finalUser?.imweb_email || emailParam || adminCode || '',
     isOwnerAdmin: isOwnerAdmin,
     isSuperAdmin: isSuperAdmin,
     adminCode: adminCode,
@@ -4364,6 +4367,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     allClinics: isSuperAdmin ? allClinicsData : []
   }
   const initialDataJson = JSON.stringify(initialData).replace(/</g, '\\u003c')
+
+  // SSR: 서버 사이드에서 직접 렌더링할 값 (JS 실행 전에도 정확한 표시)
+  const ssrDisplayName = initialData.clinicName || initialData.memberName || initialData.userEmail || initialData.adminCode || '내 치과'
+  const ssrRole = isSuperAdmin ? '최고관리자' : (isOwnerAdmin ? '관리자' : '대기실 TV 관리자')
+  const ssrEmailPart = initialData.userEmail ? ` · ${initialData.userEmail}` : ''
+  const ssrMemberPart = (initialData.memberName && ssrDisplayName !== initialData.memberName) ? ` · ${initialData.memberName}` : ''
+  const ssrSubtitle = `${ssrRole}${ssrEmailPart}${ssrMemberPart}`
+  const ssrAdminTabDisplay = isSuperAdmin ? 'inline-block' : 'none'
 
   const baseUrl = new URL(c.req.url).origin
   
@@ -4466,8 +4477,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       <!-- 헤더 (포인트관리 스타일) -->
       <div style="background:linear-gradient(135deg,#2563eb 0%,#3b82f6 100%);padding:16px 20px;color:#fff;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <div id="clinic-name-text" style="font-size:18px;font-weight:700;cursor:pointer" onclick="editClinicName()">내 치과</div>
-          <div id="clinic-subtitle" style="font-size:12px;opacity:.8;margin-top:2px">대기실 TV 관리자</div>
+          <div id="clinic-name-text" style="font-size:18px;font-weight:700;cursor:pointer" onclick="editClinicName()">${ssrDisplayName}</div>
+          <div id="clinic-subtitle" style="font-size:12px;opacity:.8;margin-top:2px">${ssrSubtitle}</div>
         </div>
       </div>
       
@@ -4494,7 +4505,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           설정
         </button>
         <button id="tab-admin" class="dtv-nb" data-tab="admin"
-          style="display:none;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          style="display:${ssrAdminTabDisplay};padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
           onclick="showTab('admin')">
           관리
         </button>
@@ -5777,7 +5788,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260308z2"></script>
+  <script defer src="/static/admin.js?v=20260321a"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
