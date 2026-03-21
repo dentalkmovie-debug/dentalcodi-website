@@ -1227,10 +1227,27 @@ app.post('/api/:adminCode/playlists', async (c) => {
   `).bind(user.id).first() as { max_order: number }
   const newSortOrder = (maxOrder?.max_order ?? -1) + 1
   
+  // 공용 영상(마스터 아이템) ID를 가져와서 기본 active_item_ids로 설정
+  let defaultActiveItemIds = '[]'
+  try {
+    const masterItems = await c.env.DB.prepare(`
+      SELECT pi.id FROM playlist_items pi
+      JOIN playlists p ON pi.playlist_id = p.id
+      JOIN users u ON p.user_id = u.id
+      WHERE u.is_master = 1 AND p.is_master_playlist = 1
+      ORDER BY pi.sort_order
+    `).all()
+    if (masterItems.results && masterItems.results.length > 0) {
+      defaultActiveItemIds = JSON.stringify(masterItems.results.map((i: any) => i.id))
+    }
+  } catch (e) {
+    console.error('Failed to load master items for default playlist:', e)
+  }
+  
   const result = await c.env.DB.prepare(`
-    INSERT INTO playlists (user_id, name, short_code, tv_code, sort_order)
-    VALUES (?, ?, ?, ?, ?)
-  `).bind(user.id, name, shortCode, tvCode, newSortOrder).run()
+    INSERT INTO playlists (user_id, name, short_code, tv_code, sort_order, active_item_ids)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(user.id, name, shortCode, tvCode, newSortOrder, defaultActiveItemIds).run()
   
   return c.json({ 
     success: true,
