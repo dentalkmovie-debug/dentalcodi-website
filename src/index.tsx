@@ -5825,24 +5825,34 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </div>
 
   <script>
-    const ADMIN_CODE = '${adminCode}';
-    const API_BASE = '/api/' + ADMIN_CODE;
+    var ADMIN_CODE = '${adminCode}';
+    var API_BASE = '/api/' + ADMIN_CODE;
     
-    // 서버에서 미리 로드한 초기 데이터
-    const INITIAL_DATA = ${initialDataJson};
+    // 서버에서 미리 로드한 초기 데이터 (var로 선언하여 모든 스크립트에서 접근 가능)
+    var INITIAL_DATA = ${initialDataJson};
+    // window에도 백업 (iframe 환경 대비)
+    window.INITIAL_DATA = INITIAL_DATA;
+    window.ADMIN_CODE = ADMIN_CODE;
+    window.API_BASE = API_BASE;
   </script>
   <!-- 관리자 JS: 개발 시 인라인, 빌드 시 admin.js로 외부화 -->
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
+    // INITIAL_DATA 안전 참조: 인라인 스크립트에서 var로 선언 + window에 할당됨
+    // admin.js에서도 동일한 객체를 사용
     // 디버그: admin.js 로드 확인
     (function(){
       var db = document.getElementById('debug-banner');
       if(db) {
-        var mc = (typeof INITIAL_DATA !== 'undefined' && INITIAL_DATA.masterItems) ? INITIAL_DATA.masterItems.length : '?';
+        var _d = (typeof INITIAL_DATA !== 'undefined') ? INITIAL_DATA : window.INITIAL_DATA;
+        var idDefined = typeof INITIAL_DATA !== 'undefined';
+        var widDefined = typeof window.INITIAL_DATA !== 'undefined';
+        var mc = '?';
+        if (_d && _d.masterItems) mc = _d.masterItems.length;
         var ml = document.getElementById('library-master-list');
         var mlc = ml ? ml.children.length : '?';
-        db.textContent = '✅ admin.js 로드됨 | INITIAL_DATA=' + mc + '개 | SSR DOM=' + mlc + '개';
+        db.textContent = '✅ admin.js | var=' + idDefined + ' win=' + widDefined + ' master=' + mc + ' DOM=' + mlc;
         db.style.background = '#efe';
         db.style.borderColor = '#8f8';
         db.style.color = '#080';
@@ -5874,14 +5884,27 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let playlistItemsSortableInstance = null;
     let noticeSortableInstance = null;
     
-    let clinicName = INITIAL_DATA.clinicName || '';
-    let memberDisplayName = INITIAL_DATA.memberName || '';
-    let playlists = INITIAL_DATA.playlists || [];
-    let notices = INITIAL_DATA.notices || [];
-    let masterItems = INITIAL_DATA.masterItems || [];
+    // INITIAL_DATA 안전 접근 (window 폴백)
+    var _ID = (typeof INITIAL_DATA !== 'undefined') ? INITIAL_DATA : (window.INITIAL_DATA || {});
+    let clinicName = _ID.clinicName || '';
+    let memberDisplayName = _ID.memberName || '';
+    let playlists = _ID.playlists || [];
+    let notices = _ID.notices || [];
+    let masterItems = _ID.masterItems || [];
     let cachedMasterItems = masterItems || [];
     let masterItemsCache = masterItems || [];
     let currentPlaylist = null;
+    
+    // INITIAL_DATA 안전 접근 헬퍼
+    function _getInitialData() {
+      if (typeof INITIAL_DATA !== 'undefined' && INITIAL_DATA) return INITIAL_DATA;
+      if (typeof window !== 'undefined' && window.INITIAL_DATA) return window.INITIAL_DATA;
+      return {};
+    }
+    function _getMasterItems() {
+      var d = _getInitialData();
+      return (d && d.masterItems && d.masterItems.length > 0) ? d.masterItems : [];
+    }
     
     // SSR DOM에서 공용 영상 데이터를 복원하는 헬퍼 함수
     // masterItemsCache가 비어있을 때 SSR로 렌더링된 DOM에서 아이템 정보를 파싱
@@ -6306,7 +6329,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 리스트가 비어있으면 INITIAL_DATA에서 강제 렌더링
       if (list && list.children.length === 0) {
-        var _items = (INITIAL_DATA && INITIAL_DATA.masterItems) || masterItemsCache || [];
+        var _items = _getMasterItems();
+        if (_items.length === 0) _items = masterItemsCache || [];
         if (_items.length > 0) {
           masterItemsCache = _items;
           cachedMasterItems = _items;
@@ -6334,7 +6358,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (list.children.length > 0) return; // 이미 렌더링됨
         sec.classList.remove('hidden');
         sec.style.display = '';
-        var _items = (INITIAL_DATA && INITIAL_DATA.masterItems) || masterItemsCache || [];
+        var _items = _getMasterItems();
+        if (_items.length === 0) _items = masterItemsCache || [];
         if (_items.length === 0) {
           // 최후의 수단: API에서 로드
           fetch(window.location.origin + '/api/master/items', { cache: 'no-store' })
@@ -8313,10 +8338,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       // ── 2단계: masterItemsCache 복원 (4중 폴백) ──
       // ★ 최우선: INITIAL_DATA.masterItems 직접 참조 (const이므로 항상 유효)
-      if ((!masterItemsCache || masterItemsCache.length === 0) && INITIAL_DATA && INITIAL_DATA.masterItems && INITIAL_DATA.masterItems.length > 0) {
-        masterItemsCache = INITIAL_DATA.masterItems;
-        cachedMasterItems = INITIAL_DATA.masterItems;
-        masterItems = INITIAL_DATA.masterItems;
+      var _edMi = _getMasterItems();
+      if ((!masterItemsCache || masterItemsCache.length === 0) && _edMi.length > 0) {
+        masterItemsCache = _edMi;
+        cachedMasterItems = _edMi;
+        masterItems = _edMi;
         console.log('[Editor] Restored from INITIAL_DATA direct:', masterItemsCache.length);
       }
       // 폴백 2: let masterItems 변수에서 복원
@@ -9226,10 +9252,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (!section) return;
       if (!masterItemsCache || masterItemsCache.length === 0) {
         // ★ 최우선: INITIAL_DATA.masterItems 직접 참조
-        if (INITIAL_DATA && INITIAL_DATA.masterItems && INITIAL_DATA.masterItems.length > 0) {
-          masterItemsCache = INITIAL_DATA.masterItems;
-          cachedMasterItems = INITIAL_DATA.masterItems;
-          masterItems = INITIAL_DATA.masterItems;
+        var _enMi = _getMasterItems();
+        if (_enMi.length > 0) {
+          masterItemsCache = _enMi;
+          cachedMasterItems = _enMi;
+          masterItems = _enMi;
         } else if (typeof masterItems !== 'undefined' && masterItems && masterItems.length > 0) {
           masterItemsCache = masterItems;
           cachedMasterItems = masterItems;
@@ -9292,13 +9319,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const playlistContainer = document.getElementById('playlist-items-container');
       const libraryMasterSection = document.getElementById('library-master-section');
       
-      console.log('[Library] renderLibraryAndPlaylist #' + _callNum, 'masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length, 'INITIAL_DATA.masterItems:', INITIAL_DATA?.masterItems?.length, 'currentPlaylist:', currentPlaylist?.id);
+      var _rlMi = _getMasterItems();
+      console.log('[Library] renderLibraryAndPlaylist #' + _callNum, 'masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length, '_getMasterItems:', _rlMi?.length, 'currentPlaylist:', currentPlaylist?.id);
       
-      // ★ 최우선: INITIAL_DATA.masterItems에서 직접 복원 (const이므로 항상 유효)
-      if ((!masterItemsCache || masterItemsCache.length === 0) && INITIAL_DATA && INITIAL_DATA.masterItems && INITIAL_DATA.masterItems.length > 0) {
-        masterItemsCache = INITIAL_DATA.masterItems;
-        cachedMasterItems = INITIAL_DATA.masterItems;
-        masterItems = INITIAL_DATA.masterItems;
+      // ★ 최우선: INITIAL_DATA.masterItems에서 직접 복원
+      if ((!masterItemsCache || masterItemsCache.length === 0) && _rlMi.length > 0) {
+        masterItemsCache = _rlMi;
+        cachedMasterItems = _rlMi;
+        masterItems = _rlMi;
         console.log('[Library] #' + _callNum + ' Restored from INITIAL_DATA:', masterItemsCache.length);
       }
       // 폴백 2: let masterItems 변수에서 복원
@@ -9594,10 +9622,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (!currentPlaylist) return;
       // masterItemsCache가 비어있으면 4중 폴백으로 복원
       // ★ 최우선: INITIAL_DATA.masterItems 직접 참조
-      if ((!masterItemsCache || masterItemsCache.length === 0) && INITIAL_DATA && INITIAL_DATA.masterItems && INITIAL_DATA.masterItems.length > 0) {
-        masterItemsCache = INITIAL_DATA.masterItems;
-        cachedMasterItems = INITIAL_DATA.masterItems;
-        masterItems = INITIAL_DATA.masterItems;
+      var _rlOMi = _getMasterItems();
+      if ((!masterItemsCache || masterItemsCache.length === 0) && _rlOMi.length > 0) {
+        masterItemsCache = _rlOMi;
+        cachedMasterItems = _rlOMi;
+        masterItems = _rlOMi;
       }
       if ((!masterItemsCache || masterItemsCache.length === 0) && typeof masterItems !== 'undefined' && masterItems && masterItems.length > 0) {
         masterItemsCache = masterItems;
