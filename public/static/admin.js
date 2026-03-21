@@ -312,8 +312,9 @@ function init() {
   if (loadingDiv) loadingDiv.style.display = 'none';
 
   // 헤더에 실제 계정 이름 표시 (포인트관리 동일 패턴)
-  // 우선순위: clinicName(치과명) → memberName(아임웹 회원명) → userEmail → adminCode
-  var displayName = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+  // '내 치과'는 기본값이므로 의미있는 이름이 아님 → 폴백 계속 진행
+  var effectiveName = (clinicName && clinicName !== '내 치과') ? clinicName : '';
+  var displayName = effectiveName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
   document.getElementById('clinic-name-text').textContent = displayName;
   if (INITIAL_DATA.isOwnerAdmin) {
     document.getElementById('clinic-name-text').style.cursor = 'default';
@@ -773,7 +774,8 @@ async function loadPlaylists() {
     const data = await res.json();
     playlists = data.playlists || [];
     clinicName = data.clinic_name || '';
-    var updatedDisplay = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+    var effectiveUpdated = (clinicName && clinicName !== '내 치과') ? clinicName : '';
+    var updatedDisplay = effectiveUpdated || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
     document.getElementById('clinic-name-text').textContent = updatedDisplay;
     renderPlaylists();
   } catch (e) {
@@ -4568,14 +4570,26 @@ function closeModal(id) {
     loadPlaylists();
     // 모달 닫으면 헤더(상단)로 스크롤
     setTimeout(function() {
+      // 1) iframe 내부 스크롤 (자체 페이지)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      // 2) dashboard 요소로 스크롤
       var dashboard = document.getElementById('dashboard');
       if (dashboard) dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // 아임웹 iframe 환경에서도 동작하도록
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (window.parent && window.parent !== window) {
-        try { window.parent.postMessage({ type: 'scrollToTop' }, '*'); } catch(e) {}
+      // 3) 아임웹 iframe 환경: 부모에게 스크롤 요청 + 높이 재계산
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          window.parent.postMessage({ type: 'scrollTo', top: 0 }, '*');
+        }
+      } catch(e) {}
+      // 4) iframe 높이 재계산 (높이가 줄면 부모도 상단으로 이동)
+      if (typeof postParentHeight === 'function') {
+        postParentHeight();
+        setTimeout(postParentHeight, 300);
       }
-    }, 100);
+    }, 150);
   }
   // 스크립트/설치방법 모달 닫힐 때 체크박스 전체 해제
   if (id === 'script-download-modal' || id === 'script-type-modal') {

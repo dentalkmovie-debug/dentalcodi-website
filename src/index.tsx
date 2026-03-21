@@ -223,7 +223,7 @@ async function getOrCreateUserByMemberCode(db: D1Database, memberCode: string, m
 }
 
 // 관리자 이메일 기준 (아임웹 가입 이메일)
-const ADMIN_EMAILS = ['imwebaws@gmail.com']
+const ADMIN_EMAILS = ['imwebaws@gmail.com', 'dentalkmovie@gmail.com']
 const normalizeEmail = (email?: string) => (email || '').trim().toLowerCase()
 const isAdminEmail = (email?: string) => ADMIN_EMAILS.includes(normalizeEmail(email))
 
@@ -2619,12 +2619,12 @@ app.get('/embed-old/:memberCode', async (c) => {
     </div>
     
     <!-- 플레이리스트 편집 모달 -->
-    <div id="edit-playlist-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 modal-backdrop" onclick="closeEditModal()"></div>
+    <div id="edit-playlist-modal-old-unused" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 modal-backdrop" onclick="closeModal('edit-playlist-modal')"></div>
       <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col m-4">
         <div class="p-4 border-b flex justify-between items-center">
           <h2 id="edit-playlist-title" class="text-lg font-bold text-gray-800">플레이리스트 편집</h2>
-          <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          <button onclick="closeModal('edit-playlist-modal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         </div>
         
         <div class="p-4 overflow-y-auto flex-1">
@@ -2766,7 +2766,7 @@ app.get('/embed-old/:memberCode', async (c) => {
         </div>
         
         <div class="p-4 border-t flex justify-end gap-2">
-          <button onclick="closeEditModal()" class="px-4 py-2 border rounded text-sm">닫기</button>
+          <button onclick="closeModal('edit-playlist-modal')" class="px-4 py-2 border rounded text-sm">닫기</button>
           <button onclick="saveAllSettings()" class="bg-blue-500 text-white px-4 py-2 rounded text-sm">저장</button>
         </div>
       </div>
@@ -4119,10 +4119,9 @@ app.get('/embed-old/:memberCode', async (c) => {
       inputs.classList.toggle('hidden', !enabled);
     }
     
-    // 모달 닫기
+    // 모달 닫기 (closeModal로 통합 - modal-open 해제, 스크롤 복원 포함)
     function closeEditModal() {
-      document.getElementById('edit-playlist-modal').style.display = 'none';
-      loadPlaylists();
+      closeModal('edit-playlist-modal');
     }
     
     function closePreviewModal() {
@@ -4271,7 +4270,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   // 관리자 권한 체크:
   // 1. URL에 is_admin=1 파라미터가 있거나
   // 2. 마스터 관리자 페이지에서 설정한 관리자인 경우
-  const isOwnerAdmin = isAdminQuery || finalUser?.is_site_admin === 1 || isAdminEmail(finalUser?.imweb_email)
+  const isOwnerAdmin = isAdminQuery || finalUser?.is_site_admin === 1 || isAdminEmail(finalUser?.imweb_email) || isAdminEmail(emailParam)
   
   // 서버에서 초기 데이터 미리 로드 (병렬)
   const [playlistsData, noticesData, masterItemsData, playlistItemsData] = await Promise.all([
@@ -4334,10 +4333,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   })
 
   // 최고관리자(super_admin) 판단:
-  // 1. ADMIN_EMAILS에 포함 (하드코딩된 관리자 이메일)
+  // 1. ADMIN_EMAILS에 포함 (DB 이메일 또는 전달된 이메일)
   // 2. DB에서 is_master=1 (마스터 관리자)
   // 3. 아임웹 사이트 관리자로 접속 (is_admin=1 파라미터) - 사이트 주인
-  const isSuperAdmin = isAdminEmail(finalUser?.imweb_email) || finalUser?.is_master === 1 || isAdminQuery
+  const isSuperAdmin = isAdminEmail(finalUser?.imweb_email) || isAdminEmail(emailParam) || finalUser?.is_master === 1 || isAdminQuery
 
   // 최고관리자일 때 전체 치과 목록 로드
   let allClinicsData: any[] = []
@@ -4369,7 +4368,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const initialDataJson = JSON.stringify(initialData).replace(/</g, '\\u003c')
 
   // SSR: 서버 사이드에서 직접 렌더링할 값 (JS 실행 전에도 정확한 표시)
-  const ssrDisplayName = initialData.clinicName || initialData.memberName || initialData.userEmail || initialData.adminCode || '내 치과'
+  // '내 치과'는 기본값이므로 의미있는 이름이 아님 → 폴백 계속 진행
+  const effectiveClinicName = (initialData.clinicName && initialData.clinicName !== '내 치과') ? initialData.clinicName : ''
+  const ssrDisplayName = effectiveClinicName || initialData.memberName || initialData.userEmail || initialData.adminCode || '내 치과'
   const ssrRole = isSuperAdmin ? '최고관리자' : (isOwnerAdmin ? '관리자' : '대기실 TV 관리자')
   const ssrEmailPart = initialData.userEmail ? ` · ${initialData.userEmail}` : ''
   const ssrMemberPart = (initialData.memberName && ssrDisplayName !== initialData.memberName) ? ` · ${initialData.memberName}` : ''
@@ -6105,8 +6106,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (loadingDiv) loadingDiv.style.display = 'none';
 
       // 헤더에 실제 계정 이름 표시 (포인트관리 동일 패턴)
-      // 우선순위: clinicName(치과명) → memberName(아임웹 회원명) → userEmail → adminCode
-      var displayName = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+      // '내 치과'는 기본값이므로 의미있는 이름이 아님 → 폴백 계속 진행
+      var effectiveName = (clinicName && clinicName !== '내 치과') ? clinicName : '';
+      var displayName = effectiveName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
       document.getElementById('clinic-name-text').textContent = displayName;
       if (INITIAL_DATA.isOwnerAdmin) {
         document.getElementById('clinic-name-text').style.cursor = 'default';
@@ -6566,7 +6568,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         const data = await res.json();
         playlists = data.playlists || [];
         clinicName = data.clinic_name || '';
-        var updatedDisplay = clinicName || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
+        var effectiveUpdated = (clinicName && clinicName !== '내 치과') ? clinicName : '';
+        var updatedDisplay = effectiveUpdated || memberDisplayName || INITIAL_DATA.userEmail || INITIAL_DATA.adminCode || '내 치과';
         document.getElementById('clinic-name-text').textContent = updatedDisplay;
         renderPlaylists();
       } catch (e) {
@@ -10361,14 +10364,26 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         loadPlaylists();
         // 모달 닫으면 헤더(상단)로 스크롤
         setTimeout(function() {
+          // 1) iframe 내부 스크롤 (자체 페이지)
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          // 2) dashboard 요소로 스크롤
           var dashboard = document.getElementById('dashboard');
           if (dashboard) dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // 아임웹 iframe 환경에서도 동작하도록
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          if (window.parent && window.parent !== window) {
-            try { window.parent.postMessage({ type: 'scrollToTop' }, '*'); } catch(e) {}
+          // 3) 아임웹 iframe 환경: 부모에게 스크롤 요청 + 높이 재계산
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'scrollToTop' }, '*');
+              window.parent.postMessage({ type: 'scrollTo', top: 0 }, '*');
+            }
+          } catch(e) {}
+          // 4) iframe 높이 재계산 (높이가 줄면 부모도 상단으로 이동)
+          if (typeof postParentHeight === 'function') {
+            postParentHeight();
+            setTimeout(postParentHeight, 300);
           }
-        }, 100);
+        }, 150);
       }
       // 스크립트/설치방법 모달 닫힐 때 체크박스 전체 해제
       if (id === 'script-download-modal' || id === 'script-type-modal') {
