@@ -5035,8 +5035,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 대기실/체어 추가 모달 -->
   <div id="create-playlist-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('create-playlist-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center p-4 pt-10 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto">
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md pointer-events-auto max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-t-xl">
           <h3 class="text-lg font-bold"><i class="fas fa-plus-circle mr-2"></i>새로 추가하기</h3>
           <p class="text-blue-100 text-sm mt-1">대기실 또는 체어를 추가하세요</p>
