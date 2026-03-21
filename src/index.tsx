@@ -6347,6 +6347,26 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function showTab(tab) {
+      // ── 탭 전환 시 열려있는 플레이리스트 에디터 닫기 ──
+      var editModal = document.getElementById('edit-playlist-modal');
+      if (editModal && editModal.style.display !== 'none' && editModal.style.display !== '') {
+        // 인라인 편집 패널이 열려있으면 닫기
+        editModal.style.cssText = 'display:none;';
+        currentPlaylist = null;
+        if (masterItemsRefreshTimer) {
+          clearInterval(masterItemsRefreshTimer);
+          masterItemsRefreshTimer = null;
+        }
+        _openModalSet.delete('edit-playlist-modal');
+        // _prevDisplay 정리
+        var mainContent = document.getElementById('dtv-pg');
+        if (mainContent) {
+          mainContent.querySelectorAll(':scope > div[id^="content-"]').forEach(function(tc) {
+            if (tc._prevDisplay !== undefined) delete tc._prevDisplay;
+          });
+        }
+      }
+
       ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
         const content = document.getElementById('content-' + t);
         const tabBtn = document.getElementById('tab-' + t);
