@@ -5828,7 +5828,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260321c"></script>
+  <script defer src="/static/admin.js?v=20260321d"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
@@ -8203,6 +8203,28 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         masterItemsCache = masterItems;
         cachedMasterItems = masterItems;
       }
+      // masterItemsCache가 여전히 비어있으면 API에서 직접 로드 시도
+      if ((!masterItemsCache || masterItemsCache.length === 0)) {
+        try {
+          const baseUrl = window.location.origin;
+          const mRes = await fetch(baseUrl + '/api/master/items', { cache: 'no-store' });
+          if (mRes.ok) {
+            const mData = await mRes.json();
+            if (mData.items && mData.items.length > 0) {
+              masterItemsCache = mData.items;
+              cachedMasterItems = mData.items;
+              masterItems = mData.items;
+              console.log('[Editor] Loaded masterItems from API:', masterItemsCache.length);
+            }
+          }
+        } catch(e) {
+          console.log('[Editor] Failed to load masterItems from API:', e);
+        }
+      }
+      // SSR에 이미 공용 영상이 렌더링되어 있는지 확인
+      const ssrMasterList = document.getElementById('library-master-list');
+      const hasSsrContent = ssrMasterList && ssrMasterList.children.length > 0;
+      
       // masterItemsCache + currentPlaylist.items 모두 이미 있으므로 즉시 렌더링
       if (masterItemsCache && masterItemsCache.length > 0 && currentPlaylist) {
         // renderLibraryAndPlaylist()는 currentPlaylist.items와 masterItemsCache를 모두 사용
@@ -8230,10 +8252,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         isOpeningEditor = false;
         return;
       } else {
-        // masterItemsCache가 없으면 스켈레톤 표시
+        // masterItemsCache가 없으면: SSR 콘텐츠가 있으면 유지, 없을 때만 스켈레톤
         const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
         const libraryMasterList = document.getElementById('library-master-list');
-        if (libraryMasterList) libraryMasterList.innerHTML = skeletonItem.repeat(4);
+        // SSR로 미리 렌더링된 공용 영상이 있으면 스켈레톤으로 덮어쓰지 않음
+        if (libraryMasterList && libraryMasterList.children.length === 0) {
+          libraryMasterList.innerHTML = skeletonItem.repeat(4);
+        }
         const libraryUserList = document.getElementById('library-user-list');
         if (libraryUserList) libraryUserList.innerHTML = skeletonItem.repeat(3);
         const playlistContainer = document.getElementById('playlist-items-container');
