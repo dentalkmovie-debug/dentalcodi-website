@@ -4308,8 +4308,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     try {
       const raw = p.active_item_ids
       if (raw === null || raw === undefined) {
-        // API와 동일하게: master ids 먼저, 그 다음 user ids
-        activeItemIds = [...masterItemIds, ...items.map((i: any) => i.id)]
+        // active_item_ids가 null이면 아직 아무것도 선택하지 않은 상태 → 빈 배열
+        activeItemIds = []
       } else {
         activeItemIds = JSON.parse(raw || '[]')
         activeItemIds = Array.isArray(activeItemIds)
@@ -4317,7 +4317,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           : []
       }
     } catch (e) {
-      activeItemIds = [...masterItemIds, ...items.map((i: any) => i.id)]
+      activeItemIds = []
     }
     return { ...p, items, activeItemIds }
   })
@@ -5096,7 +5096,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             <button type="button" onclick="closeModal('create-playlist-modal')"
               class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">취소</button>
             <button type="button" onclick="createWaitingRoom()"
-              class="flex-1 px-4 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 font-medium">
+              class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">
               <i class="fas fa-plus mr-1"></i>추가하기
             </button>
           </div>
@@ -5137,7 +5137,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             <button type="button" onclick="closeModal('create-playlist-modal')"
               class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">취소</button>
             <button type="button" onclick="createChair()"
-              class="flex-1 px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 font-medium">
+              class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">
               <i class="fas fa-plus mr-1"></i>추가하기
             </button>
           </div>
@@ -5161,10 +5161,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         </div>
         <!-- URL 표시 -->
         <div class="px-5 pt-4 pb-2">
-          <div class="bg-blue-50 border-2 border-blue-200 rounded-xl py-3 text-center">
+          <div class="bg-blue-50 border-2 border-blue-200 rounded-xl py-3 px-4 text-center">
             <p class="text-xs text-blue-500 mb-1">TV에 입력할 주소</p>
-            <p id="guide-short-url" class="text-2xl font-bold text-blue-800 font-mono tracking-wide"></p>
-            <button onclick="copyGuideUrl()" class="mt-1.5 text-xs text-blue-600 hover:text-blue-800">
+            <p id="guide-short-url" class="text-lg font-bold text-blue-800 font-mono break-all leading-snug"></p>
+            <button onclick="copyGuideUrl()" class="mt-2 px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs hover:bg-blue-200">
               <i class="fas fa-copy mr-1"></i>복사하기
             </button>
           </div>
@@ -6717,7 +6717,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0}개 미디어)</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-                  <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
+                  <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : ((location.host.includes('sandbox') || location.host.includes('localhost') ? 'dental-tv.pages.dev' : location.host) + '/' + p.short_code)}" 
                     style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;color:#374151;font-family:monospace" readonly>
                   <button onclick="copySettingUrl(\${p.id})" 
                     style="padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
@@ -7231,7 +7231,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (playlist.external_short_url) {
           document.getElementById('guide-short-url').textContent = playlist.external_short_url.replace('https://', '');
         } else {
-          document.getElementById('guide-short-url').textContent = location.host + '/' + shortCode;
+          // 프로덕션 URL 표시 (sandbox URL이 아닌 dental-tv.pages.dev 사용)
+          const prodHost = location.host.includes('sandbox') || location.host.includes('localhost') 
+            ? 'dental-tv.pages.dev' : location.host;
+          document.getElementById('guide-short-url').textContent = prodHost + '/' + shortCode;
         }
         openModal('guide-url-modal');
       }
@@ -8958,10 +8961,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const editModal = document.getElementById('edit-playlist-modal');
       const isEditOpen = editModal && !editModal.classList.contains('hidden');
 
-      // 공용 영상 로드 (캐시 우선, 없을 때만 네트워크)
+      // 공용 영상 로드 (캐시 우선, 없을 때만 네트워크 - 타임아웃 늘림)
       if (!masterItemsCache || masterItemsCache.length === 0) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         try {
           const baseUrl = window.location.origin;
           const cacheBuster = isEditOpen ? ('?ts=' + Date.now()) : '';
@@ -8974,7 +8977,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             masterItemsCache = cachedMasterItems || masterItemsCache || [];
           }
         } catch (e) {
-          masterItemsCache = cachedMasterItems || masterItemsCache || [];
+          // 타임아웃 시 재시도 (1회)
+          if (e.name === 'AbortError' && (!cachedMasterItems || cachedMasterItems.length === 0)) {
+            try {
+              const retryRes = await fetch(window.location.origin + '/api/master/items', { cache: 'no-store' });
+              if (retryRes.ok) {
+                const retryData = await retryRes.json();
+                masterItemsCache = retryData.items || [];
+                cachedMasterItems = masterItemsCache;
+              }
+            } catch (retryErr) {
+              masterItemsCache = [];
+            }
+          } else {
+            masterItemsCache = cachedMasterItems || masterItemsCache || [];
+          }
         } finally {
           clearTimeout(timeoutId);
         }
@@ -9552,6 +9569,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           
           // 플레이리스트 새로고침 (배지 업데이트: TV 설정 필요 → 오프라인)
           loadPlaylists();
+          
+          // TV 연결 설정 패널 자동 닫기
+          var wrSetupContent = document.getElementById('wr-setup-content');
+          if (wrSetupContent) wrSetupContent.style.display = 'none';
+          var wrToggleIcon = document.getElementById('wr-setup-toggle-icon');
+          if (wrToggleIcon) { wrToggleIcon.classList.remove('fa-chevron-up'); wrToggleIcon.classList.add('fa-chevron-down'); }
         } else {
           showToast('단축 URL 생성 실패: ' + (data.error || ''), 'error');
         }
