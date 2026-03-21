@@ -4714,7 +4714,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 <div style="display:flex;gap:8px">
                   <input type="text" id="settings-logo-url" placeholder="https://example.com/logo.png"
                     style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">
-                  <button onclick="saveLogoSettings()" 
+                  <button onclick="saveSettingsTabLogo()" 
                     style="padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
                     onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">저장</button>
                 </div>
@@ -5827,8 +5827,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 서버에서 미리 로드한 초기 데이터
     const INITIAL_DATA = ${initialDataJson};
   </script>
-  <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260321d"></script>
+  <!-- 관리자 JS는 아래 인라인 스크립트로 직접 포함 (defer 외부 파일 중복 실행 방지) -->
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
@@ -5866,6 +5865,29 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let cachedMasterItems = masterItems || [];
     let masterItemsCache = masterItems || [];
     let currentPlaylist = null;
+    
+    // SSR DOM에서 공용 영상 데이터를 복원하는 헬퍼 함수
+    // masterItemsCache가 비어있을 때 SSR로 렌더링된 DOM에서 아이템 정보를 파싱
+    function restoreMasterItemsFromDOM() {
+      const list = document.getElementById('library-master-list');
+      if (!list || list.children.length === 0) return [];
+      const items = [];
+      list.querySelectorAll('[data-library-id]').forEach(el => {
+        const id = parseInt(el.getAttribute('data-library-id') || '0');
+        const img = el.querySelector('img');
+        const titleEl = el.querySelector('p.truncate');
+        if (id > 0) {
+          items.push({
+            id: id,
+            thumbnail_url: img ? img.src : '',
+            title: titleEl ? titleEl.textContent : '',
+            item_type: 'vimeo',
+            url: ''
+          });
+        }
+      });
+      return items;
+    }
     const playlistCacheById = {};
     const tempVideoCacheByPlaylist = {};
     let noticeSettings = { font_size: 32, letter_spacing: 0, text_color: '#ffffff', bg_color: '#1a1a2e', bg_opacity: 100, scroll_speed: 50, position: 'bottom' };
@@ -8197,13 +8219,23 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.getElementById('edit-playlist-title').textContent = '불러오는 중...';
       }
 
-      // ── 2단계: INITIAL_DATA로 즉시 전체 렌더링 ──
-      // masterItemsCache가 비어있으면 INITIAL_DATA에서 복원 시도
+      // ── 2단계: masterItemsCache 복원 (3중 폴백) ──
+      // 폴백 1: INITIAL_DATA에서 복원
       if ((!masterItemsCache || masterItemsCache.length === 0) && typeof masterItems !== 'undefined' && masterItems.length > 0) {
         masterItemsCache = masterItems;
         cachedMasterItems = masterItems;
+        console.log('[Editor] Restored masterItemsCache from INITIAL_DATA:', masterItemsCache.length);
       }
-      // masterItemsCache가 여전히 비어있으면 API에서 직접 로드 시도
+      // 폴백 2: SSR DOM에서 복원 (INITIAL_DATA도 비어있는 극단적 경우)
+      if ((!masterItemsCache || masterItemsCache.length === 0)) {
+        const domItems = restoreMasterItemsFromDOM();
+        if (domItems.length > 0) {
+          masterItemsCache = domItems;
+          cachedMasterItems = domItems;
+          console.log('[Editor] Restored masterItemsCache from SSR DOM:', domItems.length);
+        }
+      }
+      // 폴백 3: API에서 직접 로드
       if ((!masterItemsCache || masterItemsCache.length === 0)) {
         try {
           const baseUrl = window.location.origin;
@@ -8221,30 +8253,27 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           console.log('[Editor] Failed to load masterItems from API:', e);
         }
       }
-      // SSR에 이미 공용 영상이 렌더링되어 있는지 확인
-      const ssrMasterList = document.getElementById('library-master-list');
-      const hasSsrContent = ssrMasterList && ssrMasterList.children.length > 0;
       
-      // masterItemsCache + currentPlaylist.items 모두 이미 있으므로 즉시 렌더링
+      // ── 2-b단계: 즉시 렌더링 또는 SSR 콘텐츠 유지 ──
+      // 공용 영상 섹션은 절대 스켈레톤으로 덮어쓰지 않음!
+      // SSR이 이미 올바르게 렌더링한 내용을 보존
+      const _ssrMasterList = document.getElementById('library-master-list');
+      const _hasSsrMasterContent = _ssrMasterList && _ssrMasterList.children.length > 0;
+      
       if (masterItemsCache && masterItemsCache.length > 0 && currentPlaylist) {
-        // renderLibraryAndPlaylist()는 currentPlaylist.items와 masterItemsCache를 모두 사용
-        // 캐시에 있으면 즉시 동기적으로 렌더링 가능 (API fetch 불필요)
         playlistEditorSignature = getPlaylistEditorSignature(masterItemsCache, currentPlaylist);
         await renderLibraryAndPlaylist();
         ensureMasterLibraryVisible();
         loadPlaylistOrder();
-        // 설정은 백그라운드에서 로드 (UI 블로킹 없음)
         loadPlaylistSettings().catch(() => {});
         if (typeof startMasterItemsAutoRefresh === 'function') {
           startMasterItemsAutoRefresh();
         }
-        // 3단계 API fetch는 캐시 업데이트 전용 (재렌더링 없음)
-        // INITIAL_DATA가 이미 완전한 데이터를 포함하므로 화면 갱신 불필요
+        // 캐시 업데이트만 (재렌더링 없음)
         fetch(API_BASE + '/playlists/' + id + '?ts=' + Date.now())
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (data && data.playlist) {
-              // 캐시만 업데이트 (다음 번 편집창 열 때 사용)
               playlistCacheById[id] = data.playlist;
             }
           })
@@ -8252,13 +8281,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         isOpeningEditor = false;
         return;
       } else {
-        // masterItemsCache가 없으면: SSR 콘텐츠가 있으면 유지, 없을 때만 스켈레톤
-        const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
-        const libraryMasterList = document.getElementById('library-master-list');
-        // SSR로 미리 렌더링된 공용 영상이 있으면 스켈레톤으로 덮어쓰지 않음
-        if (libraryMasterList && libraryMasterList.children.length === 0) {
-          libraryMasterList.innerHTML = skeletonItem.repeat(4);
+        // masterItemsCache가 없어도 공용 영상 스켈레톤은 절대 표시하지 않음
+        // SSR 콘텐츠가 있으면 그대로 유지, 없어도 스켈레톤 없음
+        console.log('[Editor] Fallback path: masterItemsCache=', masterItemsCache?.length, 'hasSsrContent=', _hasSsrMasterContent);
+        // 공용 영상 섹션: 절대 건드리지 않음 (SSR 유지)
+        const _masterSection = document.getElementById('library-master-section');
+        if (_masterSection && _hasSsrMasterContent) {
+          _masterSection.classList.remove('hidden');
+          _masterSection.style.display = '';
         }
+        // 내 영상/재생목록만 스켈레톤 표시
+        const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
         const libraryUserList = document.getElementById('library-user-list');
         if (libraryUserList) libraryUserList.innerHTML = skeletonItem.repeat(3);
         const playlistContainer = document.getElementById('playlist-items-container');
@@ -9097,13 +9130,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (typeof masterItems !== 'undefined' && masterItems && masterItems.length > 0) {
           masterItemsCache = masterItems;
           cachedMasterItems = masterItems;
-        } else if (list && list.children.length > 0) {
-          // SSR 콘텐츠가 이미 있으면 그냥 보여주기
-          section.classList.remove('hidden');
-          section.style.display = '';
-          return;
         } else {
-          return;
+          // DOM에서 복원 시도
+          const domItems = restoreMasterItemsFromDOM();
+          if (domItems.length > 0) {
+            masterItemsCache = domItems;
+            cachedMasterItems = domItems;
+            console.log('[ensureMasterLibraryVisible] Restored from DOM:', domItems.length);
+          } else if (list && list.children.length > 0) {
+            // SSR 콘텐츠가 이미 있으면 그냥 보여주기
+            section.classList.remove('hidden');
+            section.style.display = '';
+            return;
+          } else {
+            return;
+          }
         }
       }
       
@@ -9147,11 +9188,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       console.log('[Library] renderLibraryAndPlaylist called, masterItemsCache:', masterItemsCache?.length, 'libraryMasterSection:', !!libraryMasterSection, 'currentPlaylist:', currentPlaylist?.id);
       
-      // masterItemsCache가 비어있으면 INITIAL_DATA에서 복원 시도
+      // masterItemsCache가 비어있으면 3중 폴백으로 복원
       if ((!masterItemsCache || masterItemsCache.length === 0) && typeof masterItems !== 'undefined' && masterItems.length > 0) {
         masterItemsCache = masterItems;
         cachedMasterItems = masterItems;
         console.log('[Library] Restored masterItemsCache from INITIAL_DATA:', masterItemsCache.length);
+      }
+      if (!masterItemsCache || masterItemsCache.length === 0) {
+        const domItems = restoreMasterItemsFromDOM();
+        if (domItems.length > 0) {
+          masterItemsCache = domItems;
+          cachedMasterItems = domItems;
+          console.log('[Library] Restored masterItemsCache from DOM:', domItems.length);
+        }
       }
       
       const items = currentPlaylist.items || [];
@@ -9386,10 +9435,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 라이브러리 왼쪽 패널만 렌더 (자동 리프레시 시 플레이리스트는 건드리지 않음)
     function renderLibraryOnly() {
       if (!currentPlaylist) return;
-      // masterItemsCache가 비어있으면 INITIAL_DATA에서 복원 시도
+      // masterItemsCache가 비어있으면 3중 폴백으로 복원
       if ((!masterItemsCache || masterItemsCache.length === 0) && typeof masterItems !== 'undefined' && masterItems.length > 0) {
         masterItemsCache = masterItems;
         cachedMasterItems = masterItems;
+      }
+      if (!masterItemsCache || masterItemsCache.length === 0) {
+        const domItems = restoreMasterItemsFromDOM();
+        if (domItems.length > 0) {
+          masterItemsCache = domItems;
+          cachedMasterItems = domItems;
+        }
       }
       const libraryMasterList = document.getElementById('library-master-list');
       const libraryUserList = document.getElementById('library-user-list');
@@ -10872,7 +10928,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       } catch(e) { console.error('Load settings error:', e); }
     }
     
-    async function saveLogoSettings() {
+    async function saveSettingsTabLogo() {
       const logoUrl = (document.getElementById('settings-logo-url') || {}).value || '';
       const logoSize = parseInt((document.getElementById('settings-logo-size') || {}).value) || 150;
       try {
