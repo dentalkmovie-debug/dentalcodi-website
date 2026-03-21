@@ -8280,6 +8280,20 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // body scroll 잠금 하지 않음 (인라인이므로)
       
+      // 바탕(배경) 클릭 시 편집기 닫기
+      if (!mainContent._editorBackdropHandler) {
+        mainContent._editorBackdropHandler = function(e) {
+          // dtv-pg 자체를 클릭했을 때만 (자식 요소가 아닌 빈 배경 영역)
+          if (e.target === mainContent) {
+            var em = document.getElementById('edit-playlist-modal');
+            if (em && em.style.display !== 'none' && em.style.display !== '') {
+              closeModal('edit-playlist-modal');
+            }
+          }
+        };
+        mainContent.addEventListener('click', mainContent._editorBackdropHandler);
+      }
+      
       // UI 초기화
       resetPlaylistEditorScroll();
       playlistSearchQuery = '';
