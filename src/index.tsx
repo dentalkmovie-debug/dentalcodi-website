@@ -2216,12 +2216,12 @@ app.get('/api/tv/:shortCode', async (c) => {
   }
   
   // active_item_ids 파싱
-  // null/undefined/빈 문자열이면 기존 플레이리스트 (하위 호환성)
+  // null/undefined이면 아직 플레이리스트 설정 안 됨 → 빈 배열 (아무것도 재생 안 함)
+  // 사용자가 라이브러리에서 명시적으로 추가해야 재생됨
   const rawActiveItemIds = (playlist as any).active_item_ids
-  const hasActiveItemIds = rawActiveItemIds !== null && rawActiveItemIds !== undefined && rawActiveItemIds !== ''
   let activeItemIds: number[] = []
   
-  if (hasActiveItemIds) {
+  if (rawActiveItemIds !== null && rawActiveItemIds !== undefined && rawActiveItemIds !== '') {
     try {
       activeItemIds = JSON.parse(rawActiveItemIds || '[]')
       activeItemIds = Array.isArray(activeItemIds)
@@ -2234,11 +2234,11 @@ app.get('/api/tv/:shortCode', async (c) => {
   
   let combinedItems: any[] = []
   
-  if (!hasActiveItemIds) {
-    // 하위 호환성: active_item_ids가 없을 때는 사용자 아이템만 재생
-    combinedItems = userItems.results || []
+  if (activeItemIds.length === 0) {
+    // activeItemIds가 비어있으면 아무것도 재생 안 함 (대기 화면)
+    combinedItems = []
   } else {
-    // active_item_ids가 설정됨: 해당 ID만 순서대로 재생 (빈 배열이면 아무것도 재생 안함)
+    // active_item_ids가 설정됨: 해당 ID만 순서대로 재생
     const allItemsMap = new Map<number, any>()
     masterItems.forEach((item: any) => allItemsMap.set(item.id, { ...item, is_master: true }))
     ;(userItems.results || []).forEach((item: any) => allItemsMap.set(item.id, { ...item, is_master: false }))
