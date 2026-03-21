@@ -40,6 +40,7 @@ let playlistSearchQuery = '';
 let masterItemsSignature = '';
 let playlistEditorSignature = '';
 let masterItemsRefreshTimer = null;
+let _initDone = false;
 // 아임웹 iframe의 페이지 상단으로부터 top offset (헤더 높이 보정용)
 let iframePageTop = 0;
 // 스크롤 완료 후 모달 top 재조정 콜백
@@ -328,8 +329,10 @@ function loadFromCache() {
 }
 
 function init() {
+  if (_initDone) return;
+  _initDone = true;
   const t0 = performance.now();
-  console.log('[DentalTV] init start, masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length, 'INITIAL_DATA.masterItems:', INITIAL_DATA?.masterItems?.length);
+  console.log('[DentalTV] init start, masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length);
   // 초기 데이터로 즉시 렌더링 (API 호출 없이)
   const loadingDiv = document.getElementById('loading');
   if (loadingDiv) loadingDiv.style.display = 'none';
@@ -380,7 +383,9 @@ function init() {
   // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
   setInterval(async () => {
     const editModal = document.getElementById('edit-playlist-modal');
-    if (editModal && editModal.style.display !== 'none') return;
+    // 편집 모달이 보이면 (display가 none이 아니거나, dtv-pg의 자식이면) skip
+    if (editModal && (editModal.style.display !== 'none' && editModal.style.display !== '')) return;
+    if (currentPlaylist) return; // 편집 중이면 skip
     await loadPlaylists();
     saveToCache({ playlists, notices, clinicName });
   }, 5000);
