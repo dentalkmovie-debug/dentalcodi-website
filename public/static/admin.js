@@ -15,11 +15,25 @@ function _dbg(msg) {
   _dbg('JS로드: var=' + (typeof INITIAL_DATA !== 'undefined') + ' win=' + (typeof window.INITIAL_DATA !== 'undefined') + ' master=' + mc + ' DOM=' + mlc);
 })();
 let _deleteConfirmCallback = null;
-function showDeleteConfirm(message, callback) {
+function showDeleteConfirm(message, callback, options) {
   _deleteConfirmCallback = callback;
   var modal = document.getElementById('delete-confirm-modal');
   var msgEl = document.getElementById('delete-confirm-message');
-  if (msgEl) msgEl.textContent = message || '정말 삭제하시겠습니까?';
+  var titleEl = document.getElementById('delete-confirm-title');
+  var iconEl = document.getElementById('delete-confirm-icon');
+  var btnEl = document.getElementById('delete-confirm-btn');
+  var opt = options || {};
+  if (msgEl) msgEl.textContent = message || '\uC815\uB9D0 \uC9C4\uD589\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?';
+  if (titleEl) titleEl.textContent = opt.title || '\uD655\uC778';
+  if (iconEl) {
+    var isDestructive = opt.type !== 'info';
+    iconEl.className = 'w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ' + (isDestructive ? 'bg-red-100' : 'bg-blue-100');
+    iconEl.innerHTML = '<i class="fas ' + (opt.icon || (isDestructive ? 'fa-exclamation-triangle' : 'fa-paper-plane')) + ' text-lg ' + (isDestructive ? 'text-red-500' : 'text-blue-500') + '"></i>';
+  }
+  if (btnEl) {
+    btnEl.textContent = opt.confirmText || '\uD655\uC778';
+    btnEl.className = 'flex-1 py-3 rounded-br-xl font-bold text-sm border-l ' + (opt.type === 'info' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50');
+  }
   if (modal) modal.style.display = 'flex';
 }
 function cancelDeleteConfirm() {
@@ -5804,33 +5818,45 @@ async function executePush() {
     pushItems.push({ url: linkUrl.trim(), title: linkName.trim() || linkUrl.trim() });
   }
   
-  var itemNames = pushItems.map(function(i){ return i.title; }).join(', ');
   showDeleteConfirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?', async function() {
     var successCount = 0;
     var failCount = 0;
+    var failDetails = [];
+    showToast('\uBC30\uD3EC \uC911... (0/' + selectedCodes.length + ')');
     for (var i = 0; i < selectedCodes.length; i++) {
       var code = selectedCodes[i];
       try {
         var pRes = await fetch('/api/' + code + '/playlists');
+        if (!pRes.ok) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC870\uD68C \uC2E4\uD328'); continue; }
         var pData = await pRes.json();
-        var firstPlaylist = (pData.playlists || [])[0];
-        if (firstPlaylist) {
-          for (var j = 0; j < pushItems.length; j++) {
-            var item = pushItems[j];
-            var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: item.url, title: item.title })
-            });
-            if (addRes.ok) successCount++;
-            else failCount++;
+        var targetPlaylists = (pData.playlists || []).filter(function(p) { return !p.is_master_playlist; });
+        var firstPlaylist = targetPlaylists[0];
+        if (!firstPlaylist) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); continue; }
+        for (var j = 0; j < pushItems.length; j++) {
+          var item = pushItems[j];
+          var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: item.url, title: item.title })
+          });
+          if (addRes.ok) successCount++;
+          else {
+            failCount++;
+            var errData = {};
+            try { errData = await addRes.json(); } catch(e2) {}
+            failDetails.push(code + ': ' + (errData.error || '\uCD94\uAC00 \uC2E4\uD328'));
           }
-        } else { failCount++; }
-      } catch(e) { failCount++; }
+        }
+      } catch(e) { failCount++; failDetails.push(code + ': \uB124\uD2B8\uC6CC\uD06C \uC624\uB958'); }
+      // 진행률 업데이트
+      if (i % 3 === 0 || i === selectedCodes.length - 1) {
+        showToast('\uBC30\uD3EC \uC911... (' + (i+1) + '/' + selectedCodes.length + ')');
+      }
     }
     
     if (failCount > 0) {
       showToast('\uC131\uACF5 ' + successCount + '\uAC74 / \uC2E4\uD328 ' + failCount + '\uAC74', 'error');
+      if (failDetails.length > 0) console.warn('\uBC30\uD3EC \uC2E4\uD328 \uC0C1\uC138:', failDetails);
     } else {
       showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
     }
