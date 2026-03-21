@@ -5828,7 +5828,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     const INITIAL_DATA = ${initialDataJson};
   </script>
   <!-- 관리자 JS: 렌더링 비차단 defer 로드 -->
-  <script defer src="/static/admin.js?v=20260321b"></script>
+  <script defer src="/static/admin.js?v=20260321c"></script>
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
@@ -6241,6 +6241,20 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     } else {
       runInit();
     }
+    
+    // 안전장치: 3초 후에도 공용 영상 섹션이 숨겨져 있으면 강제 표시
+    setTimeout(function() {
+      var sec = document.getElementById('library-master-section');
+      if (sec && (sec.classList.contains('hidden') || sec.style.display === 'none')) {
+        // 편집 모달이 열려있을 때만
+        var modal = document.getElementById('edit-playlist-modal');
+        if (modal && modal.style.display === 'block') {
+          sec.classList.remove('hidden');
+          sec.style.display = '';
+          console.log('[Library] Failsafe: forced master section visible');
+        }
+      }
+    }, 3000);
     // 디버그: hash에 auto-open-{id}가 있으면 자동으로 편집창 열기
     try {
       const hash = window.location.hash;
@@ -9051,13 +9065,27 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function ensureMasterLibraryVisible() {
       const section = document.getElementById('library-master-section');
       const list = document.getElementById('library-master-list');
-      if (!section || !masterItemsCache || masterItemsCache.length === 0) return;
-      
-      // hidden 클래스가 여전히 있으면 제거
-      if (section.classList.contains('hidden')) {
-        section.classList.remove('hidden');
-        console.log('[Library] Force-showing master section (was hidden)');
+      // masterItemsCache가 없어도 SSR 콘텐츠가 있으면 표시
+      if (!section) return;
+      if (!masterItemsCache || masterItemsCache.length === 0) {
+        // INITIAL_DATA에서 복원 시도
+        if (typeof masterItems !== 'undefined' && masterItems && masterItems.length > 0) {
+          masterItemsCache = masterItems;
+          cachedMasterItems = masterItems;
+        } else if (list && list.children.length > 0) {
+          // SSR 콘텐츠가 이미 있으면 그냥 보여주기
+          section.classList.remove('hidden');
+          section.style.display = '';
+          return;
+        } else {
+          return;
+        }
       }
+      
+      // hidden 클래스와 display:none 모두 제거
+      section.classList.remove('hidden');
+      section.style.display = '';
+      if (section.style.visibility === 'hidden') section.style.visibility = '';
       
       // 리스트가 비어있으면 공용 영상 렌더링
       if (list && (!list.innerHTML || list.innerHTML.trim() === '' || list.children.length === 0)) {
@@ -9148,6 +9176,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       console.log('[Library] Master section check:', 'cacheLen:', masterItemsCache?.length, 'sectionEl:', !!libraryMasterSection);
       if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
         libraryMasterSection.classList.remove('hidden');
+        libraryMasterSection.style.display = '';
         console.log('[Library] Rendering', masterItemsCache.length, 'master items');
         libraryMasterList.innerHTML = masterItemsCache.map(item => \`
           <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
@@ -9167,7 +9196,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
         \`).join('');
       } else if (libraryMasterSection) {
-        libraryMasterSection.classList.add('hidden');
+        // masterItemsCache가 없어도 SSR 콘텐츠가 있으면 숨기지 않음
+        if (libraryMasterList && libraryMasterList.children.length === 0) {
+          libraryMasterSection.style.display = "none";
+        }
       }
       
       // 라이브러리: 내 영상
@@ -9341,6 +9373,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
         libraryMasterSection.classList.remove('hidden');
+        libraryMasterSection.style.display = '';
         libraryMasterList.innerHTML = masterItemsCache.map(item => \`
           <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
                data-library-id="\${item.id}" data-library-master="1"
@@ -9359,7 +9392,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
         \`).join('');
       } else if (libraryMasterSection) {
-        libraryMasterSection.classList.add('hidden');
+        // masterItemsCache가 없어도 SSR 콘텐츠가 있으면 숨기지 않음
+        if (libraryMasterList && libraryMasterList.children.length === 0) {
+          libraryMasterSection.style.display = "none";
+        }
       }
 
       if (items.length > 0 && libraryUserList) {
