@@ -5318,13 +5318,31 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             
             <!-- 라이브러리 목록 -->
             <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto" style="min-height:0;">
-              <!-- 공용 영상 -->
-              <div id="library-master-section" class="mb-4 hidden">
+              <!-- 공용 영상 (SSR로 미리 렌더링) -->
+              <div id="library-master-section" class="mb-4" ${initialData.masterItems && initialData.masterItems.length > 0 ? '' : 'style="display:none"'}>
                 <div class="flex items-center gap-2 mb-2 text-sm">
                   <i class="fas fa-crown text-purple-500"></i>
                   <span class="font-medium text-purple-700">공용 영상</span>
                 </div>
-                <div id="library-master-list" class="space-y-2"></div>
+                <div id="library-master-list" class="space-y-2">
+                  ${(initialData.masterItems || []).map((item: any) => `
+                    <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
+                         data-library-id="${item.id}" data-library-master="1"
+                         onclick="addToPlaylistFromLibrary(${item.id})">
+                      <div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">
+                        ${item.thumbnail_url 
+                          ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+                          : `<div class="w-full h-full flex items-center justify-center"><i class="fab fa-${item.item_type} text-purple-400"></i></div>`
+                        }
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
+                        <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+                      </div>
+                      <i class="fas fa-plus text-purple-400"></i>
+                    </div>
+                  `).join('')}
+                </div>
               </div>
               
               <!-- 내 영상 -->
