@@ -5318,6 +5318,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             
             <!-- 라이브러리 목록 -->
             <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto" style="min-height:0;">
+              <!-- 디버그: admin.js 로드 상태 표시 (문제 해결 후 제거) -->
+              <div id="debug-banner" style="background:#fee;border:1px solid #f88;padding:4px 8px;margin-bottom:4px;font-size:10px;color:#c00;border-radius:4px;">
+                ⏳ SSR=${initialData.masterItems?.length || 0}개 | JS 대기중...
+              </div>
               <!-- 공용 영상 (SSR로 미리 렌더링) -->
               <div id="library-master-section" class="mb-4" ${initialData.masterItems && initialData.masterItems.length > 0 ? '' : 'style="display:none"'}>
                 <div class="flex items-center gap-2 mb-2 text-sm">
@@ -5831,6 +5835,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
+    // 디버그: admin.js 로드 확인
+    (function(){
+      var db = document.getElementById('debug-banner');
+      if(db) {
+        var mc = (typeof INITIAL_DATA !== 'undefined' && INITIAL_DATA.masterItems) ? INITIAL_DATA.masterItems.length : '?';
+        var ml = document.getElementById('library-master-list');
+        var mlc = ml ? ml.children.length : '?';
+        db.textContent = '✅ admin.js 로드됨 | INITIAL_DATA=' + mc + '개 | SSR DOM=' + mlc + '개';
+        db.style.background = '#efe';
+        db.style.borderColor = '#8f8';
+        db.style.color = '#080';
+      }
+    })();
     let _deleteConfirmCallback = null;
     function showDeleteConfirm(message, callback) {
       _deleteConfirmCallback = callback;
@@ -6188,6 +6205,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       _initDone = true;
       const t0 = performance.now();
       console.log('[DentalTV] init start, masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length);
+      // 디버그 배너 업데이트
+      var _db2 = document.getElementById('debug-banner');
+      if(_db2) {
+        var _ml2 = document.getElementById('library-master-list');
+        _db2.textContent = '🚀 init() 실행 | cache=' + (masterItemsCache?.length||0) + ' | DOM=' + (_ml2?_ml2.children.length:'?');
+        _db2.style.background = '#eef';
+        _db2.style.borderColor = '#88f';
+        _db2.style.color = '#008';
+      }
       // 초기 데이터로 즉시 렌더링 (API 호출 없이)
       const loadingDiv = document.getElementById('loading');
       if (loadingDiv) loadingDiv.style.display = 'none';
@@ -8124,6 +8150,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (isOpeningEditor) return;
       isOpeningEditor = true;
       console.log('[Editor] openPlaylistEditor id:', id, 'masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length);
+      // 디버그 배너 업데이트
+      var _db3 = document.getElementById('debug-banner');
+      if(_db3) {
+        var _ml3 = document.getElementById('library-master-list');
+        _db3.textContent = '📝 편집기 열림 | cache=' + (masterItemsCache?.length||0) + ' | DOM=' + (_ml3?_ml3.children.length:'?') + ' | id=' + id;
+      }
       
       // ── 인라인 편집 모드: 대시보드 구조(헤더/탭) 유지, 콘텐츠 영역만 교체 ──
       var editModal = document.getElementById('edit-playlist-modal');
@@ -9252,6 +9284,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         libraryMasterSection.classList.remove('hidden');
         libraryMasterSection.style.display = '';
         console.log('[Library] Rendering', masterItemsCache.length, 'master items');
+        // 디버그: 렌더링 완료 표시
+        var _db4 = document.getElementById('debug-banner');
+        if(_db4) { _db4.textContent = '✅ 공용영상 ' + masterItemsCache.length + '개 렌더링 완료'; _db4.style.background='#efe'; _db4.style.color='#080'; }
         libraryMasterList.innerHTML = masterItemsCache.map(item => \`
           <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
                data-library-id="\${item.id}" data-library-master="1"
@@ -9271,8 +9306,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         \`).join('');
       } else if (libraryMasterSection) {
         // masterItemsCache가 없어도 SSR 콘텐츠가 있으면 숨기지 않음
+        var _db5 = document.getElementById('debug-banner');
         if (libraryMasterList && libraryMasterList.children.length === 0) {
           libraryMasterSection.style.display = "none";
+          if(_db5) { _db5.textContent = '⚠️ renderLib: cache=0, DOM=0 → 숨김'; _db5.style.background='#ffe'; _db5.style.color='#880'; }
+        } else {
+          if(_db5) { _db5.textContent = '✅ renderLib: SSR 유지 DOM=' + libraryMasterList.children.length; _db5.style.background='#efe'; _db5.style.color='#080'; }
         }
       }
       
