@@ -9018,15 +9018,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>\`
               }
             </div>
-            <div class="flex-1 min-w-0 cursor-pointer" data-item-id="\${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
-              <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600" title="클릭하여 제목 수정">\${item.title || item.url}</p>
+            <div class="flex-1 min-w-0 cursor-pointer" onclick="addToPlaylistFromLibrary(\${item.id})">
+              <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600" title="클릭하여 재생목록에 추가">\${item.title || item.url}</p>
               <p class="text-xs text-gray-500">
                 \${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' : 
                   item.item_type === 'vimeo' ? '<i class="fab fa-vimeo text-blue-400"></i>' : 
                   '<i class="fas fa-image text-green-400"></i>'}
-                <i class="fas fa-pencil-alt ml-1 text-gray-400 text-xs"></i>
               </p>
             </div>
+            <button onclick="event.stopPropagation(); editItemTitleById(\${item.id})" 
+                    class="text-gray-400 hover:text-blue-500 p-1 opacity-0 group-hover:opacity-100" title="제목 수정">
+              <i class="fas fa-pencil-alt text-xs"></i>
+            </button>
             <button onclick="addToPlaylistFromLibrary(\${item.id})" 
                     class="text-gray-400 hover:text-blue-500 p-1" title="재생목록에 추가">
               <i class="fas fa-plus"></i>
@@ -9201,14 +9204,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   : \`<div class="w-full h-full flex items-center justify-center"><i class="fab fa-\${item.item_type} \${item.item_type === 'youtube' ? 'text-red-500' : 'text-blue-400'}"></i></div>\`
               }
             </div>
-            <div class="flex-1 min-w-0 cursor-pointer" data-item-id="\${item.id}" onclick="editItemTitleById(this.dataset.itemId)">
-              <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600">\${item.title || item.url}</p>
+            <div class="flex-1 min-w-0 cursor-pointer" onclick="addToPlaylistFromLibrary(\${item.id})">
+              <p class="text-xs font-medium text-gray-800 truncate hover:text-blue-600" title="클릭하여 재생목록에 추가">\${item.title || item.url}</p>
               <p class="text-xs text-gray-500">
                 \${item.item_type === 'youtube' ? '<i class="fab fa-youtube text-red-500"></i>' :
                   item.item_type === 'vimeo' ? '<i class="fab fa-vimeo text-blue-400"></i>' :
                   '<i class="fas fa-image text-green-400"></i>'}
               </p>
             </div>
+            <button onclick="event.stopPropagation(); editItemTitleById(\${item.id})"
+                    class="text-gray-400 hover:text-blue-500 p-1 opacity-0 group-hover:opacity-100" title="제목 수정">
+              <i class="fas fa-pencil-alt text-xs"></i>
+            </button>
             <button onclick="addToPlaylistFromLibrary(\${item.id})"
                     class="text-gray-400 hover:text-blue-500 p-1" title="재생목록에 추가">
               <i class="fas fa-plus"></i>
