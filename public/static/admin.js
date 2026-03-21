@@ -1,22 +1,18 @@
 // ── 삭제 확인 모달 (confirm 대체) ──
+// 디버그 로그 헬퍼: 배너에 누적 로그
+function _dbg(msg) {
+  var db = document.getElementById('debug-banner');
+  if(db) { db.innerHTML += '<br>' + msg; db.scrollTop = db.scrollHeight; }
+}
 // INITIAL_DATA 안전 참조: 인라인 스크립트에서 var로 선언 + window에 할당됨
 // admin.js에서도 동일한 객체를 사용
 // 디버그: admin.js 로드 확인
 (function(){
-  var db = document.getElementById('debug-banner');
-  if(db) {
-    var _d = (typeof INITIAL_DATA !== 'undefined') ? INITIAL_DATA : window.INITIAL_DATA;
-    var idDefined = typeof INITIAL_DATA !== 'undefined';
-    var widDefined = typeof window.INITIAL_DATA !== 'undefined';
-    var mc = '?';
-    if (_d && _d.masterItems) mc = _d.masterItems.length;
-    var ml = document.getElementById('library-master-list');
-    var mlc = ml ? ml.children.length : '?';
-    db.textContent = '✅ admin.js | var=' + idDefined + ' win=' + widDefined + ' master=' + mc + ' DOM=' + mlc;
-    db.style.background = '#efe';
-    db.style.borderColor = '#8f8';
-    db.style.color = '#080';
-  }
+  var _d = (typeof INITIAL_DATA !== 'undefined') ? INITIAL_DATA : (typeof window !== 'undefined' ? window.INITIAL_DATA : null);
+  var mc = (_d && _d.masterItems) ? _d.masterItems.length : '?';
+  var ml = document.getElementById('library-master-list');
+  var mlc = ml ? ml.children.length : '?';
+  _dbg('JS로드: var=' + (typeof INITIAL_DATA !== 'undefined') + ' win=' + (typeof window.INITIAL_DATA !== 'undefined') + ' master=' + mc + ' DOM=' + mlc);
 })();
 let _deleteConfirmCallback = null;
 function showDeleteConfirm(message, callback) {
@@ -3479,29 +3475,31 @@ async function renderLibraryAndPlaylist() {
   const playlistContainer = document.getElementById('playlist-items-container');
   const libraryMasterSection = document.getElementById('library-master-section');
   
+  // ★★★ 강화된 복원: 캐시가 비어있으면 무조건 모든 소스에서 시도 ★★★
   var _rlMi = _getMasterItems();
-  console.log('[Library] renderLibraryAndPlaylist #' + _callNum, 'masterItemsCache:', masterItemsCache?.length, 'masterItems:', masterItems?.length, '_getMasterItems:', _rlMi?.length, 'currentPlaylist:', currentPlaylist?.id);
+  _dbg('renderLib #' + _callNum + ': cache=' + (masterItemsCache ? masterItemsCache.length : 'null') + ' var=' + (masterItems ? masterItems.length : 'null') + ' INIT=' + _rlMi.length);
+  console.log('[Library] renderLibraryAndPlaylist #' + _callNum, 'cache:', masterItemsCache?.length, 'var:', masterItems?.length, 'INIT:', _rlMi?.length, 'playlist:', currentPlaylist?.id);
   
-  // ★ 최우선: INITIAL_DATA.masterItems에서 직접 복원
+  // 복원 1: INITIAL_DATA (const, 변경 불가능한 원본)
   if ((!masterItemsCache || masterItemsCache.length === 0) && _rlMi.length > 0) {
-    masterItemsCache = _rlMi;
-    cachedMasterItems = _rlMi;
-    masterItems = _rlMi;
-    console.log('[Library] #' + _callNum + ' Restored from INITIAL_DATA:', masterItemsCache.length);
+    masterItemsCache = _rlMi.slice(); // 복사본 사용
+    cachedMasterItems = masterItemsCache;
+    masterItems = masterItemsCache;
+    _dbg('#' + _callNum + ' INIT복원: ' + masterItemsCache.length);
   }
-  // 폴백 2: let masterItems 변수에서 복원
-  if ((!masterItemsCache || masterItemsCache.length === 0) && typeof masterItems !== 'undefined' && masterItems && masterItems.length > 0) {
-    masterItemsCache = masterItems;
-    cachedMasterItems = masterItems;
-    console.log('[Library] #' + _callNum + ' Restored from masterItems var:', masterItemsCache.length);
+  // 복원 2: masterItems 변수
+  if ((!masterItemsCache || masterItemsCache.length === 0) && masterItems && masterItems.length > 0) {
+    masterItemsCache = masterItems.slice();
+    cachedMasterItems = masterItemsCache;
+    _dbg('#' + _callNum + ' var복원: ' + masterItemsCache.length);
   }
-  // 폴백 3: SSR DOM에서 복원
+  // 복원 3: SSR DOM
   if (!masterItemsCache || masterItemsCache.length === 0) {
-    const domItems = restoreMasterItemsFromDOM();
+    var domItems = restoreMasterItemsFromDOM();
     if (domItems.length > 0) {
       masterItemsCache = domItems;
       cachedMasterItems = domItems;
-      console.log('[Library] #' + _callNum + ' Restored from DOM:', domItems.length);
+      _dbg('#' + _callNum + ' DOM복원: ' + domItems.length);
     }
   }
   
@@ -3511,52 +3509,48 @@ async function renderLibraryAndPlaylist() {
   const editModal = document.getElementById('edit-playlist-modal');
   const isEditOpen = editModal && !editModal.classList.contains('hidden');
 
-  // 공용 영상 로드 (캐시 우선, 없을 때만 네트워크 - 타임아웃 늘림)
+  // 복원 4: 캐시가 여전히 비어있으면 API에서 로드
   if (!masterItemsCache || masterItemsCache.length === 0) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    _dbg('#' + _callNum + ' API로드 시작... origin=' + window.location.origin);
     try {
-      const baseUrl = window.location.origin;
-      const cacheBuster = isEditOpen ? ('?ts=' + Date.now()) : '';
-      const res = await fetch(baseUrl + '/api/master/items' + cacheBuster, { cache: 'no-store', signal: controller.signal });
+      var _apiUrl = '/api/master/items?ts=' + Date.now();
+      _dbg('#' + _callNum + ' fetch: ' + _apiUrl);
+      var res = await fetch(_apiUrl, { cache: 'no-store' });
+      _dbg('#' + _callNum + ' fetch 응답: ' + res.status);
       if (res.ok) {
-        const data = await res.json();
-        masterItemsCache = data.items || [];
+        var data = await res.json();
+        masterItemsCache = (data.items || []).slice();
         cachedMasterItems = masterItemsCache;
+        masterItems = masterItemsCache;
+        _dbg('#' + _callNum + ' API성공: ' + masterItemsCache.length + '개');
       } else {
-        masterItemsCache = cachedMasterItems || masterItemsCache || [];
+        _dbg('#' + _callNum + ' API실패: status=' + res.status);
       }
     } catch (e) {
-      // 타임아웃 시 재시도 (1회)
-      if (e.name === 'AbortError' && (!cachedMasterItems || cachedMasterItems.length === 0)) {
-        try {
-          const retryRes = await fetch(window.location.origin + '/api/master/items', { cache: 'no-store' });
-          if (retryRes.ok) {
-            const retryData = await retryRes.json();
-            masterItemsCache = retryData.items || [];
-            cachedMasterItems = masterItemsCache;
-          }
-        } catch (retryErr) {
-          masterItemsCache = cachedMasterItems || (typeof masterItems !== 'undefined' ? masterItems : []);
+      _dbg('#' + _callNum + ' API에러: ' + (e.message || e));
+      // 재시도
+      try {
+        var retryRes = await fetch('/api/master/items', { cache: 'no-store' });
+        if (retryRes.ok) {
+          var retryData = await retryRes.json();
+          masterItemsCache = (retryData.items || []).slice();
+          cachedMasterItems = masterItemsCache;
+          masterItems = masterItemsCache;
+          _dbg('#' + _callNum + ' 재시도성공: ' + masterItemsCache.length + '개');
         }
-      } else {
-        masterItemsCache = cachedMasterItems || masterItemsCache || (typeof masterItems !== 'undefined' ? masterItems : []);
+      } catch (e2) {
+        _dbg('#' + _callNum + ' 재시도실패: ' + (e2.message || e2));
       }
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 
   
   // 라이브러리: 공용 영상
-  console.log('[Library] Master section check:', 'cacheLen:', masterItemsCache?.length, 'sectionEl:', !!libraryMasterSection);
+  _dbg('렌더링 진입: cache=' + (masterItemsCache ? masterItemsCache.length : 'null'));
   if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
     libraryMasterSection.classList.remove('hidden');
     libraryMasterSection.style.display = '';
-    console.log('[Library] Rendering', masterItemsCache.length, 'master items');
-    // 디버그: 렌더링 완료 표시
-    var _db4 = document.getElementById('debug-banner');
-    if(_db4) { _db4.textContent = '✅ 공용영상 ' + masterItemsCache.length + '개 렌더링 완료'; _db4.style.background='#efe'; _db4.style.color='#080'; }
+    _dbg('✅ 공용영상 ' + masterItemsCache.length + '개 렌더링');
     libraryMasterList.innerHTML = masterItemsCache.map(item => `
       <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
            data-library-id="${item.id}" data-library-master="1"
@@ -3577,23 +3571,23 @@ async function renderLibraryAndPlaylist() {
   } else if (libraryMasterSection) {
     // masterItemsCache가 없어도 절대 숨기지 않음
     // 대신 마지막 수단으로 API에서 강제 로드 후 렌더링
-    var _db5 = document.getElementById('debug-banner');
-    console.log('[Library] #' + _callNum + ' else branch: cache empty, attempting forced API load');
-    if(_db5) { _db5.textContent = '⏳ renderLib #' + _callNum + ': API 로드 중... (cache=0)'; _db5.style.background='#fef'; _db5.style.color='#808'; }
+    _dbg('⚠️ else분기: cache비어있음, API강제로드');
     // 섹션은 보이게 유지 (숨기지 않음!)
     libraryMasterSection.classList.remove('hidden');
     libraryMasterSection.style.display = '';
     // API에서 강제 로드 시도
     try {
-      const _forceRes = await fetch(window.location.origin + '/api/master/items', { cache: 'no-store' });
+      _dbg('강제API: /api/master/items 호출...');
+      const _forceRes = await fetch('/api/master/items?force=' + Date.now(), { cache: 'no-store' });
+      _dbg('강제API: status=' + _forceRes.status);
       if (_forceRes.ok) {
         const _forceData = await _forceRes.json();
+        _dbg('강제API: items=' + (_forceData.items ? _forceData.items.length : 'null'));
         if (_forceData.items && _forceData.items.length > 0) {
-          masterItemsCache = _forceData.items;
-          cachedMasterItems = _forceData.items;
-          masterItems = _forceData.items;
-          console.log('[Library] #' + _callNum + ' Forced API load success:', masterItemsCache.length);
-          if(_db5) { _db5.textContent = '✅ API에서 ' + masterItemsCache.length + '개 로드 완료'; _db5.style.background='#efe'; _db5.style.color='#080'; }
+          masterItemsCache = _forceData.items.slice();
+          cachedMasterItems = masterItemsCache;
+          masterItems = masterItemsCache;
+          _dbg('✅ API에서 ' + masterItemsCache.length + '개 로드');
           if (libraryMasterList) {
             libraryMasterList.innerHTML = masterItemsCache.map(item => `
               <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
@@ -3616,8 +3610,7 @@ async function renderLibraryAndPlaylist() {
         }
       }
     } catch(e) {
-      console.log('[Library] #' + _callNum + ' Forced API load failed:', e);
-      if(_db5) { _db5.textContent = '❌ API 로드 실패'; _db5.style.background='#fee'; _db5.style.color='#800'; }
+      _dbg('❌ 강제API에러: ' + (e.message || e));
     }
   }
   
