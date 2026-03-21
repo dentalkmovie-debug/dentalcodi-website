@@ -5319,7 +5319,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             <!-- 라이브러리 목록 -->
             <div id="library-scroll-container" class="p-4 flex-1 overflow-y-auto" style="min-height:0;">
               <!-- 디버그: 로그 누적 패널 (문제 해결 후 제거) -->
-              <div id="debug-banner" style="background:#f8f8ff;border:1px solid #88f;padding:4px 8px;margin-bottom:4px;font-size:9px;color:#333;border-radius:4px;max-height:80px;overflow-y:auto;font-family:monospace;line-height:1.3;">
+              <div id="debug-banner" style="display:none;background:#f8f8ff;border:1px solid #88f;padding:4px 8px;margin-bottom:4px;font-size:9px;color:#333;border-radius:4px;max-height:80px;overflow-y:auto;font-family:monospace;line-height:1.3;">
                 SSR=${initialData.masterItems?.length || 0}개
               </div>
               <!-- 공용 영상 (SSR로 미리 렌더링) -->
