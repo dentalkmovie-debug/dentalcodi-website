@@ -1179,7 +1179,8 @@ app.get('/api/:adminCode/playlists', async (c) => {
     try {
       const raw = p.active_item_ids
       if (raw === null || raw === undefined) {
-        activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
+        // active_item_ids가 null이면 아직 아무것도 선택하지 않은 상태 → 빈 배열
+        activeItemIds = []
       } else {
         activeItemIds = JSON.parse(raw || '[]')
         activeItemIds = Array.isArray(activeItemIds)
@@ -1187,7 +1188,7 @@ app.get('/api/:adminCode/playlists', async (c) => {
           : []
       }
     } catch (e) {
-      activeItemIds = [...masterIdsForActive, ...items.map((i: any) => i.id)]
+      activeItemIds = []
     }
     // 서버에서 is_active 계산 (클라이언트 시간 오차 방지)
     // last_active_at이 60초 이내면 사용중 (TV 3초 폴링 기준, 네트워크 지연/cold start 여유 포함)
@@ -1477,20 +1478,9 @@ app.get('/api/:adminCode/playlists/:id', async (c) => {
   const rawActiveItemIds = (playlist as any).active_item_ids
   
   if (rawActiveItemIds === null || rawActiveItemIds === undefined) {
-    // 기존 플레이리스트: active_item_ids가 설정되지 않음 → 현재 아이템으로 초기화 후 저장
-    activeItemIds = [
-      ...masterItems.map((item: any) => item.id),
-      ...userItems.map((item: any) => item.id)
-    ]
-
-    try {
-      await c.env.DB.prepare(`
-        UPDATE playlists SET active_item_ids = ?, updated_at = datetime('now')
-        WHERE id = ? AND user_id = ?
-      `).bind(JSON.stringify(activeItemIds), playlistId, user.id).run()
-    } catch (e) {
-      console.log('[Playlist] Failed to backfill active_item_ids:', e)
-    }
+    // active_item_ids가 null이면 아직 아무것도 선택하지 않은 상태 → 빈 배열
+    // 사용자가 라이브러리에서 직접 추가해야 재생목록에 나타남
+    activeItemIds = []
   } else {
     // 새 플레이리스트: active_item_ids가 설정됨 → 해당 값 그대로 사용
     try {
