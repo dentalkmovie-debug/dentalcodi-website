@@ -6580,6 +6580,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const wrSetup = document.getElementById('waitingroom-setup-section');
       const chSetup = document.getElementById('chair-setup-section');
       
+      // TV 연결 설정 토글 상태 미리 저장 (innerHTML 교체 후 복원용)
+      const wrSetupContent = document.getElementById('wr-setup-content');
+      const chSetupContent = document.getElementById('ch-setup-content');
+      const wrSetupOpen = wrSetupContent && wrSetupContent.style.display === 'block';
+      const chSetupOpen = chSetupContent && chSetupContent.style.display === 'block';
+      
       // 체크박스 선택 상태 미리 저장 (innerHTML 교체 후 복원용)
       const checkedIds = new Set(
         Array.from(document.querySelectorAll('.chair-checkbox:checked'))
@@ -6650,18 +6656,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px">
                   <button onclick="openPlaylistEditor(\${p.id})" 
-                    style="padding:5px 12px;border-radius:8px;border:none;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     플레이리스트
                   </button>
                   <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
-                    style="padding:5px 12px;border-radius:8px;border:none;background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     TV로 내보내기
                   </button>
                   <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
-                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
                   </button>
                   <button onclick="deletePlaylist(\${p.id})" 
@@ -6788,28 +6794,28 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px">
                   <button onclick="openPlaylistEditor(\${p.id})" 
-                    style="padding:5px 12px;border-radius:8px;border:none;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     플레이리스트
                   </button>
                   <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
-                    style="padding:5px 12px;border-radius:8px;border:none;background:#f0fdf4;color:#16a34a;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     TV로 내보내기
                   </button>
                   <button onclick="showTempVideoModal(\${p.id}, '\${p.name}', '\${p.short_code}')" 
-                    style="padding:5px 12px;border-radius:8px;border:none;background:#fff7ed;color:#ea580c;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     임시 영상 전송
                   </button>
                   <button id="stop-temp-btn-\${p.id}" onclick="stopTempVideoForPlaylist(\${p.id})" 
-                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280;font-size:11px;font-weight:500;cursor:not-allowed;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" aria-disabled="true">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;font-size:11px;font-weight:500;cursor:not-allowed;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" aria-disabled="true">
                     <i class="fas fa-stop"></i>
                     <span>기본으로 복귀</span>
                   </button>
                   <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
-                    style="padding:5px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+                    style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
+                    onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
                   </button>
                   <button onclick="deletePlaylist(\${p.id})" 
@@ -6888,6 +6894,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           if (checkedIds.has(cb.dataset.id)) cb.checked = true;
         });
       }
+      
+      // TV 연결 설정 토글 상태 복원
+      restoreSetupToggleState(wrSetupOpen, chSetupOpen);
       
       // 드래그 정렬 초기화
       initPlaylistSortable();
@@ -6979,6 +6988,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       icon.classList.toggle('fa-chevron-down', !isHidden);
       icon.classList.toggle('fa-chevron-up', isHidden);
       if (typeof postParentHeight === 'function') { setTimeout(postParentHeight, 50); setTimeout(postParentHeight, 300); }
+    }
+    
+    // TV 연결 설정 토글 상태 복원 (renderPlaylists 후 호출)
+    function restoreSetupToggleState(wrOpen, chOpen) {
+      if (wrOpen) {
+        const c = document.getElementById('wr-setup-content');
+        const i = document.getElementById('wr-setup-toggle-icon');
+        if (c) { c.style.display = 'block'; }
+        if (i) { i.classList.remove('fa-chevron-down'); i.classList.add('fa-chevron-up'); }
+      }
+      if (chOpen) {
+        const c = document.getElementById('ch-setup-content');
+        const i = document.getElementById('ch-setup-toggle-icon');
+        if (c) { c.style.display = 'block'; }
+        if (i) { i.classList.remove('fa-chevron-down'); i.classList.add('fa-chevron-up'); }
+      }
     }
     
     // 전체 선택 토글
@@ -10334,6 +10359,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         loadPlaylists();
+        // 모달 닫으면 헤더(상단)로 스크롤
+        setTimeout(function() {
+          var dashboard = document.getElementById('dashboard');
+          if (dashboard) dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // 아임웹 iframe 환경에서도 동작하도록
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (window.parent && window.parent !== window) {
+            try { window.parent.postMessage({ type: 'scrollToTop' }, '*'); } catch(e) {}
+          }
+        }, 100);
       }
       // 스크립트/설치방법 모달 닫힐 때 체크박스 전체 해제
       if (id === 'script-download-modal' || id === 'script-type-modal') {
