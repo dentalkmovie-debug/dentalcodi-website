@@ -1,3 +1,25 @@
+// ── 삭제 확인 모달 (confirm 대체) ──
+let _deleteConfirmCallback = null;
+function showDeleteConfirm(message, callback) {
+  _deleteConfirmCallback = callback;
+  var modal = document.getElementById('delete-confirm-modal');
+  var msgEl = document.getElementById('delete-confirm-message');
+  if (msgEl) msgEl.textContent = message || '정말 삭제하시겠습니까?';
+  if (modal) modal.style.display = 'flex';
+}
+function cancelDeleteConfirm() {
+  _deleteConfirmCallback = null;
+  var modal = document.getElementById('delete-confirm-modal');
+  if (modal) modal.style.display = 'none';
+}
+function executeDeleteConfirm() {
+  var cb = _deleteConfirmCallback;
+  _deleteConfirmCallback = null;
+  var modal = document.getElementById('delete-confirm-modal');
+  if (modal) modal.style.display = 'none';
+  if (typeof cb === 'function') cb();
+}
+
 // Sortable 인스턴스 (함수 호이스팅을 위해 최상단 선언)
 let sortableInstance = null;
 let playlistItemsSortableInstance = null;
@@ -777,16 +799,16 @@ async function masterAddItem() {
 }
 
 async function masterDeleteItem(itemId) {
-  if (!confirm('이 동영상을 삭제하시겠습니까?\n삭제하면 모든 치과에서 즉시 제거됩니다.')) return;
-  
-  try {
-    await fetch(MASTER_API + '/items/' + itemId, { method: 'DELETE' });
-    showToast('삭제되었습니다.');
-    loadMasterItems();
-  } catch (e) {
-    console.error(e);
-    showToast('삭제 실패', 'error');
-  }
+  showDeleteConfirm('이 동영상을 삭제하시겠습니까?\n삭제하면 모든 치과에서 즉시 제거됩니다.', async function() {
+    try {
+      await fetch(MASTER_API + '/items/' + itemId, { method: 'DELETE' });
+      showToast('삭제되었습니다.');
+      loadMasterItems();
+    } catch (e) {
+      console.error(e);
+      showToast('삭제 실패', 'error');
+    }
+  });
 }
 
 async function loadPlaylists() {
@@ -2188,18 +2210,21 @@ async function deletePlaylist(id) {
     return;
   }
   
-  if (!confirm('정말 삭제하시겠습니까?')) return;
-  
-  try {
-    const res = await fetch(API_BASE + '/playlists/' + id, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      loadPlaylists();
-      showToast('삭제되었습니다.');
-    } else {
-      showToast(data.error || '삭제 실패', 'error');
+  showDeleteConfirm('이 대기실/체어를 삭제하시겠습니까?', async function() {
+    try {
+      const res = await fetch(API_BASE + '/playlists/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadPlaylists();
+        showToast('삭제되었습니다.');
+      } else {
+        showToast(data.error || '삭제 실패', 'error');
+      }
+    } catch (e) {
+      showToast('삭제 실패', 'error');
     }
-  } catch (e) {
+  });
+}
     showToast('삭제 실패', 'error');
   }
 }
@@ -3209,10 +3234,10 @@ async function renderLibraryAndPlaylist() {
             cachedMasterItems = masterItemsCache;
           }
         } catch (retryErr) {
-          masterItemsCache = [];
+          masterItemsCache = cachedMasterItems || (typeof masterItems !== 'undefined' ? masterItems : []);
         }
       } else {
-        masterItemsCache = cachedMasterItems || masterItemsCache || [];
+        masterItemsCache = cachedMasterItems || masterItemsCache || (typeof masterItems !== 'undefined' ? masterItems : []);
       }
     } finally {
       clearTimeout(timeoutId);
@@ -3556,8 +3581,8 @@ async function deletePlaylistItem(itemId) {
     currentPlaylist = data.playlist;
     currentPlaylist.activeItemIds = prevActiveIds;
     
-    // 공용 영상 캐시도 새로 로드
-    masterItemsCache = null;
+    // 공용 영상 캐시는 유지 (사용자 영상 삭제와 무관)
+    // masterItemsCache = null; // 불필요한 재로드 방지
     
     // 2컬럼 레이아웃 또는 기존 레이아웃 렌더링
     if (document.getElementById('library-master-list')) {
@@ -3591,27 +3616,25 @@ async function shortenUrl(playlistId, currentCode) {
     return;
   }
   
-  if (!confirm('URL을 5자리로 단축하시겠습니까?\n기존 URL(' + currentCode + ')은 더 이상 작동하지 않습니다.')) {
-    return;
-  }
-  
-  try {
-    const res = await fetch(API_BASE + '/playlists/' + playlistId + '/shorten', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    
-    if (!res.ok) throw new Error('단축 실패');
-    
-    const data = await res.json();
-    showToast('URL이 단축되었습니다: ' + data.short_code);
-    
-    // UI 업데이트
-    await loadPlaylists();
-    
-  } catch (e) {
-    showToast('단축 실패: ' + e.message, 'error');
-  }
+  showDeleteConfirm('URL을 5자리로 단축하시겠습니까?\n기존 URL(' + currentCode + ')은 더 이상 작동하지 않습니다.', async function() {
+    try {
+      const res = await fetch(API_BASE + '/playlists/' + playlistId + '/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!res.ok) throw new Error('단축 실패');
+      
+      const data = await res.json();
+      showToast('URL이 단축되었습니다: ' + data.short_code);
+      
+      // UI 업데이트
+      await loadPlaylists();
+      
+    } catch (e) {
+      showToast('단축 실패: ' + e.message, 'error');
+    }
+  });
 }
 
 // TV 코드 생성
@@ -4547,15 +4570,15 @@ async function toggleNotice(id, isActive) {
 }
 
 async function deleteNotice(id) {
-  if (!confirm('정말 삭제하시겠습니까?')) return;
-  
-  try {
-    await fetch(API_BASE + '/notices/' + id, { method: 'DELETE' });
-    loadNotices();
-    showToast('삭제되었습니다.');
-  } catch (e) {
-    showToast('삭제 실패', 'error');
-  }
+  showDeleteConfirm('이 공지를 삭제하시겠습니까?', async function() {
+    try {
+      await fetch(API_BASE + '/notices/' + id, { method: 'DELETE' });
+      loadNotices();
+      showToast('삭제되었습니다.');
+    } catch (e) {
+      showToast('삭제 실패', 'error');
+    }
+  });
 }
 
 function editClinicName() {
@@ -4592,6 +4615,12 @@ const GUIDE_MODALS = new Set([
 // ── 열린 모달 추적 Set (선택자 기반 감지 대신 확실한 추적) ──
 var _openModalSet = new Set();
 
+// ── 오버레이 모달 (fixed 위치, iframe 높이 변경 불필요) ──
+var OVERLAY_MODALS = new Set([
+  'create-playlist-modal', 'delete-confirm-modal', 'clinic-name-modal',
+  'notice-modal', 'preview-modal'
+]);
+
 function openModal(id) {
   // edit-playlist-modal은 인라인으로 표시 (openPlaylistEditor에서 처리)
   if (id === 'edit-playlist-modal') return;
@@ -4600,6 +4629,7 @@ function openModal(id) {
   if (!el) return;
 
   const isGuideModal = GUIDE_MODALS.has(id);
+  const isOverlayModal = OVERLAY_MODALS.has(id);
 
   if (isGuideModal) {
     const dashboard = document.getElementById('dashboard');
@@ -4625,18 +4655,21 @@ function openModal(id) {
   document.body.classList.add('modal-open');
   _openModalSet.add(id);
 
-  try {
-    if (window.parent && window.parent !== window) {
-      const needH = isGuideModal
-        ? (() => {
-            const box = wrapperEl ? wrapperEl.querySelector(':scope > div') : null;
-            return Math.max(box ? box.scrollHeight + 80 : 650, 600);
-          })()
-        : Math.max(Math.round(window.screen.height * 0.92), 700);
-      window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-      window.parent.postMessage({ type: 'scrollToTop' }, '*');
-    }
-  } catch(e) {}
+  // 오버레이 모달은 iframe 높이 변경 불필요 (fixed 위치이므로)
+  if (!isOverlayModal) {
+    try {
+      if (window.parent && window.parent !== window) {
+        const needH = isGuideModal
+          ? (() => {
+              const box = wrapperEl ? wrapperEl.querySelector(':scope > div') : null;
+              return Math.max(box ? box.scrollHeight + 80 : 650, 600);
+            })()
+          : Math.max(Math.round(window.screen.height * 0.92), 700);
+        window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
+        window.parent.postMessage({ type: 'scrollToTop' }, '*');
+      }
+    } catch(e) {}
+  }
 
   if (isGuideModal) {
     try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
@@ -4784,6 +4817,10 @@ let lastSentHeight = 0;
 function postParentHeight() {
   try {
     if (window.parent && window.parent !== window) {
+      // 오버레이 모달이 열려있으면 높이 변경 스킵
+      for (var mid of _openModalSet) {
+        if (OVERLAY_MODALS.has(mid)) return;
+      }
       const appEl = document.getElementById('app');
       const dashboardEl = document.getElementById('dashboard');
       const targetEl = (dashboardEl && dashboardEl.style.display !== 'none') ? dashboardEl : appEl;
@@ -5019,15 +5056,16 @@ async function refreshAdminClinics() {
 }
 
 async function adminSuspendClinic(adminCode) {
-  if (!confirm('\uC774 \uCE58\uACFC\uB97C \uC815\uC9C0\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
-  try {
-    const res = await fetch('/api/master/clinics/' + adminCode + '/suspend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: '\uAD00\uB9AC\uC790\uC5D0 \uC758\uD574 \uC815\uC9C0' })
-    });
-    if (res.ok) { showToast('\uC815\uC9C0 \uCC98\uB9AC \uC644\uB8CC'); await refreshAdminClinics(); }
-  } catch(e) { showToast('\uCC98\uB9AC \uC2E4\uD328', 'error'); }
+  showDeleteConfirm('\uC774 \uCE58\uACFC\uB97C \uC815\uC9C0\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?', async function() {
+    try {
+      const res = await fetch('/api/master/clinics/' + adminCode + '/suspend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: '\uAD00\uB9AC\uC790\uC5D0 \uC758\uD574 \uC815\uC9C0' })
+      });
+      if (res.ok) { showToast('\uC815\uC9C0 \uCC98\uB9AC \uC644\uB8CC'); await refreshAdminClinics(); }
+    } catch(e) { showToast('\uCC98\uB9AC \uC2E4\uD328', 'error'); }
+  });
 }
 
 async function adminActivateClinic(adminCode) {
@@ -5180,15 +5218,16 @@ async function adminAddMasterItem() {
 }
 
 async function adminDeleteMasterItem(itemId) {
-  if (!confirm('\uC774 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
-  try {
-    const res = await fetch('/api/master/items/' + itemId, { method: 'DELETE' });
-    if (res.ok) {
-      masterItems = masterItems.filter(i => i.id !== itemId); cachedMasterItems = masterItems; masterItemsCache = masterItems;
-      if (_adminSubTab === 'overview') renderAdminOverview(); else renderAdminMasterItems();
-      showToast('\uC0AD\uC81C \uC644\uB8CC');
-    }
-  } catch(e) { showToast('\uC0AD\uC81C \uC2E4\uD328', 'error'); }
+  showDeleteConfirm('\uC774 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?', async function() {
+    try {
+      const res = await fetch('/api/master/items/' + itemId, { method: 'DELETE' });
+      if (res.ok) {
+        masterItems = masterItems.filter(i => i.id !== itemId); cachedMasterItems = masterItems; masterItemsCache = masterItems;
+        if (_adminSubTab === 'overview') renderAdminOverview(); else renderAdminMasterItems();
+        showToast('\uC0AD\uC81C \uC644\uB8CC');
+      }
+    } catch(e) { showToast('\uC0AD\uC81C \uC2E4\uD328', 'error'); }
+  });
 }
 
 function renderAdminPush() {
@@ -5384,43 +5423,43 @@ async function executePush() {
   }
   
   var itemNames = pushItems.map(function(i){ return i.title; }).join(', ');
-  if (!confirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?\n\n' + itemNames)) return;
-  
-  var successCount = 0;
-  var failCount = 0;
-  for (var i = 0; i < selectedCodes.length; i++) {
-    var code = selectedCodes[i];
-    try {
-      var pRes = await fetch('/api/' + code + '/playlists');
-      var pData = await pRes.json();
-      var firstPlaylist = (pData.playlists || [])[0];
-      if (firstPlaylist) {
-        for (var j = 0; j < pushItems.length; j++) {
-          var item = pushItems[j];
-          var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: item.url, title: item.title })
-          });
-          if (addRes.ok) successCount++;
-          else failCount++;
-        }
-      } else { failCount++; }
-    } catch(e) { failCount++; }
-  }
-  
-  if (failCount > 0) {
-    showToast('\uC131\uACF5 ' + successCount + '\uAC74 / \uC2E4\uD328 ' + failCount + '\uAC74', 'error');
-  } else {
-    showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
-  }
-  // 입력 초기화
-  _pushTemplates = [];
-  var nameEl = document.getElementById('push-link-name');
-  var urlEl = document.getElementById('push-link-url');
-  if (nameEl) nameEl.value = '';
-  if (urlEl) urlEl.value = '';
-  renderPushTemplates();
+  showDeleteConfirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?', async function() {
+    var successCount = 0;
+    var failCount = 0;
+    for (var i = 0; i < selectedCodes.length; i++) {
+      var code = selectedCodes[i];
+      try {
+        var pRes = await fetch('/api/' + code + '/playlists');
+        var pData = await pRes.json();
+        var firstPlaylist = (pData.playlists || [])[0];
+        if (firstPlaylist) {
+          for (var j = 0; j < pushItems.length; j++) {
+            var item = pushItems[j];
+            var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: item.url, title: item.title })
+            });
+            if (addRes.ok) successCount++;
+            else failCount++;
+          }
+        } else { failCount++; }
+      } catch(e) { failCount++; }
+    }
+    
+    if (failCount > 0) {
+      showToast('\uC131\uACF5 ' + successCount + '\uAC74 / \uC2E4\uD328 ' + failCount + '\uAC74', 'error');
+    } else {
+      showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
+    }
+    // 입력 초기화
+    _pushTemplates = [];
+    var nameEl = document.getElementById('push-link-name');
+    var urlEl = document.getElementById('push-link-url');
+    if (nameEl) nameEl.value = '';
+    if (urlEl) urlEl.value = '';
+    renderPushTemplates();
+  });
 }
 
 init();
