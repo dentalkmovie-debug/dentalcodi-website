@@ -4470,10 +4470,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       <!-- 탭 네비게이션 (포인트관리 스타일) -->
       <div id="tab-nav" style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 8px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch">
-        <button id="tab-playlists" class="dtv-nb" data-tab="playlists"
+        <button id="tab-waitingrooms" class="dtv-nb" data-tab="waitingrooms"
           style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;color:#2563eb;border-bottom:2px solid #2563eb;font-family:inherit;white-space:nowrap"
-          onclick="showTab('playlists')">
-          플레이리스트
+          onclick="showTab('waitingrooms')">
+          대기실
+        </button>
+        <button id="tab-chairs" class="dtv-nb" data-tab="chairs"
+          style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          onclick="showTab('chairs')">
+          체어
         </button>
         <button id="tab-notices" class="dtv-nb" data-tab="notices"
           style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
@@ -4494,19 +4499,44 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       <!-- 콘텐츠 영역 (포인트관리 스타일) -->
       <main id="dtv-pg" style="background:#f9fafb;padding:16px;border-radius:0 0 12px 12px;min-height:400px;border:1px solid #e5e7eb;border-top:none">
-        <!-- 플레이리스트 관리 -->
-        <div id="content-playlists">
+        <!-- 대기실 관리 -->
+        <div id="content-waitingrooms">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <span style="font-size:18px;font-weight:700;color:#1f2937">대기실 관리</span>
-            <button onclick="showCreatePlaylistModal()" 
-              style="padding:8px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s"
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px"><i class="fas fa-couch"></i></span>
+              <span style="font-size:18px;font-weight:700;color:#1f2937">대기실 관리</span>
+              <span id="waitingroom-count-badge" style="font-size:11px;color:#2563eb;background:#dbeafe;padding:2px 10px;border-radius:20px;font-weight:600">0개</span>
+            </div>
+            <button onclick="showCreatePlaylistModal('waitingroom')" 
+              style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s"
               onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-              대기실/체어 추가
+              <i class="fas fa-plus" style="margin-right:4px"></i>대기실 추가
             </button>
           </div>
+          <div id="waitingrooms-container" style="display:grid;gap:12px"></div>
           
-          <div id="playlists-container" style="display:grid;gap:12px">
+          <!-- 대기실 초기 설정 (TV 연결) -->
+          <div id="waitingroom-setup-section" style="margin-top:16px"></div>
+        </div>
+        
+        <!-- 체어 관리 -->
+        <div id="content-chairs" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px"><i class="fas fa-tv"></i></span>
+              <span style="font-size:18px;font-weight:700;color:#1f2937">체어 관리</span>
+              <span id="chair-count-badge" style="font-size:11px;color:#6366f1;background:#e0e7ff;padding:2px 10px;border-radius:20px;font-weight:600">0개</span>
+            </div>
+            <button onclick="showCreatePlaylistModal('chair')" 
+              style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(99,102,241,.3);transition:opacity .15s"
+              onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+              <i class="fas fa-plus" style="margin-right:4px"></i>체어 추가
+            </button>
           </div>
+          <div id="chairs-container" style="display:grid;gap:12px"></div>
+          
+          <!-- 체어 초기 설정 (스크립트 다운로드) -->
+          <div id="chair-setup-section" style="margin-top:16px"></div>
         </div>
         
         <!-- 공지사항 관리 -->
@@ -6078,7 +6108,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 최고관리자 탭 표시
       if (INITIAL_DATA.isSuperAdmin) {
         const adminTab = document.getElementById('tab-admin');
-        if (adminTab) adminTab.style.display = '';
+        if (adminTab) adminTab.style.display = 'inline-block';
       }
       
       // 이미 로드된 데이터로 즉시 렌더링
@@ -6311,7 +6341,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function showTab(tab) {
-      ['playlists', 'notices', 'settings', 'admin', 'master'].forEach(t => {
+      ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
         const content = document.getElementById('content-' + t);
         const tabBtn = document.getElementById('tab-' + t);
         if (content) content.style.display = (t === tab) ? '' : 'none';
@@ -6525,11 +6555,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function renderPlaylists() {
-      const container = document.getElementById('playlists-container');
-      
-      // 초기 설정 섹션 열림 상태 미리 저장 (innerHTML 교체 전)
-      const exportSectionBefore = document.getElementById('export-section-content');
-      const wasExportOpen = exportSectionBefore && exportSectionBefore.style.display === 'block';
+      const wrContainer = document.getElementById('waitingrooms-container');
+      const chContainer = document.getElementById('chairs-container');
+      const wrSetup = document.getElementById('waitingroom-setup-section');
+      const chSetup = document.getElementById('chair-setup-section');
       
       // 체크박스 선택 상태 미리 저장 (innerHTML 교체 후 복원용)
       const checkedIds = new Set(
@@ -6537,23 +6566,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           .map(cb => cb.dataset.id)
       );
       
-      if (playlists.length === 0) {
-        container.innerHTML = \`
-          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center">
-            <i class="fas fa-folder-open" style="font-size:32px;color:#d1d5db;margin-bottom:12px;display:block"></i>
-            <p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 대기실/체어가 없습니다.</p>
-            <button onclick="showCreatePlaylistModal()" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
-              <i class="fas fa-plus" style="margin-right:6px"></i>대기실/체어 추가
-            </button>
-          </div>
-        \`;
-        return;
-      }
-      
       // =========================================================
       // 체어와 대기실 분리
-      // - 체어: 이름에 '체어'가 포함된 항목 (스크립트 다운로드 방식)
-      // - 대기실: 이름에 '체어'가 없는 항목 (단축 URL + USB 북마크 방식)
       // =========================================================
       const chairs = playlists
         .filter(p => p.name.includes('체어'))
@@ -6562,18 +6576,28 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         .filter(p => !p.name.includes('체어'))
         .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999));
       
-      // 대기실/체어 분리하여 표시
-      container.innerHTML = \`
-        <!-- =========================================================
-             대기실 목록
-             ========================================================= -->
-        \${waitingRooms.length > 0 ? \`
-        <div style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:11px"><i class="fas fa-couch"></i></span>
-            <span style="font-size:13px;font-weight:700;color:#1f2937">대기실</span>
-            <span style="font-size:11px;color:#2563eb;background:#dbeafe;padding:2px 8px;border-radius:20px;font-weight:600">\${waitingRooms.length}개</span>
-          </div>
+      // 카운트 배지 업데이트
+      const wrBadge = document.getElementById('waitingroom-count-badge');
+      const chBadge = document.getElementById('chair-count-badge');
+      if (wrBadge) wrBadge.textContent = waitingRooms.length + '개';
+      if (chBadge) chBadge.textContent = chairs.length + '개';
+      
+      // =========================================================
+      // 대기실 탭 렌더링
+      // =========================================================
+      if (wrContainer) {
+        if (waitingRooms.length === 0) {
+          wrContainer.innerHTML = \`
+            <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center">
+              <i class="fas fa-couch" style="font-size:32px;color:#d1d5db;margin-bottom:12px;display:block"></i>
+              <p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 대기실이 없습니다.</p>
+              <button onclick="showCreatePlaylistModal('waitingroom')" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+                <i class="fas fa-plus" style="margin-right:6px"></i>대기실 추가
+              </button>
+            </div>
+          \`;
+        } else {
+          wrContainer.innerHTML = \`
           <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
             \${waitingRooms.map((p, idx) => {
               const isActive = p.is_tv_active === true;
@@ -6630,20 +6654,88 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
             \`}).join('')}
           </div>
-        </div>
-        \` : ''}
-        
-        <!-- =========================================================
-             체어 목록
-             ========================================================= -->
-        \${chairs.length > 0 ? \`
-        <div style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:11px"><i class="fas fa-tv"></i></span>
-            <span style="font-size:13px;font-weight:700;color:#1f2937">체어</span>
-            <span style="font-size:11px;color:#6366f1;background:#e0e7ff;padding:2px 8px;border-radius:20px;font-weight:600">\${chairs.length}개</span>
-            <span style="font-size:10px;color:#9ca3af;margin-left:4px">드래그하여 순서 변경</span>
+          \`;
+        }
+      }
+      
+      // 대기실 초기 설정 (TV 연결)
+      if (wrSetup) {
+        wrSetup.innerHTML = \`
+        <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#f9fafb">
+          <button onclick="toggleWaitingRoomSetup()" style="width:100%;padding:12px 16px;background:#f3f4f6;display:flex;align-items:center;justify-content:space-between;border:none;cursor:pointer;font-family:inherit;transition:background .15s"
+            onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
+            <span style="font-weight:700;color:#374151;display:flex;align-items:center;gap:8px;font-size:12px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:10px"><i class="fas fa-cog"></i></span>
+              TV 연결 설정
+            </span>
+            <i id="wr-setup-toggle-icon" class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px"></i>
+          </button>
+          <div id="wr-setup-content" style="display:none;padding:16px">
+            \${waitingRooms.length > 0 ? \`
+            <div style="display:grid;gap:10px">
+              \${waitingRooms.map(p => \`
+              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                  <span style="font-size:13px;font-weight:600;color:#1f2937">\${p.name}</span>
+                  <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0}개 미디어)</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+                  <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
+                    style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;color:#374151;font-family:monospace" readonly>
+                  <button onclick="copySettingUrl(\${p.id})" 
+                    style="padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
+                    onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+                    복사
+                  </button>
+                  \${!p.external_short_url ? \`
+                  <button id="btn-shorten-\${p.id}" onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
+                    style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                    onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    단축 URL 생성
+                  </button>
+                  \` : ''}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <button onclick="showTvExportModal(\${p.id}, '\${p.name}', '\${p.short_code}')"
+                    style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                    onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    사용법 (URL 직접 입력)
+                  </button>
+                </div>
+                <p style="margin:8px 0 0;font-size:11px;color:#2563eb">
+                  <i class="fas fa-info-circle" style="margin-right:4px"></i>
+                  USB 인식 문제로 <strong>URL 직접 입력 방식</strong>만 제공합니다.
+                </p>
+              </div>
+              \`).join('')}
+            </div>
+            \` : \`
+            <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
+              <i class="fas fa-info-circle" style="margin-right:4px"></i>
+              등록된 대기실이 없습니다. 위에서 대기실을 추가하세요.
+            </div>
+            \`}
           </div>
+        </div>
+        \`;
+      }
+      
+      // =========================================================
+      // 체어 탭 렌더링
+      // =========================================================
+      if (chContainer) {
+        if (chairs.length === 0) {
+          chContainer.innerHTML = \`
+            <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center">
+              <i class="fas fa-tv" style="font-size:32px;color:#d1d5db;margin-bottom:12px;display:block"></i>
+              <p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 체어가 없습니다.</p>
+              <button onclick="showCreatePlaylistModal('chair')" style="padding:8px 20px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+                <i class="fas fa-plus" style="margin-right:6px"></i>체어 추가
+              </button>
+            </div>
+          \`;
+        } else {
+          chContainer.innerHTML = \`
           <div id="chair-sortable-container" style="display:grid;gap:10px">
             \${chairs.map((p, idx) => {
               const isActive = p.is_tv_active === true;
@@ -6710,124 +6802,57 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
             \`}).join('')}
           </div>
-        </div>
-        \` : ''}
-        
-        <!-- =========================================================
-             초기 설정 섹션 (접기/펼치기)
-             ========================================================= -->
+          \`;
+        }
+      }
+      
+      // 체어 초기 설정 (스크립트 다운로드)
+      if (chSetup) {
+        chSetup.innerHTML = \`
         <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#f9fafb">
-          <button onclick="toggleExportSection()" style="width:100%;padding:14px 16px;background:#f3f4f6;display:flex;align-items:center;justify-content:space-between;border:none;cursor:pointer;font-family:inherit;transition:background .15s"
+          <button onclick="toggleChairSetup()" style="width:100%;padding:12px 16px;background:#f3f4f6;display:flex;align-items:center;justify-content:space-between;border:none;cursor:pointer;font-family:inherit;transition:background .15s"
             onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">
-            <span style="font-weight:700;color:#374151;display:flex;align-items:center;gap:8px;font-size:13px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#6b7280,#9ca3af);color:#fff;font-size:11px"><i class="fas fa-cog"></i></span>
-              초기 설정 (TV 연결)
+            <span style="font-weight:700;color:#374151;display:flex;align-items:center;gap:8px;font-size:12px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:10px"><i class="fas fa-cog"></i></span>
+              PC 모니터 설치 설정
             </span>
-            <i id="export-toggle-icon" class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px"></i>
+            <i id="ch-setup-toggle-icon" class="fas fa-chevron-down" style="color:#9ca3af;font-size:12px"></i>
           </button>
-          <div id="export-section-content" style="display:none;padding:16px">
-            
-            <!-- 체어 설정 -->
-            <div style="margin-bottom:16px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #818cf8">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#6366f1;color:#fff;font-size:10px"><i class="fas fa-tv"></i></span>
-                <span style="font-size:13px;font-weight:700;color:#1f2937">체어 설정</span>
-                <span style="font-size:11px;color:#9ca3af">(PC 모니터 자동 실행)</span>
-              </div>
-              
-              \${chairs.length > 0 ? \`
-              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
-                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                  \${chairs.map(p => \`
-                    <label style="display:flex;align-items:center;gap:6px;background:#f9fafb;padding:8px 12px;border-radius:8px;cursor:pointer;border:1px solid #e5e7eb;font-size:13px;transition:background .15s"
-                      onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f9fafb'">
-                      <input type="checkbox" class="chair-checkbox" data-id="\${p.id}" data-code="\${p.short_code}" data-name="\${p.name}" style="accent-color:#6366f1">
-                      <span style="color:#374151;font-weight:500">\${p.name}</span>
-                      <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0})</span>
-                      \${!p.last_active_at ? '<span style="padding:2px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:600">미설치</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#dcfce7;color:#16a34a;font-size:10px;font-weight:600">연결됨</span>'}
-                    </label>
-                  \`).join('')}
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px">
-                  <button onclick="exportSelectedScripts()" style="padding:8px 16px;border-radius:8px;border:none;background:#6b7280;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
-                    onmouseover="this.style.background='#4b5563'" onmouseout="this.style.background='#6b7280'">
-                    스크립트 다운로드
-                  </button>
-                  <button onclick="downloadAutoRunScript(this)" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
-                    onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                    설치 방법
-                  </button>
-                </div>
-              </div>
-              \` : \`
-              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
-                <i class="fas fa-info-circle" style="margin-right:4px"></i>
-                등록된 체어가 없습니다. 위에서 체어를 추가하세요.
-              </div>
-              \`}
-            </div>
-            
-            <!-- 대기실 설정 -->
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #3b82f6">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#2563eb;color:#fff;font-size:10px"><i class="fas fa-couch"></i></span>
-                <span style="font-size:13px;font-weight:700;color:#1f2937">대기실 설정</span>
-                <span style="font-size:11px;color:#9ca3af">(스마트 TV 연결)</span>
-              </div>
-              
-              \${waitingRooms.length > 0 ? \`
-              <div style="display:grid;gap:10px">
-                \${waitingRooms.map(p => \`
-                <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-                    <span style="font-size:13px;font-weight:600;color:#1f2937">\${p.name}</span>
-                    <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0}개 미디어)</span>
-                  </div>
-                  
-                  <!-- URL 복사 -->
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
-                    <input type="text" id="setting-url-\${p.id}" value="\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}" 
-                      style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:12px;color:#374151;font-family:monospace" readonly>
-                    <button onclick="copySettingUrl(\${p.id})" 
-                      style="padding:8px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s"
-                      onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
-                      복사
-                    </button>
-                    \${!p.external_short_url ? \`
-                    <button id="btn-shorten-\${p.id}" onclick="generateShortUrl(\${p.id}, '\${p.short_code}')" 
-                      style="padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
-                      onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                      단축 URL 생성
-                    </button>
-                    \` : ''}
-                  </div>
-                  
-                  <!-- 사용법 안내 -->
-                  <div style="display:flex;flex-wrap:wrap;gap:6px">
-                    <button onclick="showTvExportModal(\${p.id}, '\${p.name}', '\${p.short_code}')"
-                      style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
-                      onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                      사용법 (URL 직접 입력)
-                    </button>
-                  </div>
-                  <p style="margin:8px 0 0;font-size:11px;color:#2563eb">
-                    <i class="fas fa-info-circle" style="margin-right:4px"></i>
-                    USB 인식 문제로 <strong>URL 직접 입력 방식</strong>만 제공합니다.
-                  </p>
-                </div>
+          <div id="ch-setup-content" style="display:none;padding:16px">
+            \${chairs.length > 0 ? \`
+            <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                \${chairs.map(p => \`
+                  <label style="display:flex;align-items:center;gap:6px;background:#f9fafb;padding:8px 12px;border-radius:8px;cursor:pointer;border:1px solid #e5e7eb;font-size:13px;transition:background .15s"
+                    onmouseover="this.style.background='#eef2ff'" onmouseout="this.style.background='#f9fafb'">
+                    <input type="checkbox" class="chair-checkbox" data-id="\${p.id}" data-code="\${p.short_code}" data-name="\${p.name}" style="accent-color:#6366f1">
+                    <span style="color:#374151;font-weight:500">\${p.name}</span>
+                    <span style="font-size:11px;color:#9ca3af">(\${p.item_count || 0})</span>
+                    \${!p.last_active_at ? '<span style="padding:2px 6px;border-radius:4px;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:600">미설치</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#dcfce7;color:#16a34a;font-size:10px;font-weight:600">연결됨</span>'}
+                  </label>
                 \`).join('')}
               </div>
-              \` : \`
-              <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
-                <i class="fas fa-info-circle" style="margin-right:4px"></i>
-                등록된 대기실이 없습니다. 위에서 대기실을 추가하세요.
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <button onclick="exportSelectedScripts()" style="padding:8px 16px;border-radius:8px;border:none;background:#6b7280;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s"
+                  onmouseover="this.style.background='#4b5563'" onmouseout="this.style.background='#6b7280'">
+                  스크립트 다운로드
+                </button>
+                <button onclick="downloadAutoRunScript(this)" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s"
+                  onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                  설치 방법
+                </button>
               </div>
-              \`}
             </div>
-            
+            \` : \`
+            <div style="background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:13px">
+              <i class="fas fa-info-circle" style="margin-right:4px"></i>
+              등록된 체어가 없습니다. 위에서 체어를 추가하세요.
+            </div>
+            \`}
           </div>
         </div>
-      \`;
+        \`;
+      }
       
       // 임시 영상 상태 확인
       checkTempVideoStatus();
@@ -6835,17 +6860,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 임시 영상 상태 주기적 확인 (5초마다) - 자동복귀 감지용
       if (!window.tempStatusInterval) {
         window.tempStatusInterval = setInterval(checkTempVideoStatus, 5000);
-      }
-      
-      // 초기 설정 섹션 열림 상태 복원 (innerHTML 교체로 style이 리셋되기 때문)
-      const exportSectionAfter = document.getElementById('export-section-content');
-      const exportIconAfter = document.getElementById('export-toggle-icon');
-      if (exportSectionAfter && wasExportOpen) {
-        exportSectionAfter.style.display = 'block';
-        if (exportIconAfter) {
-          exportIconAfter.classList.remove('fa-chevron-down');
-          exportIconAfter.classList.add('fa-chevron-up');
-        }
       }
       
       // 체크박스 선택 상태 복원
@@ -6921,6 +6935,30 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         setTimeout(postParentHeight, 50);
         setTimeout(postParentHeight, 300);
       }
+    }
+    
+    // 대기실 초기 설정 토글
+    function toggleWaitingRoomSetup() {
+      const content = document.getElementById('wr-setup-content');
+      const icon = document.getElementById('wr-setup-toggle-icon');
+      if (!content || !icon) return;
+      const isHidden = content.style.display === 'none' || content.style.display === '';
+      content.style.display = isHidden ? 'block' : 'none';
+      icon.classList.toggle('fa-chevron-down', !isHidden);
+      icon.classList.toggle('fa-chevron-up', isHidden);
+      if (typeof postParentHeight === 'function') { setTimeout(postParentHeight, 50); setTimeout(postParentHeight, 300); }
+    }
+    
+    // 체어 초기 설정 토글
+    function toggleChairSetup() {
+      const content = document.getElementById('ch-setup-content');
+      const icon = document.getElementById('ch-setup-toggle-icon');
+      if (!content || !icon) return;
+      const isHidden = content.style.display === 'none' || content.style.display === '';
+      content.style.display = isHidden ? 'block' : 'none';
+      icon.classList.toggle('fa-chevron-down', !isHidden);
+      icon.classList.toggle('fa-chevron-up', isHidden);
+      if (typeof postParentHeight === 'function') { setTimeout(postParentHeight, 50); setTimeout(postParentHeight, 300); }
     }
     
     // 전체 선택 토글
@@ -7637,7 +7675,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 새로 생성된 플레이리스트 정보 저장용
     let newlyCreatedPlaylist = null;
     
-    function showCreatePlaylistModal() {
+    function showCreatePlaylistModal(presetType) {
       // 모든 단계 초기화
       document.getElementById('create-step-1').classList.remove('hidden');
       document.getElementById('create-step-waiting').classList.add('hidden');
@@ -7645,6 +7683,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       document.getElementById('new-waiting-name').value = '';
       document.getElementById('new-chair-name').value = '';
       openModal('create-playlist-modal');
+      // 프리셋 타입이 있으면 바로 해당 단계로
+      if (presetType === 'waitingroom') {
+        selectCreateType('waiting');
+      } else if (presetType === 'chair') {
+        selectCreateType('chair');
+      }
     }
     
     function selectCreateType(type) {
