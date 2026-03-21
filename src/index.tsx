@@ -3594,7 +3594,7 @@ app.get('/embed-old/:memberCode', async (c) => {
     async function refreshPlaylistEditorData() {
       if (!currentPlaylist) return;
       const editModal = document.getElementById('edit-playlist-modal');
-      if (!editModal || editModal.classList.contains('hidden')) return;
+      if (!editModal || editModal.style.display === 'none' || editModal.style.display === '') return;
 
       let masterOk = false;
       try {
@@ -5842,7 +5842,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     async function refreshPlaylistEditorData() {
       if (!currentPlaylist) return;
       const editModal = document.getElementById('edit-playlist-modal');
-      if (!editModal || editModal.classList.contains('hidden')) return;
+      if (!editModal || editModal.style.display === 'none' || editModal.style.display === '') return;
 
       try {
         const masterRes = await fetch(window.location.origin + '/api/master/items?ts=' + Date.now(), { cache: 'no-store' });
@@ -9560,6 +9560,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
       el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:40px; box-sizing:border-box;';
       document.body.classList.add('modal-open');
+      if (el.id) _openModalSet.add(el.id);
       // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
       try {
         if (window.parent && window.parent !== window) {
@@ -10272,6 +10273,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       'autorun-guide-modal', 'guide-url-modal', 'individual-install-modal'
     ]);
 
+    // ── 열린 모달 추적 Set (선택자 기반 감지 대신 확실한 추적) ──
+    var _openModalSet = new Set();
+
     function openModal(id) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -10300,6 +10304,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
       document.body.classList.add('modal-open');
+      _openModalSet.add(id);
 
       try {
         if (window.parent && window.parent !== window) {
@@ -10319,6 +10324,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
 
+
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
@@ -10331,25 +10337,31 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
       }
       
+      // 추적 Set에서 제거
+      _openModalSet.delete(id);
+      
       // 열린 모달이 없을 때 공통 처리
-      const openModals = document.querySelectorAll('[style*="position: fixed"][style*="display: flex"]');
-      if (openModals.length === 0) {
+      if (_openModalSet.size === 0) {
         document.body.classList.remove('modal-open');
-
-        // 가이드 모달이 닫힐 때만 dashboard 복원 + iframe 높이 원상 복구
-        if (GUIDE_MODALS.has(id)) {
-          const dashboard = document.getElementById('dashboard');
-          if (dashboard) dashboard.style.display = '';
-          try {
-            if (window.parent && window.parent !== window) {
-              modalHeightLocked = false;
-              setTimeout(() => { if (typeof postParentHeight === 'function') postParentHeight(); }, 100);
-            }
-          } catch(e) {}
-        }
+        // body overflow 강제 복원 (혹시 남아있을 경우)
+        document.body.style.overflow = '';
       }
+
+      // 가이드 모달이 닫힐 때 dashboard 복원 + iframe 높이 원상 복구
+      if (GUIDE_MODALS.has(id)) {
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) dashboard.style.display = '';
+        try {
+          if (window.parent && window.parent !== window) {
+            modalHeightLocked = false;
+            setTimeout(() => { if (typeof postParentHeight === 'function') postParentHeight(); }, 100);
+          }
+        } catch(e) {}
+      }
+
       if (id === 'preview-modal') {
-        document.getElementById('preview-iframe').src = '';
+        var previewIframe = document.getElementById('preview-iframe');
+        if (previewIframe) previewIframe.src = '';
       }
       if (id === 'edit-playlist-modal') {
         currentPlaylist = null;
@@ -10358,15 +10370,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         loadPlaylists();
-        // 모달 닫으면 헤더(상단)로 스크롤
+        // 모달 닫으면 헤더(상단)로 스크롤 + 높이 복원
         setTimeout(function() {
-          // 1) iframe 내부 스크롤 (자체 페이지)
+          // 1) iframe 내부 스크롤
           window.scrollTo({ top: 0, behavior: 'smooth' });
           document.documentElement.scrollTop = 0;
           document.body.scrollTop = 0;
           // 2) dashboard 요소로 스크롤
           var dashboard = document.getElementById('dashboard');
-          if (dashboard) dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (dashboard) {
+            dashboard.style.display = '';
+            dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
           // 3) 아임웹 iframe 환경: 부모에게 스크롤 요청 + 높이 재계산
           try {
             if (window.parent && window.parent !== window) {
@@ -10374,10 +10389,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               window.parent.postMessage({ type: 'scrollTo', top: 0 }, '*');
             }
           } catch(e) {}
-          // 4) iframe 높이 재계산 (높이가 줄면 부모도 상단으로 이동)
+          // 4) iframe 높이 재계산
+          modalHeightLocked = false;
           if (typeof postParentHeight === 'function') {
             postParentHeight();
             setTimeout(postParentHeight, 300);
+            setTimeout(postParentHeight, 800);
           }
         }, 150);
       }
