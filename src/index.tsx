@@ -8040,9 +8040,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
       });
     }
-        showToast('삭제 실패', 'error');
-      }
-    }
     
     let isOpeningEditor = false;
 

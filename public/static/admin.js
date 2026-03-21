@@ -2225,9 +2225,6 @@ async function deletePlaylist(id) {
     }
   });
 }
-    showToast('삭제 실패', 'error');
-  }
-}
 
 let isOpeningEditor = false;
 
