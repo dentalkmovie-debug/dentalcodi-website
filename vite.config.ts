@@ -4,12 +4,11 @@ import pages from '@hono/vite-cloudflare-pages'
 /**
  * adminJsExtract 플러그인:
  * 빌드 결과물(_worker.js)에서 @@ADMIN_JS_BEGIN@@ ~ @@ADMIN_JS_END@@ 사이 코드를
- * admin.js 동적 로드 코드로 교체합니다.
- * 실제 JS는 prebuild(build-admin-css.cjs)가 public/static/admin.js로 미리 추출합니다.
+ * 빈 문자열로 교체합니다.
+ * 소스에서 <script defer src="/static/admin.js"> 태그가 별도로 추가되어 있으므로,
+ * 빌드 후에는 admin.js만 실행됩니다.
  */
 function adminJsExtract(): Plugin {
-  // 빌드 시점 타임스탬프로 캐시 버스터 고정
-  const buildTs = Date.now()
   return {
     name: 'admin-js-extract',
     generateBundle(_, bundle) {
@@ -24,14 +23,9 @@ function adminJsExtract(): Plugin {
           while (startPos !== -1) {
             const endPos = code.indexOf(END, startPos)
             if (endPos === -1) break
-            // 마커 포함 블록을 admin.js 동적 로드 코드로 교체
-            // 빌드 타임스탬프 기반 캐시 버스터
-            const replacement = `
-var _as = document.createElement("script");
-_as.src = "/static/admin.js?v=${buildTs}";
-document.currentScript.parentNode.appendChild(_as);
-`
-            code = code.slice(0, startPos) + replacement + code.slice(endPos + END.length)
+            // 마커 포함 블록을 빈 문자열로 교체
+            // admin.js는 별도 <script defer> 태그로 로드됨
+            code = code.slice(0, startPos) + '/* [admin.js externalized] */' + code.slice(endPos + END.length)
             startPos = code.indexOf(BEGIN)
           }
           

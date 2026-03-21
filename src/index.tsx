@@ -5827,7 +5827,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 서버에서 미리 로드한 초기 데이터
     const INITIAL_DATA = ${initialDataJson};
   </script>
-  <!-- 관리자 JS는 아래 인라인 스크립트로 직접 포함 (defer 외부 파일 중복 실행 방지) -->
+  <!-- 관리자 JS: 개발 시 인라인, 빌드 시 admin.js로 외부화 -->
   <script>
     // @@ADMIN_JS_BEGIN@@
     // ── 삭제 확인 모달 (confirm 대체) ──
@@ -11489,6 +11489,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     init();
     // @@ADMIN_JS_END@@
   </script>
+  <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
+  <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
+  <script defer src="/static/admin.js?v=${Date.now()}"></script>
 </body>
 </html>
   `)
