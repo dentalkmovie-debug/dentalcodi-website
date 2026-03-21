@@ -317,6 +317,14 @@ function init() {
   } else {
     document.getElementById('clinic-name-text').textContent = clinicName;
   }
+
+  // 서브타이틀에 이메일/역할 표시
+  var subtitle = document.getElementById('clinic-subtitle');
+  if (subtitle) {
+    var email = INITIAL_DATA.userEmail || '';
+    var role = INITIAL_DATA.isSuperAdmin ? '최고관리자' : '대기실 TV 관리자';
+    subtitle.textContent = email ? email + ' · ' + role : role;
+  }
   
   // 최고관리자 탭 표시
   if (INITIAL_DATA.isSuperAdmin) {

@@ -4352,7 +4352,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     playlists: playlistsWithItems,
     notices: noticesData.results || [],
     masterItems: masterItemsData.results || [],
-    clinicName: finalUser?.clinic_name || '내 치과',
+    clinicName: finalUser?.clinic_name || finalUser?.imweb_email || adminCode || '내 치과',
+    userEmail: finalUser?.imweb_email || emailParam || '',
     isOwnerAdmin: isOwnerAdmin,
     isSuperAdmin: isSuperAdmin,
     adminCode: adminCode,
@@ -4463,7 +4464,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       <div style="background:linear-gradient(135deg,#2563eb 0%,#3b82f6 100%);padding:16px 20px;color:#fff;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
         <div>
           <div id="clinic-name-text" style="font-size:18px;font-weight:700;cursor:pointer" onclick="editClinicName()">내 치과</div>
-          <div style="font-size:12px;opacity:.8;margin-top:2px">대기실 TV 관리자</div>
+          <div id="clinic-subtitle" style="font-size:12px;opacity:.8;margin-top:2px">대기실 TV 관리자</div>
         </div>
       </div>
       
@@ -4495,15 +4496,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       <main id="dtv-pg" style="background:#f9fafb;padding:16px;border-radius:0 0 12px 12px;min-height:400px;border:1px solid #e5e7eb;border-top:none">
         <!-- 플레이리스트 관리 -->
         <div id="content-playlists">
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-gray-800">대기실 관리</h2>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span style="font-size:18px;font-weight:700;color:#1f2937">대기실 관리</span>
             <button onclick="showCreatePlaylistModal()" 
-              class="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-2.5 rounded-lg hover:from-blue-600 hover:to-indigo-600 transition shadow-lg">
+              style="padding:8px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s"
+              onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
               대기실/체어 추가
             </button>
           </div>
           
-          <div id="playlists-container" class="grid gap-4">
+          <div id="playlists-container" style="display:grid;gap:12px">
           </div>
         </div>
         
@@ -4603,11 +4605,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
           </div>
           
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-gray-800">공지사항 목록</h2>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span style="font-size:18px;font-weight:700;color:#1f2937">공지사항 목록</span>
             <button onclick="showCreateNoticeModal()"
-              class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
-              <i class="fas fa-plus mr-2"></i>새 공지사항
+              style="padding:8px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s"
+              onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+              <i class="fas fa-plus" style="margin-right:6px"></i>새 공지사항
             </button>
           </div>
           
@@ -4617,7 +4620,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         
         <!-- 설정 탭 -->
         <div id="content-settings" style="display:none">
-          <h2 class="text-xl font-bold text-gray-800 mb-6"><i class="fas fa-cog mr-2 text-blue-500"></i>TV 설정</h2>
+          <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+            <i class="fas fa-cog" style="color:#2563eb"></i>TV 설정
+          </div>
           
           <!-- 치과명 -->
           <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
@@ -6039,6 +6044,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.getElementById('clinic-name-text').onclick = null;
       } else {
         document.getElementById('clinic-name-text').textContent = clinicName;
+      }
+
+      // 서브타이틀에 이메일/역할 표시
+      var subtitle = document.getElementById('clinic-subtitle');
+      if (subtitle) {
+        var email = INITIAL_DATA.userEmail || '';
+        var role = INITIAL_DATA.isSuperAdmin ? '최고관리자' : '대기실 TV 관리자';
+        subtitle.textContent = email ? email + ' · ' + role : role;
       }
       
       // 최고관리자 탭 표시
