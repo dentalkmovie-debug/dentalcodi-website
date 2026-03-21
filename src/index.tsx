@@ -6636,7 +6636,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
             \${waitingRooms.map((p, idx) => {
               const isActive = p.is_tv_active === true;
-              const needsSetup = !p.external_short_url;
+              const neverConnected = !p.last_active_at;
+              const isOffline = !isActive && !neverConnected;
               return \`
             <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
                  style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#e5e7eb'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
@@ -6654,7 +6655,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                       <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
                       \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
-                      \${needsSetup ? '<span id="badge-setup-' + p.id + '" style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                      \${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
+                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
                     </div>
                     <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                       <span style="color:#2563eb;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -6774,6 +6776,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           <div id="chair-sortable-container" style="display:grid;gap:10px">
             \${chairs.map((p, idx) => {
               const isActive = p.is_tv_active === true;
+              const neverConnected = !p.last_active_at;
+              const isOffline = !isActive && !neverConnected;
               return \`
             <div class="playlist-sortable-item" id="playlist-card-main-\${p.id}" data-playlist-id="\${p.id}" draggable="true"
                  style="background:#fff;border-radius:12px;border:1px solid \${isActive ? '#bbf7d0' : '#c7d2fe'};overflow:hidden;cursor:move;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:border-color .2s,box-shadow .2s"
@@ -6792,7 +6796,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                       <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
                       \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
-                      \${!p.last_active_at ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;font-size:10px;font-weight:700">체어 설치 필요</span>' : ''}
+                      \${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
+                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
                     </div>
                     <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                       <span style="color:#6366f1;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -9563,9 +9568,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         guideUrlEl.textContent = shortUrlDisplay;
       }
       
-      // 4. 'TV 설정 필요' 배지 제거
-      const badgeEl = document.getElementById('badge-setup-' + playlistId);
-      if (badgeEl) badgeEl.remove();
+      // 4. 배지 상태는 TV 연결 시 자동 갱신됨 (5초 자동 갱신 기준)
       
       // 5. '단축 URL 생성' 버튼 제거
       const btnShortenEl = document.getElementById('btn-shorten-' + playlistId);
