@@ -6216,10 +6216,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let _adminSearchQuery = '';
 
     // ============================================
-    // localStorage 캐시 유틸
+    // localStorage 캐시 유틸 (삭제된 데이터 유령 방지)
     // ============================================
     const CACHE_KEY = 'dental_tv_cache_' + ADMIN_CODE;
     const CACHE_EXPIRY = 60 * 1000; // 1분
+    
+    // 앱 시작 시 무조건 이전 캐시 삭제 (서버 데이터가 진실의 원천)
+    try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
     
     function saveToCache(data) {
       try {
@@ -6237,7 +6240,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         const raw = localStorage.getItem(CACHE_KEY);
         if (!raw) return null;
         const data = JSON.parse(raw);
-        if (Date.now() - data.ts > CACHE_EXPIRY) return null;
+        if (Date.now() - data.ts > CACHE_EXPIRY) {
+          localStorage.removeItem(CACHE_KEY);
+          return null;
+        }
         return data;
       } catch(e) { return null; }
     }
@@ -6332,79 +6338,44 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       runInit();
     }
     
-    // 안전장치: 3초 후에도 공용 영상이 비어있으면 강제 복원
-    setTimeout(function() {
-      var sec = document.getElementById('library-master-section');
-      var list = document.getElementById('library-master-list');
-      var modal = document.getElementById('edit-playlist-modal');
-      if (!sec || !modal || modal.style.display !== 'block') return;
-      
-      // 섹션이 숨겨져 있으면 강제 표시
-      if (sec.classList.contains('hidden') || sec.style.display === 'none') {
-        sec.classList.remove('hidden');
-        sec.style.display = '';
-        console.log('[Library] Failsafe: forced master section visible');
-      }
-      
-      // 리스트가 비어있으면 INITIAL_DATA에서 강제 렌더링
-      if (list && list.children.length === 0) {
-        var _items = _getMasterItems();
-        if (_items.length === 0) _items = masterItemsCache || [];
-        if (_items.length > 0) {
-          masterItemsCache = _items;
-          cachedMasterItems = _items;
-          console.log('[Library] Failsafe: rendering', _items.length, 'items from INITIAL_DATA');
-          list.innerHTML = _items.map(function(item) {
-            return '<div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition" data-library-id="' + item.id + '" data-library-master="1" onclick="addToPlaylistFromLibrary(' + item.id + ')">' +
-              '<div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">' +
-              (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center"><i class="fab fa-vimeo text-purple-400"></i></div>') +
-              '</div>' +
-              '<div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || item.url || '') + '</p><p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p></div>' +
-              '<i class="fas fa-plus text-purple-400"></i></div>';
-          }).join('');
-          var db = document.getElementById('debug-banner');
-          if(db) { db.textContent = '🔧 안전장치: ' + _items.length + '개 강제 렌더링'; db.style.background='#fef'; db.style.color='#808'; }
-        }
-      }
-    }, 3000);
-    // 5초, 10초 추가 안전장치
-    [5000, 10000].forEach(function(delay) {
+    // 안전장치: 3초 후에도 공용 영상이 비어있으면 API에서만 로드 (캐시 복원 금지)
+    // masterItemsCache/INITIAL_DATA에서 복원하면 삭제된 데이터가 유령처럼 남는 문제 발생
+    [3000, 8000].forEach(function(delay) {
       setTimeout(function() {
         var sec = document.getElementById('library-master-section');
         var list = document.getElementById('library-master-list');
         var modal = document.getElementById('edit-playlist-modal');
         if (!sec || !list || !modal || modal.style.display !== 'block') return;
         if (list.children.length > 0) return; // 이미 렌더링됨
+        
+        // 섹션이 숨겨져 있으면 표시
         sec.classList.remove('hidden');
         sec.style.display = '';
-        var _items = _getMasterItems();
-        if (_items.length === 0) _items = masterItemsCache || [];
-        if (_items.length === 0) {
-          // 최후의 수단: API에서 로드
-          fetch(window.location.origin + '/api/master/items', { cache: 'no-store' })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-              if (data.items && data.items.length > 0 && list.children.length === 0) {
-                masterItemsCache = data.items;
-                list.innerHTML = data.items.map(function(item) {
-                  return '<div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition" data-library-id="' + item.id + '" data-library-master="1" onclick="addToPlaylistFromLibrary(' + item.id + ')">' +
-                    '<div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">' +
-                    (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center"><i class="fab fa-vimeo text-purple-400"></i></div>') +
-                    '</div><div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || '') + '</p><p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p></div><i class="fas fa-plus text-purple-400"></i></div>';
-                }).join('');
-                console.log('[Library] Failsafe ' + delay + 'ms: rendered', data.items.length, 'from API');
-              }
-            }).catch(function() {});
-          return;
-        }
-        masterItemsCache = _items;
-        list.innerHTML = _items.map(function(item) {
-          return '<div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition" data-library-id="' + item.id + '" data-library-master="1" onclick="addToPlaylistFromLibrary(' + item.id + ')">' +
-            '<div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">' +
-            (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center"><i class="fab fa-vimeo text-purple-400"></i></div>') +
-            '</div><div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || '') + '</p><p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p></div><i class="fas fa-plus text-purple-400"></i></div>';
-        }).join('');
-        console.log('[Library] Failsafe ' + delay + 'ms: rendered', _items.length, 'items');
+        
+        // API에서만 로드 (캐시/INITIAL_DATA 복원 금지 - 삭제된 데이터 유령 방지)
+        fetch(window.location.origin + '/api/master/items', { cache: 'no-store' })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var items = data.items || [];
+            masterItemsCache = items;
+            cachedMasterItems = items;
+            masterItems = items;
+            if (items.length > 0 && list.children.length === 0) {
+              list.innerHTML = items.map(function(item) {
+                return '<div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition" data-library-id="' + item.id + '" data-library-master="1" onclick="addToPlaylistFromLibrary(' + item.id + ')">' +
+                  '<div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">' +
+                  (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center"><i class="fab fa-vimeo text-purple-400"></i></div>') +
+                  '</div><div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || '') + '</p><p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p></div><i class="fas fa-plus text-purple-400"></i></div>';
+              }).join('');
+              console.log('[Library] Failsafe ' + delay + 'ms: rendered', items.length, 'from API');
+            } else if (items.length === 0) {
+              // 서버에 공용 영상이 없으면 섹션 숨기기
+              sec.style.display = 'none';
+              console.log('[Library] Failsafe ' + delay + 'ms: no master items on server, hiding section');
+            }
+          }).catch(function(e) {
+            console.error('[Library] Failsafe ' + delay + 'ms: API error', e);
+          });
       }, delay);
     });
     // 디버그: hash에 auto-open-{id}가 있으면 자동으로 편집창 열기
@@ -11220,8 +11191,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const body = document.getElementById('admin-body');
       if (!body) return;
       body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>\uB85C\uB529 \uC911...</div>';
-      if (sub === 'push') renderAdminPush();
-      else if (sub === 'overview') renderAdminOverview();
+      if (sub === 'push') {
+        // 링크 배포 탭: 최신 치과 목록 로드 후 렌더링
+        refreshAdminClinics().catch(function(){});
+        renderAdminPush();
+      } else if (sub === 'overview') {
+        // 전체 현황 탭: 최신 마스터 아이템 + 치과 목록 로드 후 렌더링
+        Promise.all([
+          loadMasterItemsForAdmin(),
+          refreshAdminClinics().catch(function(){})
+        ]).then(function() {
+          renderAdminOverview();
+        });
+      }
     }
 
     function renderAdminClinics() {
@@ -11667,10 +11649,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         pushItems.push({ url: linkUrl.trim(), title: linkName.trim() || linkUrl.trim() });
       }
       
-      showDeleteConfirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?', async function() {
-        var successCount = 0;
-        var failCount = 0;
-        var failDetails = [];
+      showDeleteConfirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?',
+        async function() {
+        var successCount = 0, failCount = 0, failDetails = [];
         showToast('\uBC30\uD3EC \uC911... (0/' + selectedCodes.length + ')');
         for (var i = 0; i < selectedCodes.length; i++) {
           var code = selectedCodes[i];
@@ -11716,7 +11697,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (nameEl) nameEl.value = '';
         if (urlEl) urlEl.value = '';
         renderPushTemplates();
-      });
+      }, { type: 'info', title: '\uB9C1\uD06C \uBC30\uD3EC', icon: 'fa-paper-plane', confirmText: '\uBC30\uD3EC' });
     }
 
     init();
