@@ -4402,13 +4402,33 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
   const baseUrl = new URL(c.req.url).origin
   
+  // 강력한 캐시 방지 헤더 설정 (아임웹 iframe 캐시 문제 방지)
+  c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+  
   return c.html(`
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>치과 TV 관리자</title>
+  <script>
+    // bfcache(뒤로/앞으로 캐시)에서 복원 시 강제 새로고침
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) { window.location.reload(); }
+    });
+    // 앱 시작 시 모든 dental_tv 관련 localStorage 캐시 강제 삭제
+    try {
+      Object.keys(localStorage).forEach(function(k) {
+        if (k.indexOf('dental_tv_cache') === 0) localStorage.removeItem(k);
+      });
+    } catch(e) {}
+  </script>
   <script>
     // adminCode/email은 URL 파라미터로만 관리 (localStorage 저장 안 함)
     // localStorage는 /login 페이지에서만 사용
