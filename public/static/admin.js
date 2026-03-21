@@ -271,12 +271,44 @@ function focusPlaylistItem(itemId, isMaster) {
   }, 1500);
 }
 
+// 관리 탭 상태
+let _adminLoaded = false;
+let _adminSubTab = 'clinics';
+let _allClinics = INITIAL_DATA.allClinics || [];
+let _adminSearchQuery = '';
+
+// ============================================
+// localStorage 캐시 유틸
+// ============================================
+const CACHE_KEY = 'dental_tv_cache_' + ADMIN_CODE;
+const CACHE_EXPIRY = 60 * 1000; // 1분
+
+function saveToCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      ts: Date.now(),
+      playlists: data.playlists || [],
+      notices: data.notices || [],
+      clinicName: data.clinicName || ''
+    }));
+  } catch(e) {}
+}
+
+function loadFromCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (Date.now() - data.ts > CACHE_EXPIRY) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
 function init() {
+  const t0 = performance.now();
   // 초기 데이터로 즉시 렌더링 (API 호출 없이)
   const loadingDiv = document.getElementById('loading');
-  const dashboardDiv = document.getElementById('dashboard');
   if (loadingDiv) loadingDiv.style.display = 'none';
-  // dashboard는 이미 표시 상태이므로 추가 처리 불필요
 
   if (INITIAL_DATA.isOwnerAdmin) {
     document.getElementById('clinic-name-text').textContent = '관리자';
@@ -286,14 +318,25 @@ function init() {
     document.getElementById('clinic-name-text').innerHTML = clinicName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
   }
   
+  // 최고관리자 탭 표시
+  if (INITIAL_DATA.isSuperAdmin) {
+    const adminTab = document.getElementById('tab-admin');
+    if (adminTab) adminTab.style.display = '';
+  }
+  
   // 이미 로드된 데이터로 즉시 렌더링
   renderPlaylists();
   renderNotices();
   checkMasterLoginStatus();
   
+  // 캐시에 현재 데이터 저장
+  saveToCache({ playlists, notices, clinicName });
+  
   // 설정은 백그라운드에서 로드 (UI 업데이트용)
   loadNoticeSettings();
   setupAutoHeight();
+  
+  console.log('[DentalTV] init done in', Math.round(performance.now() - t0), 'ms');
   
   // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
   // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
@@ -301,6 +344,7 @@ function init() {
     const editModal = document.getElementById('edit-playlist-modal');
     if (editModal && editModal.style.display !== 'none') return;
     await loadPlaylists();
+    saveToCache({ playlists, notices, clinicName });
   }, 5000);
 }
 
@@ -510,12 +554,12 @@ function updateNoticePositionButtons(position) {
 }
 
 function showTab(tab) {
-  ['playlists', 'notices', 'master'].forEach(t => {
+  ['playlists', 'notices', 'settings', 'admin', 'master'].forEach(t => {
     const content = document.getElementById('content-' + t);
     const tabBtn = document.getElementById('tab-' + t);
     if (content) content.classList.toggle('hidden', t !== tab);
     if (tabBtn) {
-      if (t === 'master') {
+      if (t === 'master' || t === 'admin') {
         tabBtn.classList.toggle('border-purple-500', t === tab);
         tabBtn.classList.toggle('text-purple-600', t === tab);
       } else {
@@ -526,6 +570,9 @@ function showTab(tab) {
       tabBtn.classList.toggle('text-gray-500', t !== tab);
     }
   });
+  if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; renderAdminClinics(); }
+  if (tab === 'settings') initSettingsTab();
+  if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
 }
 
 // ============================================
@@ -4528,6 +4575,474 @@ function setupAutoHeight() {
     const observer = new MutationObserver(() => postParentHeight());
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
   } catch (e) {}
+}
+
+// ============================================
+// 설정 탭
+// ============================================
+function initSettingsTab() {
+  const nameInput = document.getElementById('settings-clinic-name');
+  if (nameInput) nameInput.value = clinicName || '';
+  
+  // admin code
+  const codeEl = document.getElementById('settings-admin-code');
+  if (codeEl) codeEl.textContent = ADMIN_CODE;
+  
+  // TV URLs
+  const urlsContainer = document.getElementById('settings-tv-urls');
+  if (urlsContainer && playlists.length > 0) {
+    urlsContainer.innerHTML = playlists.map(p => {
+      const tvUrl = location.origin + '/' + p.short_code;
+      return `<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium">${p.name || ''}</p>
+          <p class="text-xs text-blue-600 font-mono truncate">${tvUrl}</p>
+        </div>
+        <button onclick="copyToClipboard('${tvUrl}')" class="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100 flex-shrink-0">\uBCF5\uC0AC</button>
+      </div>`;
+    }).join('');
+  }
+  
+  // 로고/자막 설정 로드
+  loadSettingsData();
+}
+
+async function loadSettingsData() {
+  try {
+    const res = await fetch(API_BASE + '/settings');
+    const data = await res.json();
+    // 로고 설정
+    const logoUrl = document.getElementById('settings-logo-url');
+    const logoSize = document.getElementById('settings-logo-size');
+    const sizeLabel = document.getElementById('logo-size-label');
+    if (logoUrl) logoUrl.value = data.logo_url || '';
+    if (logoSize) logoSize.value = data.logo_size || 150;
+    if (sizeLabel) sizeLabel.textContent = (data.logo_size || 150) + 'px';
+    // 로고 미리보기
+    if (data.logo_url) {
+      const preview = document.getElementById('settings-logo-preview');
+      const img = document.getElementById('logo-preview-img');
+      if (preview && img) { img.src = data.logo_url; preview.classList.remove('hidden'); }
+    }
+    // 자막 설정
+    const sf = document.getElementById('settings-subtitle-font');
+    const so = document.getElementById('settings-subtitle-opacity');
+    const sp = document.getElementById('settings-subtitle-position');
+    const soff = document.getElementById('settings-subtitle-offset');
+    if (sf) sf.value = data.subtitle_font_size || 28;
+    if (so) so.value = data.subtitle_bg_opacity ?? 80;
+    if (sp) sp.value = data.subtitle_position || 'bottom';
+    if (soff) soff.value = data.subtitle_bottom_offset || 80;
+  } catch(e) { console.error('Load settings error:', e); }
+}
+
+async function saveLogoSettings() {
+  const logoUrl = (document.getElementById('settings-logo-url') || {}).value || '';
+  const logoSize = parseInt((document.getElementById('settings-logo-size') || {}).value) || 150;
+  try {
+    const res = await fetch(API_BASE + '/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logo_url: logoUrl, logo_size: logoSize })
+    });
+    if (res.ok) {
+      showToast('\uB85C\uACE0 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+      const preview = document.getElementById('settings-logo-preview');
+      const img = document.getElementById('logo-preview-img');
+      if (logoUrl && preview && img) { img.src = logoUrl; preview.classList.remove('hidden'); }
+      else if (preview) preview.classList.add('hidden');
+    }
+  } catch(e) { showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'); }
+}
+
+async function saveSubtitleSettings() {
+  const font = parseInt((document.getElementById('settings-subtitle-font') || {}).value) || 28;
+  const opacity = parseInt((document.getElementById('settings-subtitle-opacity') || {}).value) ?? 80;
+  const position = (document.getElementById('settings-subtitle-position') || {}).value || 'bottom';
+  const offset = parseInt((document.getElementById('settings-subtitle-offset') || {}).value) || 80;
+  try {
+    const res = await fetch(API_BASE + '/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subtitle_font_size: font, subtitle_bg_opacity: opacity, subtitle_position: position, subtitle_bottom_offset: offset })
+    });
+    if (res.ok) showToast('\uC790\uB9C9 \uC124\uC815 \uC800\uC7A5');
+  } catch(e) { showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'); }
+}
+
+function saveClinicNameFromSettings() {
+  const nameInput = document.getElementById('settings-clinic-name');
+  if (!nameInput || !nameInput.value.trim()) return;
+  const newName = nameInput.value.trim();
+  
+  fetch(API_BASE + '/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clinic_name: newName })
+  }).then(res => {
+    if (res.ok) {
+      clinicName = newName;
+      document.getElementById('clinic-name-text').innerHTML = newName + ' <i class="fas fa-pencil-alt ml-2 text-sm text-blue-200"></i>';
+      showToast('\uCE58\uACFC\uBA85\uC774 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+    }
+  }).catch(() => showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'));
+}
+
+// ============================================
+// 최고관리자 탭
+// ============================================
+function showAdminSubTab(sub) {
+  _adminSubTab = sub;
+  ['clinics', 'master-items', 'push'].forEach(s => {
+    const btn = document.getElementById('admin-sub-' + s);
+    if (btn) {
+      btn.className = s === sub 
+        ? 'px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium'
+        : 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300';
+    }
+  });
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  body.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>\uB85C\uB529 \uC911...</div>';
+  if (sub === 'clinics') renderAdminClinics();
+  else if (sub === 'master-items') renderAdminMasterItems();
+  else if (sub === 'push') renderAdminPush();
+}
+
+function renderAdminClinics() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  const q = _adminSearchQuery.toLowerCase().trim();
+  const clinics = (_allClinics || []).filter(c => {
+    if (!q) return true;
+    return (c.clinic_name || '').toLowerCase().includes(q) ||
+           (c.imweb_email || '').toLowerCase().includes(q) ||
+           (c.admin_code || '').toLowerCase().includes(q);
+  });
+  const totalCount = (_allClinics || []).length;
+  const activeCount = clinics.filter(c => c.is_active !== 0).length;
+  const suspendedCount = clinics.filter(c => c.is_active === 0).length;
+  const imwebCount = clinics.filter(c => c.imweb_member_id).length;
+  const unregCount = clinics.filter(c => !c.imweb_member_id).length;
+  
+  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-hospital mr-2 text-purple-500"></i>\uCE58\uACFC \uAD00\uB9AC (${totalCount}\uAC1C)</h3>
+      <button onclick="refreshAdminClinics()" class="text-sm text-purple-500 hover:text-purple-700"><i class="fas fa-sync-alt mr-1"></i>\uC0C8\uB85C\uACE0\uCE68</button>
+    </div>
+    <!-- \uAC80\uC0C9 -->
+    <div class="mb-3">
+      <input type="text" id="admin-clinic-search" placeholder="\uCE58\uACFC\uBA85, \uC774\uBA54\uC77C, \uCF54\uB4DC \uAC80\uC0C9..." value="${q.replace(/"/g, '&quot;')}"
+        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300"
+        oninput="_adminSearchQuery=this.value; renderAdminClinics()">
+    </div>
+    <!-- \uC694\uC57D \uBC30\uC9C0 -->
+    <div class="flex gap-2 mb-3 text-xs flex-wrap">
+      <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full">\uD65C\uC131 ${activeCount}</span>
+      <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full">\uC815\uC9C0 ${suspendedCount}</span>
+      <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">\uC784\uC6F9\uC5F0\uB3D9 ${imwebCount}</span>
+      <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uB294 \uBBF8\uB4F1\uB85D \uC0C1\uD0DC">\uBBF8\uB4F1\uB85D ${unregCount}</span>
+    </div>
+    ${clinics.length === 0 ? '<p class="text-gray-400 text-center py-4">' + (q ? '\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.' : '\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.') + '</p>' :
+    '<div class="space-y-2 max-h-[60vh] overflow-y-auto">' + clinics.map(c => {
+      const statusBadge = c.is_active === 0 
+        ? '<span class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded">\uC815\uC9C0</span>'
+        : '<span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded">\uD65C\uC131</span>';
+      const imwebBadge = c.imweb_member_id
+        ? '<span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded">\uC784\uC6F9</span>'
+        : '<span class="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded" title="\uC544\uC784\uC6F9 \uD68C\uC6D0\uC774\uC9C0\uB9CC DB\uC5D0 \uCE58\uACFC \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC74C">\uBBF8\uB4F1\uB85D</span>';
+      return `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-medium text-sm">${c.clinic_name || '\uC774\uB984\uC5C6\uC74C'}</span>
+            ${statusBadge} ${imwebBadge}
+          </div>
+          <p class="text-xs text-gray-500 mt-0.5">
+            ${c.imweb_email || c.admin_code || ''} | \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 ${c.playlist_count || 0}\uAC1C | \uACF5\uC9C0 ${c.notice_count || 0}\uAC1C
+          </p>
+        </div>
+        <div class="flex gap-1 flex-shrink-0">
+          <button onclick="window.open('/admin/${c.admin_code}','_blank')" class="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="\uAD00\uB9AC\uC790 \uD398\uC774\uC9C0 \uC5F4\uAE30"><i class="fas fa-external-link-alt"></i></button>
+          ${c.is_active !== 0 
+            ? '<button onclick="adminSuspendClinic(\'' + c.admin_code + '\')" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100">\uC815\uC9C0</button>'
+            : '<button onclick="adminActivateClinic(\'' + c.admin_code + '\')" class="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100">\uD65C\uC131\uD654</button>'}
+        </div>
+      </div>`;
+    }).join('') + '</div>'}
+  </div>`;
+}
+
+async function refreshAdminClinics() {
+  try {
+    const res = await fetch('/api/master/users');
+    if (res.ok) {
+      const data = await res.json();
+      _allClinics = (data.users || []).filter(u => !u.is_master);
+      renderAdminClinics();
+      showToast('\uC0C8\uB85C\uACE0\uCE68 \uC644\uB8CC');
+    }
+  } catch(e) { showToast('\uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error'); }
+}
+
+async function adminSuspendClinic(adminCode) {
+  if (!confirm('\uC774 \uCE58\uACFC\uB97C \uC815\uC9C0\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+  try {
+    const res = await fetch('/api/master/clinics/' + adminCode + '/suspend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: '\uAD00\uB9AC\uC790\uC5D0 \uC758\uD574 \uC815\uC9C0' })
+    });
+    if (res.ok) { showToast('\uC815\uC9C0 \uCC98\uB9AC \uC644\uB8CC'); await refreshAdminClinics(); }
+  } catch(e) { showToast('\uCC98\uB9AC \uC2E4\uD328', 'error'); }
+}
+
+async function adminActivateClinic(adminCode) {
+  try {
+    const res = await fetch('/api/master/clinics/' + adminCode + '/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (res.ok) { showToast('\uD65C\uC131\uD654 \uC644\uB8CC'); await refreshAdminClinics(); }
+  } catch(e) { showToast('\uCC98\uB9AC \uC2E4\uD328', 'error'); }
+}
+
+function renderAdminMasterItems() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  
+  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-gray-800"><i class="fas fa-video mr-2 text-purple-500"></i>\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC (${(masterItems || []).length}\uAC1C)</h3>
+    </div>
+    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+      <div class="flex gap-2">
+        <input type="text" id="admin-new-url" placeholder="YouTube \uB610\uB294 Vimeo URL" class="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500">
+        <button onclick="adminAddMasterItem()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600"><i class="fas fa-plus mr-1"></i>\uCD94\uAC00</button>
+      </div>
+    </div>
+    <div id="admin-master-items-list" class="space-y-2">
+      ${(masterItems || []).map(item => {
+        const thumb = item.thumbnail_url 
+          ? '<img src="' + item.thumbnail_url + '" class="w-16 h-10 object-cover rounded">'
+          : '<div class="w-16 h-10 bg-gray-200 rounded flex items-center justify-center"><i class="fas fa-video text-gray-400"></i></div>';
+        return '<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">' +
+          thumb +
+          '<div class="flex-1 min-w-0"><p class="text-sm font-medium truncate">' + (item.title || item.url || '') + '</p><p class="text-xs text-gray-400">' + (item.item_type || '') + '</p></div>' +
+          '<button onclick="adminDeleteMasterItem(' + item.id + ')" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"><i class="fas fa-trash"></i></button>' +
+          '</div>';
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+async function adminAddMasterItem() {
+  const urlInput = document.getElementById('admin-new-url');
+  if (!urlInput || !urlInput.value.trim()) return;
+  try {
+    const res = await fetch('/api/master/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlInput.value.trim() })
+    });
+    if (res.ok) {
+      urlInput.value = '';
+      const itemsRes = await fetch('/api/master/items');
+      if (itemsRes.ok) { const data = await itemsRes.json(); masterItems = data.items || []; cachedMasterItems = masterItems; masterItemsCache = masterItems; }
+      renderAdminMasterItems();
+      showToast('\uC601\uC0C1 \uCD94\uAC00 \uC644\uB8CC');
+    } else { const err = await res.json(); showToast(err.error || '\uCD94\uAC00 \uC2E4\uD328', 'error'); }
+  } catch(e) { showToast('\uCD94\uAC00 \uC2E4\uD328', 'error'); }
+}
+
+async function adminDeleteMasterItem(itemId) {
+  if (!confirm('\uC774 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+  try {
+    const res = await fetch('/api/master/items/' + itemId, { method: 'DELETE' });
+    if (res.ok) {
+      masterItems = masterItems.filter(i => i.id !== itemId); cachedMasterItems = masterItems; masterItemsCache = masterItems;
+      renderAdminMasterItems();
+      showToast('\uC0AD\uC81C \uC644\uB8CC');
+    }
+  } catch(e) { showToast('\uC0AD\uC81C \uC2E4\uD328', 'error'); }
+}
+
+function renderAdminPush() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  const clinics = (_allClinics || []).filter(c => c.is_active !== 0);
+  
+  body.innerHTML = `<div class="bg-white rounded-xl shadow-sm p-6">
+    <h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-paper-plane mr-2 text-purple-500"></i>\uB9C1\uD06C \uBC30\uD3EC</h3>
+    <p class="text-sm text-gray-500 mb-2">\uC120\uD0DD\uD55C \uCE58\uACFC\uC758 \uCCAB \uBC88\uC9F8 \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8\uC5D0 \uC601\uC0C1 \uB9C1\uD06C\uB97C \uCD94\uAC00\uD569\uB2C8\uB2E4.</p>
+    
+    <!-- STEP 1: \uCE58\uACFC \uC120\uD0DD -->
+    <div class="mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC \uB300\uC0C1 \uC120\uD0DD (${clinics.length}\uAC1C \uCE58\uACFC)</label>
+      </div>
+      <div class="flex items-center gap-2 mb-2">
+        <input type="checkbox" id="push-select-all" onchange="togglePushSelectAll()" class="w-4 h-4 accent-purple-500">
+        <label for="push-select-all" class="text-sm text-gray-600">\uC804\uCCB4 \uC120\uD0DD</label>
+        <span id="push-selected-count" class="text-xs text-purple-500 font-medium ml-auto">0\uAC1C \uC120\uD0DD</span>
+      </div>
+      <div class="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1">
+        ${clinics.map(c => 
+          '<label class="flex items-center gap-2 p-1.5 hover:bg-purple-50 rounded cursor-pointer">' +
+          '<input type="checkbox" class="push-clinic-cb w-4 h-4 accent-purple-500" value="' + c.admin_code + '" onchange="updatePushCount()">' +
+          '<span class="text-sm">' + (c.clinic_name || c.admin_code) + '</span>' +
+          '<span class="text-xs text-gray-400 ml-auto">' + (c.imweb_email || '') + '</span></label>'
+        ).join('')}
+      </div>
+    </div>
+    
+    <!-- STEP 2: \uB9C1\uD06C \uD15C\uD50C\uB9BF \uC120\uD0DD -->
+    <div class="mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC\uD560 \uB9C1\uD06C</label>
+      </div>
+      
+      <!-- \uD15C\uD50C\uB9BF \uBC84\uD2BC -->
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <button onclick="selectPushTemplate('master')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-200 transition">
+          <i class="fas fa-list mr-1"></i>\uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD
+        </button>
+        <button onclick="selectPushTemplate('youtube')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200 transition">
+          <i class="fab fa-youtube mr-1"></i>YouTube URL
+        </button>
+        <button onclick="selectPushTemplate('custom')" class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
+          <i class="fas fa-edit mr-1"></i>\uC9C1\uC811 \uC785\uB825
+        </button>
+      </div>
+      
+      <!-- \uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD \uC601\uC5ED (\uAE30\uBCF8 \uC228\uAE40) -->
+      <div id="push-master-select" style="display:none" class="mb-3 border rounded-lg p-3 bg-indigo-50">
+        <p class="text-xs text-indigo-600 mb-2"><i class="fas fa-info-circle mr-1"></i>\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694</p>
+        <div class="max-h-32 overflow-y-auto space-y-1" id="push-master-items-list">
+          ${(masterItems || []).map(item => 
+            '<label class="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer">' +
+            '<input type="checkbox" class="push-master-item-cb w-4 h-4 accent-indigo-500" value="' + item.id + '" data-url="' + (item.url || '') + '" data-title="' + ((item.title || '').replace(/"/g, '&amp;quot;')) + '">' +
+            (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-10 h-6 object-cover rounded">' : '<div class="w-10 h-6 bg-gray-200 rounded flex items-center justify-center"><i class="fas fa-video text-gray-400 text-xs"></i></div>') +
+            '<span class="text-xs truncate">' + (item.title || item.url || '') + '</span></label>'
+          ).join('')}
+        </div>
+      </div>
+      
+      <!-- \uC9C1\uC811 \uC785\uB825 \uC601\uC5ED -->
+      <div id="push-custom-input" class="flex gap-2">
+        <input type="text" id="push-link-name" placeholder="\uB9C1\uD06C \uC774\uB984" class="w-1/3 border rounded-lg px-3 py-2 text-sm">
+        <input type="text" id="push-link-url" placeholder="URL (https://...)" class="flex-1 border rounded-lg px-3 py-2 text-sm">
+      </div>
+    </div>
+    
+    <!-- STEP 3: \uBC30\uD3EC \uC2E4\uD589 -->
+    <div>
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-purple-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+        <label class="text-sm font-bold text-gray-700">\uBC30\uD3EC \uC2E4\uD589</label>
+      </div>
+      <button onclick="executePush()" class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 rounded-lg font-bold hover:from-purple-600 hover:to-indigo-600 transition shadow-lg">
+        <i class="fas fa-paper-plane mr-2"></i>\uC120\uD0DD \uCE58\uACFC\uC5D0 \uBC30\uD3EC
+      </button>
+    </div>
+  </div>`;
+}
+
+function updatePushCount() {
+  const count = document.querySelectorAll('.push-clinic-cb:checked').length;
+  const el = document.getElementById('push-selected-count');
+  if (el) el.textContent = count + '\uAC1C \uC120\uD0DD';
+}
+
+function selectPushTemplate(type) {
+  const masterSelect = document.getElementById('push-master-select');
+  const customInput = document.getElementById('push-custom-input');
+  if (!masterSelect || !customInput) return;
+  
+  if (type === 'master') {
+    masterSelect.style.display = '';
+    customInput.style.display = 'none';
+  } else {
+    masterSelect.style.display = 'none';
+    customInput.style.display = '';
+    if (type === 'youtube') {
+      const nameEl = document.getElementById('push-link-name');
+      const urlEl = document.getElementById('push-link-url');
+      if (nameEl) nameEl.placeholder = '\uC601\uC0C1 \uC81C\uBAA9';
+      if (urlEl) { urlEl.placeholder = 'YouTube URL (https://youtube.com/...)'; urlEl.value = ''; }
+    } else {
+      const nameEl = document.getElementById('push-link-name');
+      const urlEl = document.getElementById('push-link-url');
+      if (nameEl) nameEl.placeholder = '\uB9C1\uD06C \uC774\uB984';
+      if (urlEl) { urlEl.placeholder = 'URL (https://...)'; urlEl.value = ''; }
+    }
+  }
+}
+
+function togglePushSelectAll() {
+  const checked = document.getElementById('push-select-all').checked;
+  document.querySelectorAll('.push-clinic-cb').forEach(cb => { cb.checked = checked; });
+  updatePushCount();
+}
+
+async function executePush() {
+  const selectedCodes = Array.from(document.querySelectorAll('.push-clinic-cb:checked')).map(cb => cb.value);
+  if (selectedCodes.length === 0) { showToast('\uBC30\uD3EC \uB300\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694', 'error'); return; }
+  
+  // \uACF5\uC6A9 \uC601\uC0C1 \uC120\uD0DD \uBAA8\uB4DC \uD655\uC778
+  const masterSelect = document.getElementById('push-master-select');
+  const isMasterMode = masterSelect && masterSelect.style.display !== 'none';
+  
+  let pushItems = [];
+  if (isMasterMode) {
+    const checked = document.querySelectorAll('.push-master-item-cb:checked');
+    if (checked.length === 0) { showToast('\uBC30\uD3EC\uD560 \uACF5\uC6A9 \uC601\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694', 'error'); return; }
+    checked.forEach(cb => {
+      pushItems.push({ url: cb.dataset.url, title: cb.dataset.title || cb.dataset.url });
+    });
+  } else {
+    const linkName = (document.getElementById('push-link-name') || {}).value || '';
+    const linkUrl = (document.getElementById('push-link-url') || {}).value || '';
+    if (!linkUrl.trim()) { showToast('URL\uC744 \uC785\uB825\uD558\uC138\uC694', 'error'); return; }
+    pushItems.push({ url: linkUrl.trim(), title: linkName.trim() || linkUrl.trim() });
+  }
+  
+  const itemNames = pushItems.map(i => i.title).join(', ');
+  if (!confirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?\n\n' + itemNames)) return;
+  
+  let successCount = 0;
+  let failCount = 0;
+  for (const code of selectedCodes) {
+    try {
+      const pRes = await fetch('/api/' + code + '/playlists');
+      const pData = await pRes.json();
+      const firstPlaylist = (pData.playlists || [])[0];
+      if (firstPlaylist) {
+        for (const item of pushItems) {
+          const addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: item.url, title: item.title })
+          });
+          if (addRes.ok) successCount++;
+          else failCount++;
+        }
+      } else { failCount++; }
+    } catch(e) { failCount++; }
+  }
+  
+  if (failCount > 0) {
+    showToast('\uC131\uACF5 ' + successCount + '\uAC74 / \uC2E4\uD328 ' + failCount + '\uAC74', 'error');
+  } else {
+    showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
+  }
+  // \uC785\uB825 \uCD08\uAE30\uD654
+  const nameEl = document.getElementById('push-link-name');
+  const urlEl = document.getElementById('push-link-url');
+  if (nameEl) nameEl.value = '';
+  if (urlEl) urlEl.value = '';
+  document.querySelectorAll('.push-master-item-cb').forEach(cb => { cb.checked = false; });
 }
 
 init();
