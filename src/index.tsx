@@ -1955,12 +1955,16 @@ app.post('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   const playlistId = c.req.param('playlistId')
   const user = await getOrCreateUser(c.env.DB, adminCode)
   
+  if (!user) {
+    return c.json({ error: '사용자를 찾을 수 없습니다.' }, 401)
+  }
+  
   const playlist = await c.env.DB.prepare(`
     SELECT id, name FROM playlists WHERE id = ? AND user_id = ?
   `).bind(playlistId, user.id).first() as any
   
   if (!playlist) {
-    return c.json({ error: '권한이 없습니다.' }, 403)
+    return c.json({ error: '권한이 없습니다. (playlist=' + playlistId + ', user=' + user.id + ')' }, 403)
   }
   
   // 대기실(이름에 '체어'가 없는 경우)은 임시 영상 기능 비활성화
@@ -1970,13 +1974,17 @@ app.post('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   
   const { url, title, type, return_time } = await c.req.json()
   
-  await c.env.DB.prepare(`
+  if (!url) {
+    return c.json({ error: '영상 URL이 필요합니다.' }, 400)
+  }
+  
+  const result = await c.env.DB.prepare(`
     UPDATE playlists 
     SET temp_video_url = ?, temp_video_title = ?, temp_video_type = ?, temp_return_time = ?
     WHERE id = ?
   `).bind(url, title, type, return_time || 'end', playlistId).run()
   
-  return c.json({ success: true })
+  return c.json({ success: true, changes: result.meta?.changes || 0 })
 })
 
 // TV에서 임시 영상 해제 (영상 끝나면 자동 복귀용)
@@ -8521,10 +8529,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
 
     async function sendTempVideo() {
+      console.log('[sendTempVideo] called');
       const playlistId = document.getElementById('temp-video-playlist-id').value;
       const shortCode = document.getElementById('temp-video-short-code').value;
       const urlInput = document.getElementById('temp-video-url').value.trim();
       const returnTime = document.getElementById('temp-return-time').value;
+      
+      console.log('[sendTempVideo] playlistId:', playlistId, 'shortCode:', shortCode, 'returnTime:', returnTime);
       
       // URL 또는 공용자료 선택 확인
       let videoUrl = '';
@@ -8549,8 +8560,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         videoTitle = selectedTempVideoItem.title || '공용 영상';
         videoType = selectedTempVideoItem.item_type;
       } else {
+        console.warn('[sendTempVideo] No video selected or URL entered');
         showToast('영상을 선택하거나 URL을 입력해주세요', 'error');
         return;
+      }
+      
+      console.log('[sendTempVideo] sending:', { url: videoUrl, title: videoTitle, type: videoType, return_time: returnTime });
+      
+      // 전송 버튼 비활성화 (중복 전송 방지)
+      const sendBtn = document.querySelector('#temp-video-modal button[onclick="sendTempVideo()"]');
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>전송 중...';
       }
       
       try {
@@ -8565,25 +8586,52 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           })
         });
         
+        console.log('[sendTempVideo] response status:', res.status);
+        
         if (res.ok) {
-          showToast('✅ 임시 영상이 전송되었습니다!');
           closeModal('temp-video-modal');
           // 캐시 업데이트
           _tempVideoActiveCache[playlistId] = { active: true, return_time: returnTime };
-          // 상태 업데이트
+          // 상태 업데이트: 전송 직후 인디케이터와 복귀 버튼 항상 활성화 (전송 확인 피드백)
           const indicator = document.getElementById('temp-indicator-' + playlistId);
-          // 인디케이터는 수동복귀일 때만 표시
-          if (indicator) indicator.style.display = (returnTime === 'manual') ? '' : 'none';
-          setStopButtonState(playlistId, returnTime === 'manual');
+          if (indicator) indicator.style.display = '';
+          setStopButtonState(playlistId, true);
+          
+          // return_time이 'end'이면 일정 시간 후 자동으로 비활성화 (영상 끝나면 서버에서 해제됨)
+          if (returnTime === 'end') {
+            setTimeout(function() { checkTempVideoStatus(); }, 15000); // 15초 후 상태 재확인
+          }
+          
+          // 전송 성공 후 서버 확인 (TV에 반영되었는지 검증)
+          try {
+            const verifyRes = await fetch(API_BASE + '/playlists/' + playlistId + '/temp-video');
+            const verifyData = await verifyRes.json();
+            if (verifyData.active) {
+              showToast('✅ 임시 영상이 전송되었습니다! (TV에 약 10초 내 반영)');
+              console.log('[sendTempVideo] verified on server:', verifyData);
+            } else {
+              showToast('⚠️ 전송 요청은 성공했지만 서버에서 확인되지 않았습니다. 다시 시도해주세요.', 'error');
+              console.warn('[sendTempVideo] not verified on server:', verifyData);
+            }
+          } catch (verifyErr) {
+            // 검증 실패해도 전송 자체는 성공했으므로 성공 토스트
+            showToast('✅ 임시 영상이 전송되었습니다!');
+          }
         } else {
           const errData = await res.json().catch(() => ({}));
           const errMsg = errData.error || ('전송 실패 (HTTP ' + res.status + ')');
-          console.error('sendTempVideo error:', res.status, errData);
+          console.error('[sendTempVideo] error:', res.status, errData);
           showToast(errMsg, 'error');
         }
       } catch (e) {
-        console.error('sendTempVideo exception:', e);
+        console.error('[sendTempVideo] exception:', e);
         showToast('전송 실패: ' + (e.message || '네트워크 오류'), 'error');
+      } finally {
+        // 전송 버튼 복원
+        if (sendBtn) {
+          sendBtn.disabled = false;
+          sendBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>전송';
+        }
       }
     }
     
