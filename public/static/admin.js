@@ -5104,12 +5104,24 @@ function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  // ── 단순 표시: HTML의 fixed inset-0 z-50 클래스가 이미 올바른 위치를 잡음 ──
+  // ── 단순 표시 ──
   el.style.display = 'flex';
   
-  // ── backdrop fade-in ──
-  var bd = el.querySelector('.modal-backdrop');
-  if (bd) requestAnimationFrame(function() { bd.classList.add('active'); });
+  // ── 모달 카드에 그림자 추가 (배경 대신) ──
+  var card = el.querySelector('.bg-white');
+  if (card) card.classList.add('modal-card-shadow');
+  
+  // ── 바깥 클릭 시 닫기 (backdrop 대신) ──
+  if (!el._outsideClickHandler) {
+    el._outsideClickHandler = function(e) {
+      // 모달 카드 내부 클릭이 아니면 닫기
+      var c = el.querySelector('.bg-white');
+      if (c && !c.contains(e.target)) {
+        closeModal(id);
+      }
+    };
+  }
+  el.addEventListener('click', el._outsideClickHandler);
   
   // ── 배경 스크롤 방지 ──
   if (_openModalSet.size === 0) {
@@ -5129,9 +5141,13 @@ function openModal(id) {
 function closeModal(id) {
   const el = document.getElementById(id);
   if (el) {
-    // backdrop fade-out 초기화
-    var bd = el.querySelector('.modal-backdrop');
-    if (bd) bd.classList.remove('active');
+    // 그림자 제거
+    var card = el.querySelector('.bg-white');
+    if (card) card.classList.remove('modal-card-shadow');
+    // 바깥 클릭 핸들러 제거
+    if (el._outsideClickHandler) {
+      el.removeEventListener('click', el._outsideClickHandler);
+    }
     // ── 단순 숨김 ──
     el.style.display = 'none';
   }

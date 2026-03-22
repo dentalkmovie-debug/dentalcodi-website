@@ -2708,8 +2708,8 @@ app.get('/embed-old/:memberCode', async (c) => {
   <style>
     html, body { margin: 0; padding: 0; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-    .modal-backdrop { background: rgba(0,0,0,0.5); opacity:0; transition: opacity 0.15s ease; }
-    .modal-backdrop.active { opacity:1; }
+    .modal-backdrop { display:none !important; }
+    .modal-card-shadow { box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.06); }
     .toast { animation: slideIn 0.3s ease; }
     @keyframes slideIn {
       from { transform: translateY(-100%); opacity: 0; }
@@ -4674,8 +4674,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       overflow: hidden !important;
     }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-    .modal-backdrop { background: rgba(0,0,0,0.5); opacity:0; transition: opacity 0.15s ease; }
-    .modal-backdrop.active { opacity:1; }
+    .modal-backdrop { display:none !important; }
+    .modal-card-shadow { box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.06); }
     .toast { animation: slideIn 0.3s ease; }
     .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
     .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
@@ -11281,12 +11281,24 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const el = document.getElementById(id);
       if (!el) return;
 
-      // ── 단순 표시: HTML의 fixed inset-0 z-50 클래스가 이미 올바른 위치를 잡음 ──
+      // ── 단순 표시 ──
       el.style.display = 'flex';
       
-      // ── backdrop fade-in ──
-      var bd = el.querySelector('.modal-backdrop');
-      if (bd) requestAnimationFrame(function() { bd.classList.add('active'); });
+      // ── 모달 카드에 그림자 추가 (배경 대신) ──
+      var card = el.querySelector('.bg-white');
+      if (card) card.classList.add('modal-card-shadow');
+      
+      // ── 바깥 클릭 시 닫기 (backdrop 대신) ──
+      if (!el._outsideClickHandler) {
+        el._outsideClickHandler = function(e) {
+          // 모달 카드 내부 클릭이 아니면 닫기
+          var c = el.querySelector('.bg-white');
+          if (c && !c.contains(e.target)) {
+            closeModal(id);
+          }
+        };
+      }
+      el.addEventListener('click', el._outsideClickHandler);
       
       // ── 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
@@ -11306,9 +11318,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
-        // backdrop fade-out 초기화
-        var bd = el.querySelector('.modal-backdrop');
-        if (bd) bd.classList.remove('active');
+        // 그림자 제거
+        var card = el.querySelector('.bg-white');
+        if (card) card.classList.remove('modal-card-shadow');
+        // 바깥 클릭 핸들러 제거
+        if (el._outsideClickHandler) {
+          el.removeEventListener('click', el._outsideClickHandler);
+        }
         // ── 단순 숨김 ──
         el.style.display = 'none';
       }
