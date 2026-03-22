@@ -1155,8 +1155,14 @@ function renderPlaylists() {
   // TV 연결 설정 토글 상태 미리 저장 (innerHTML 교체 후 복원용)
   const wrSetupContent = document.getElementById('wr-setup-content');
   const chSetupContent = document.getElementById('ch-setup-content');
-  const wrSetupOpen = wrSetupContent && wrSetupContent.style.display === 'block';
-  const chSetupOpen = chSetupContent && chSetupContent.style.display === 'block';
+  var wrSetupOpen = wrSetupContent && wrSetupContent.style.display === 'block';
+  var chSetupOpen = chSetupContent && chSetupContent.style.display === 'block';
+  // 편집 패널 닫기 시 설정 섹션도 강제 닫기
+  if (window._forceCloseSetupSections) {
+    wrSetupOpen = false;
+    chSetupOpen = false;
+    window._forceCloseSetupSections = false;
+  }
   
   // 체크박스 선택 상태 미리 저장 (innerHTML 교체 후 복원용)
   const checkedIds = new Set(
