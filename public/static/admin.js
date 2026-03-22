@@ -117,7 +117,7 @@ function restoreMasterItemsFromDOM() {
 }
 const playlistCacheById = {};
 const tempVideoCacheByPlaylist = {};
-const _tempVideoActiveCache = {}; // 임시 영상 활성 상태 캐시 (깜빡임 방지)
+const _tempVideoActiveCache = {}; // 임시 영상 활성 상태 캐시 { [playlistId]: { active: bool, return_time: string } }
 let noticeSettings = { font_size: 32, letter_spacing: 0, text_color: '#ffffff', bg_color: '#1a1a2e', bg_opacity: 100, scroll_speed: 50, position: 'bottom' };
 let playlistSearchQuery = '';
 let masterItemsSignature = '';
@@ -1240,7 +1240,7 @@ function renderPlaylists() {
               <div style="width:36px;height:36px;border-radius:10px;background:${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#6366f1,#818cf8)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
                 <i class="fas fa-tv" style="color:#fff;font-size:14px"></i>
                 ${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
-                <span id="temp-indicator-${p.id}" style="display:${_tempVideoActiveCache[p.id] ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
+                <span id="temp-indicator-${p.id}" style="display:${_tempVideoActiveCache[p.id]?.active ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
               </div>
               <div style="min-width:0;flex:1">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1273,7 +1273,7 @@ function renderPlaylists() {
                 임시 영상 전송
               </button>
               <button id="stop-temp-btn-${p.id}" onclick="stopTempVideoForPlaylist(${p.id})" 
-                style="padding:5px 14px;border-radius:8px;border:1px solid ${_tempVideoActiveCache[p.id] ? '#fecaca' : '#e5e7eb'};background:${_tempVideoActiveCache[p.id] ? '#fef2f2' : '#f9fafb'};color:${_tempVideoActiveCache[p.id] ? '#dc2626' : '#9ca3af'};font-size:11px;font-weight:${_tempVideoActiveCache[p.id] ? '600' : '500'};cursor:${_tempVideoActiveCache[p.id] ? 'pointer' : 'not-allowed'};font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" ${_tempVideoActiveCache[p.id] ? '' : 'aria-disabled="true"'}>
+                style="padding:5px 14px;border-radius:8px;border:1px solid ${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#fecaca' : '#e5e7eb'};background:${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#fef2f2' : '#f9fafb'};color:${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#dc2626' : '#9ca3af'};font-size:11px;font-weight:${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '600' : '500'};cursor:${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? 'pointer' : 'not-allowed'};font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" ${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '' : 'aria-disabled="true"'}>
                 <i class="fas fa-stop"></i>
                 <span>기본으로 복귀</span>
               </button>
@@ -1353,10 +1353,12 @@ function renderPlaylists() {
   
   // 임시 영상 상태 즉시 복원 (캐시에서 - API 응답 전 깜빡임 방지)
   for (const pId in _tempVideoActiveCache) {
-    if (_tempVideoActiveCache[pId]) {
+    const cached = _tempVideoActiveCache[pId];
+    if (cached && cached.active) {
       const indicator = document.getElementById('temp-indicator-' + pId);
       if (indicator) indicator.style.display = '';
-      setStopButtonState(parseInt(pId), true);
+      // return_time이 'manual'일 때만 복귀 버튼 활성화
+      setStopButtonState(parseInt(pId), cached.return_time === 'manual');
     }
   }
   
@@ -1389,15 +1391,15 @@ async function checkTempVideoStatus() {
       const res = await fetch(API_BASE + '/playlists/' + p.id + '/temp-video');
       const data = await res.json();
       const indicator = document.getElementById('temp-indicator-' + p.id);
-      const stopBtn = document.getElementById('stop-temp-btn-' + p.id);
       
       if (data.active) {
-        _tempVideoActiveCache[p.id] = true;
-        // 임시 영상 재생 중 - 인디케이터와 복귀 버튼 표시
+        _tempVideoActiveCache[p.id] = { active: true, return_time: data.return_time || 'end' };
+        // 임시 영상 재생 중 - 인디케이터 표시
         if (indicator) indicator.style.display = '';
-        setStopButtonState(p.id, true);
+        // return_time이 'manual'일 때만 복귀 버튼 활성화
+        setStopButtonState(p.id, data.return_time === 'manual');
       } else {
-        _tempVideoActiveCache[p.id] = false;
+        _tempVideoActiveCache[p.id] = { active: false, return_time: null };
         // 임시 영상 없음 (자동복귀 포함) - 인디케이터와 복귀 버튼 숨김
         if (indicator) indicator.style.display = 'none';
         setStopButtonState(p.id, false);
@@ -2155,6 +2157,8 @@ async function sendTempVideo() {
     if (res.ok) {
       showToast('✅ 임시 영상이 전송되었습니다!');
       closeModal('temp-video-modal');
+      // 캐시 업데이트
+      _tempVideoActiveCache[playlistId] = { active: true, return_time: returnTime };
       // 상태 업데이트 - 인디케이터와 기본으로 복귀 버튼 표시
       const indicator = document.getElementById('temp-indicator-' + playlistId);
       if (indicator) indicator.style.display = '';
@@ -2193,6 +2197,8 @@ async function stopTempVideoForPlaylist(playlistId) {
     if (res.ok) {
       showToast('✅ 기본 재생목록으로 복귀합니다');
       document.getElementById('temp-video-current-status')?.classList.add('hidden');
+      // 캐시 업데이트
+      _tempVideoActiveCache[playlistId] = { active: false, return_time: null };
       // 인디케이터 숨기기
       const indicator = document.getElementById('temp-indicator-' + playlistId);
       if (indicator) indicator.style.display = 'none';

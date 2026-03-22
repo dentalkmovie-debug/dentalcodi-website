@@ -6174,7 +6174,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     const playlistCacheById = {};
     const tempVideoCacheByPlaylist = {};
-    const _tempVideoActiveCache = {}; // 임시 영상 활성 상태 캐시 (깜빡임 방지)
+    const _tempVideoActiveCache = {}; // 임시 영상 활성 상태 캐시 { [playlistId]: { active: bool, return_time: string } }
     let noticeSettings = { font_size: 32, letter_spacing: 0, text_color: '#ffffff', bg_color: '#1a1a2e', bg_opacity: 100, scroll_speed: 50, position: 'bottom' };
     let playlistSearchQuery = '';
     let masterItemsSignature = '';
@@ -7297,7 +7297,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   <div style="width:36px;height:36px;border-radius:10px;background:\${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#6366f1,#818cf8)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
                     <i class="fas fa-tv" style="color:#fff;font-size:14px"></i>
                     \${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
-                    <span id="temp-indicator-\${p.id}" style="display:\${_tempVideoActiveCache[p.id] ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
+                    <span id="temp-indicator-\${p.id}" style="display:\${_tempVideoActiveCache[p.id]?.active ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
                   </div>
                   <div style="min-width:0;flex:1">
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -7330,7 +7330,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     임시 영상 전송
                   </button>
                   <button id="stop-temp-btn-\${p.id}" onclick="stopTempVideoForPlaylist(\${p.id})" 
-                    style="padding:5px 14px;border-radius:8px;border:1px solid \${_tempVideoActiveCache[p.id] ? '#fecaca' : '#e5e7eb'};background:\${_tempVideoActiveCache[p.id] ? '#fef2f2' : '#f9fafb'};color:\${_tempVideoActiveCache[p.id] ? '#dc2626' : '#9ca3af'};font-size:11px;font-weight:\${_tempVideoActiveCache[p.id] ? '600' : '500'};cursor:\${_tempVideoActiveCache[p.id] ? 'pointer' : 'not-allowed'};font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" \${_tempVideoActiveCache[p.id] ? '' : 'aria-disabled="true"'}>
+                    style="padding:5px 14px;border-radius:8px;border:1px solid \${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#fecaca' : '#e5e7eb'};background:\${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#fef2f2' : '#f9fafb'};color:\${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '#dc2626' : '#9ca3af'};font-size:11px;font-weight:\${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '600' : '500'};cursor:\${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? 'pointer' : 'not-allowed'};font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" \${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? '' : 'aria-disabled="true"'}>
                     <i class="fas fa-stop"></i>
                     <span>기본으로 복귀</span>
                   </button>
@@ -7410,10 +7410,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 임시 영상 상태 즉시 복원 (캐시에서 - API 응답 전 깜빡임 방지)
       for (const pId in _tempVideoActiveCache) {
-        if (_tempVideoActiveCache[pId]) {
+        const cached = _tempVideoActiveCache[pId];
+        if (cached && cached.active) {
           const indicator = document.getElementById('temp-indicator-' + pId);
           if (indicator) indicator.style.display = '';
-          setStopButtonState(parseInt(pId), true);
+          // return_time이 'manual'일 때만 복귀 버튼 활성화
+          setStopButtonState(parseInt(pId), cached.return_time === 'manual');
         }
       }
       
@@ -7446,15 +7448,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           const res = await fetch(API_BASE + '/playlists/' + p.id + '/temp-video');
           const data = await res.json();
           const indicator = document.getElementById('temp-indicator-' + p.id);
-          const stopBtn = document.getElementById('stop-temp-btn-' + p.id);
           
           if (data.active) {
-            _tempVideoActiveCache[p.id] = true;
-            // 임시 영상 재생 중 - 인디케이터와 복귀 버튼 표시
+            _tempVideoActiveCache[p.id] = { active: true, return_time: data.return_time || 'end' };
+            // 임시 영상 재생 중 - 인디케이터 표시
             if (indicator) indicator.style.display = '';
-            setStopButtonState(p.id, true);
+            // return_time이 'manual'일 때만 복귀 버튼 활성화
+            setStopButtonState(p.id, data.return_time === 'manual');
           } else {
-            _tempVideoActiveCache[p.id] = false;
+            _tempVideoActiveCache[p.id] = { active: false, return_time: null };
             // 임시 영상 없음 (자동복귀 포함) - 인디케이터와 복귀 버튼 숨김
             if (indicator) indicator.style.display = 'none';
             setStopButtonState(p.id, false);
@@ -8212,6 +8214,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (res.ok) {
           showToast('✅ 임시 영상이 전송되었습니다!');
           closeModal('temp-video-modal');
+          // 캐시 업데이트
+          _tempVideoActiveCache[playlistId] = { active: true, return_time: returnTime };
           // 상태 업데이트 - 인디케이터와 기본으로 복귀 버튼 표시
           const indicator = document.getElementById('temp-indicator-' + playlistId);
           if (indicator) indicator.style.display = '';
@@ -8250,6 +8254,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (res.ok) {
           showToast('✅ 기본 재생목록으로 복귀합니다');
           document.getElementById('temp-video-current-status')?.classList.add('hidden');
+          // 캐시 업데이트
+          _tempVideoActiveCache[playlistId] = { active: false, return_time: null };
           // 인디케이터 숨기기
           const indicator = document.getElementById('temp-indicator-' + playlistId);
           if (indicator) indicator.style.display = 'none';
@@ -13117,6 +13123,8 @@ app.get('/tv/:shortCode', async (c) => {
       }
     }
     
+    let _consecutive404Count = 0; // 연속 404 횟수 (3회 이상이면 삭제 확정)
+    
     async function loadData(isInitial = false) {
       if (isLoadingData) {
         pendingLoad = true;
@@ -13125,10 +13133,22 @@ app.get('/tv/:shortCode', async (c) => {
       isLoadingData = true;
       try {
         const res = await fetch('/api/tv/' + SHORT_CODE + '?t=' + Date.now() + '&cid=' + CLIENT_ID);
-        if (!res.ok) throw new Error('플레이리스트를 찾을 수 없습니다.');
+        if (!res.ok) {
+          const err = new Error(res.status === 404 ? '404_NOT_FOUND' : 'SERVER_ERROR_' + res.status);
+          err.httpStatus = res.status;
+          throw err;
+        }
         
         const data = await res.json();
         const serverTempVideo = data.tempVideo;
+        
+        // 이전에 에러 화면이 표시되었다면 숨기고 정상 복구
+        const errorScreen = document.getElementById('error-screen');
+        if (errorScreen && errorScreen.style.display !== 'none') {
+          errorScreen.style.display = 'none';
+          console.log('[loadData] Recovered from error screen');
+        }
+        _consecutive404Count = 0; // 성공하면 404 카운터 리셋
         
         // 이 TV의 실제 admin_code/email을 저장 (관리자 페이지 이동 시 올바른 계정으로 연결)
         if (data.adminCode) {
@@ -13349,31 +13369,32 @@ app.get('/tv/:shortCode', async (c) => {
         if (isInitial) {
           document.getElementById('loading-screen').classList.add('hidden');
           document.getElementById('error-screen').style.display = 'flex';
-          document.getElementById('error-message').textContent = e.message;
+          document.getElementById('error-message').textContent = (e.httpStatus === 404)
+            ? '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.'
+            : '서버 연결에 실패했습니다. 잠시 후 다시 시도합니다.';
         } else {
-          // 폴링 중 404 (플레이리스트 삭제됨) → 재생 중단 + 안내 화면 표시
-          const status = (e && e.status) ? e.status : 0;
-          // fetch 응답에서 status를 직접 확인하기 위해 별도 처리
-          // 에러 메시지에 '404' 또는 '찾을 수 없습니다'가 포함되면 삭제된 것으로 판단
-          const isDeleted = e.message && (
-            e.message.includes('404') || 
-            e.message.includes('찾을 수 없습니다') ||
-            e.message.includes('not found')
-          );
+          // 폴링 중 404 (플레이리스트 삭제됨) → 연속 3회 이상이면 재생 중단 + 안내 화면 표시
+          // httpStatus가 정확히 404일 때만 삭제 처리
+          const isDeleted = e.httpStatus === 404;
           if (isDeleted) {
-            console.log('[loadData] Playlist deleted (404), stopping playback');
-            // 재생 중단
-            try { if (typeof stopAllPlayback === 'function') stopAllPlayback(); } catch(_) {}
-            // 영상 숨기기
-            const videoEl = document.getElementById('main-video');
-            if (videoEl) videoEl.style.display = 'none';
-            const ytEl = document.getElementById('youtube-player');
-            if (ytEl) ytEl.style.display = 'none';
-            const vmEl = document.getElementById('vimeo-player');
-            if (vmEl) vmEl.style.display = 'none';
-            // 에러 화면 표시
-            document.getElementById('error-screen').style.display = 'flex';
-            document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.';
+            _consecutive404Count++;
+            console.log('[loadData] 404 count:', _consecutive404Count);
+            // 연속 3회 이상 404면 삭제 확정 (일시적 오류 방지)
+            if (_consecutive404Count >= 3) {
+              console.log('[loadData] Playlist deleted (404 x3), stopping playback');
+              // 재생 중단
+              try { if (typeof stopAllPlayback === 'function') stopAllPlayback(); } catch(_) {}
+              // 영상 숨기기
+              const videoEl = document.getElementById('main-video');
+              if (videoEl) videoEl.style.display = 'none';
+              const ytEl = document.getElementById('youtube-player');
+              if (ytEl) ytEl.style.display = 'none';
+              const vmEl = document.getElementById('vimeo-player');
+              if (vmEl) vmEl.style.display = 'none';
+              // 에러 화면 표시
+              document.getElementById('error-screen').style.display = 'flex';
+              document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.';
+            }
             // 폴링 계속하되 빈번하지 않게 (혹시 복구될 경우 대비)
           }
         }
