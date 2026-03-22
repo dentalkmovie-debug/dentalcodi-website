@@ -13737,13 +13737,10 @@ app.get('/tv/:shortCode', async (c) => {
           background: false,
           playsinline: true,
           transparent: false,
-          texttrack: false
+          texttrack: 'ko'
         });
         
         player.ready().then(() => {
-          // Vimeo 내장 자막 강제 비활성화
-          player.disableTextTrack().catch(() => {});
-          
           console.log('Vimeo preload ready:', index);
           preloadedPlayers[index] = player;
           preloadingIndex = -1;
@@ -13881,7 +13878,7 @@ app.get('/tv/:shortCode', async (c) => {
           background: false,
           playsinline: true,
           transparent: false,
-          texttrack: false
+          texttrack: 'ko'
         });
         
         players[idx] = player;
@@ -13900,11 +13897,6 @@ app.get('/tv/:shortCode', async (c) => {
             console.log('First Vimeo ready:', idx, 'session:', thisSession);
             // autoplay=true이므로 play() 호출 불필요 - PlayInterrupted 방지
             startVimeoPlayback(player, idx);
-            
-            // Vimeo 내장 자막 비활성화
-            setTimeout(() => {
-              player.disableTextTrack().catch(() => {});
-            }, 1000);
           }
         }).catch((e) => {
           console.log('Vimeo ready failed:', e);
@@ -14270,8 +14262,27 @@ app.get('/tv/:shortCode', async (c) => {
         const vimeoId = extractVimeoId(item.url);
         if (vimeoId) {
           loadSubtitleForVimeo(vimeoId).then((subs) => {
-            if (subs && subs.length > 0 && thisSession === vimeoSessionId) {
+            if (thisSession !== vimeoSessionId) return;
+            if (subs && subs.length > 0) {
+              // 커스텀 자막이 있으면 Vimeo 내장 자막 비활성화 후 커스텀 자막 사용
+              player.disableTextTrack().catch(() => {});
               startSubtitleSync(player, vimeoId, idx);
+            } else {
+              // 커스텀 자막이 없으면 Vimeo 내장 자막 활성화 시도
+              player.getTextTracks().then((tracks) => {
+                if (thisSession !== vimeoSessionId) return;
+                console.log('Vimeo text tracks available:', tracks.length, tracks.map(t => t.language + '/' + t.kind));
+                if (tracks.length > 0) {
+                  // 한국어 우선, 없으면 첫 번째 트랙
+                  const koTrack = tracks.find(t => t.language === 'ko');
+                  const targetTrack = koTrack || tracks[0];
+                  player.enableTextTrack(targetTrack.language, targetTrack.kind).then(() => {
+                    console.log('Vimeo text track enabled:', targetTrack.language, targetTrack.kind);
+                  }).catch((e) => {
+                    console.log('Failed to enable text track:', e);
+                  });
+                }
+              }).catch(() => {});
             }
           });
         }
@@ -14342,15 +14353,12 @@ app.get('/tv/:shortCode', async (c) => {
           background: false,
           playsinline: true,
           transparent: false,
-          texttrack: false
+          texttrack: 'ko'
         });
         
         players[idx] = player;
         
         player.ready().then(() => {
-          // Vimeo 내장 자막 강제 비활성화
-          player.disableTextTrack().catch(() => {});
-          
           // 세션 체크
           if (thisSession !== vimeoSessionId) {
             console.log('Session changed during ready, destroying player');
@@ -14691,7 +14699,7 @@ app.get('/tv/:shortCode', async (c) => {
           background: false,
           playsinline: true,
           transparent: false,
-          texttrack: false
+          texttrack: 'ko'
         });
         
         players[nextIndex] = player;
@@ -14705,7 +14713,6 @@ app.get('/tv/:shortCode', async (c) => {
         
         // 플레이어 준비되면 재생 시작
         player.ready().then(() => {
-          player.disableTextTrack().catch(() => {});
           if (thisSession !== vimeoSessionId) return;
           if (currentIndex !== nextIndex) return;
           
