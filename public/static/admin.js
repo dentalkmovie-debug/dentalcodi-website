@@ -4999,50 +4999,32 @@ function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
 
-  const isGuideModal = GUIDE_MODALS.has(id);
-  const isOverlayModal = OVERLAY_MODALS.has(id);
-
-  // ── 1) 대시보드 숨기기 (모든 모달에서 적용) ──
-  const dashboard = document.getElementById('dashboard');
-  if (dashboard) dashboard.style.display = 'none';
-
-  // ── 2) iframe 내부 스크롤을 맨 위로 ──
-  window.scrollTo(0, 0);
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-
-  // ── 3) 모달을 body 직접 자식으로 이동 ──
+  // ── 1) 모달을 body 직접 자식으로 이동 ──
   if (el.parentElement !== document.body) {
     document.body.appendChild(el);
   }
 
-  // 내부 wrapper paddingTop 제거
-  const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-  if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
-
-  // ── 4) 모달 표시 ──
-  // dashboard를 숨겼으므로 모달만 보임
-  // position:relative + 충분한 높이로 내부 absolute 자식이 올바르게 배치
-  const vh = Math.max(window.innerHeight, document.documentElement.clientHeight, 600);
-  el.style.cssText = 'display:block !important; position:relative; width:100%; height:' + vh + 'px; z-index:99999; overflow:hidden; margin:0; padding:0;';
+  // ── 2) 모달 표시: position:fixed로 뷰포트 전체 덮기 ──
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column;';
   
-  // 내부 absolute inset-0 자식들의 overflow-y를 auto로 보장 + 아임웹 헤더 보정
-  const contentWrapper = el.querySelector('.absolute.inset-0.flex');
-  if (contentWrapper) {
-    contentWrapper.style.overflowY = 'auto';
-    // 아임웹 헤더에 가려지는 부분 보정 (scrollToTop 후 iframePageTop 활용)
-    // iframePageTop이 0이면 아임웹이 아닌 환경이므로 보정 불필요
-    if (iframePageTop > 0) {
-      contentWrapper.style.paddingTop = Math.min(iframePageTop, 120) + 'px';
+  // 내부 absolute 자식들을 flex 자식으로 변환
+  var children = el.children;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    // backdrop: 절대 위치 유지 (뒤에 깔림)
+    if (child.classList.contains('bg-black/50') || child.classList.contains('modal-backdrop') || (child.getAttribute('onclick') || '').includes('closeModal') && !child.querySelector('.bg-white')) {
+      child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
+    } else {
+      // content wrapper: flex로 변환하여 전체 높이 차지
+      child.style.cssText = 'position:relative; z-index:1; flex:1; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; padding-top:8px;';
+      // pointer-events 복원
+      child.style.pointerEvents = 'none';
+      var box = child.querySelector('.bg-white');
+      if (box) box.style.pointerEvents = 'auto';
     }
   }
-  // backdrop에도 동일 보정
-  const backdrop = el.querySelector('.modal-backdrop, .bg-black\/50, [onclick*="closeModal"]');
-  if (backdrop && backdrop.classList.contains('absolute')) {
-    // backdrop은 전체를 덮으므로 보정 불필요
-  }
   
-  // ── 5) 배경 스크롤 방지 ──
+  // ── 3) 배경 스크롤 방지 ──
   if (_openModalSet.size === 0) {
     window._savedScrollY = window.scrollY || window.pageYOffset || 0;
   }
@@ -5055,14 +5037,10 @@ function openModal(id) {
   // iframe 높이 변경 차단
   modalHeightLocked = true;
   
-  // ── 6) 부모 iframe에 높이 설정 + 스크롤 최상단 요청 ──
+  // ── 4) 부모 iframe에 스크롤 최상단 요청 ──
   try {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'lockScroll' }, '*');
       window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      // iframe 높이를 뷰포트 크기로 설정 (모달이 전체 보이도록)
-      const screenH = Math.max(Math.round(window.screen.height * 0.95), vh, 700);
-      window.parent.postMessage({ type: 'setHeight', height: screenH }, '*');
     }
   } catch(e) {}
 }
@@ -5073,11 +5051,13 @@ function closeModal(id) {
   if (el) {
     // cssText로 일괄 초기화
     el.style.cssText = 'display:none;';
-    // 모달 박스 zoom/transform/paddingTop 초기화
-    const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
-    const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-    if (wrapper) { wrapper.style.paddingTop = ''; wrapper.style.overflowY = ''; }
-    if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
+    // 자식 요소 스타일 초기화 (openModal에서 변경한 것 되돌리기)
+    var children = el.children;
+    for (var i = 0; i < children.length; i++) {
+      children[i].style.cssText = '';
+      var box = children[i].querySelector('.bg-white');
+      if (box) box.style.pointerEvents = '';
+    }
   }
   
   // 추적 Set에서 제거
@@ -5085,24 +5065,13 @@ function closeModal(id) {
   
   // 열린 모달이 없을 때 공통 처리
   if (_openModalSet.size === 0) {
-    // 대시보드 복원
-    const dashboard = document.getElementById('dashboard');
-    if (dashboard) dashboard.style.display = '';
-    
     document.body.classList.remove('modal-open');
     document.documentElement.classList.remove('modal-open');
     document.body.style.overflow = '';
-    document.body.style.top = '';
     document.documentElement.style.overflow = '';
     // iframe 높이 변경 차단 해제
     modalHeightLocked = false;
-    // 부모 iframe에 스크롤 잠금 해제 + 높이 복원
-    try {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: 'unlockScroll' }, '*');
-      }
-    } catch(e) {}
-    // iframe 높이 복원 + 스크롤 위치 복원
+    // iframe 높이 복원
     try { 
       if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
     } catch(e) {}
@@ -5112,10 +5081,8 @@ function closeModal(id) {
     }
   }
 
-  // 가이드 모달이 닫힐 때 dashboard 복원 + iframe 높이 원상 복구
+  // 가이드 모달이 닫힐 때 iframe 높이 원상 복구
   if (GUIDE_MODALS.has(id)) {
-    const dashboard = document.getElementById('dashboard');
-    if (dashboard) dashboard.style.display = '';
     try {
       if (window.parent && window.parent !== window) {
         modalHeightLocked = false;
