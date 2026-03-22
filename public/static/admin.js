@@ -1980,6 +1980,7 @@ function initSortableContainer(container) {
 // ===== 임시 영상 전송 기능 =====
 let selectedTempVideoItem = null;
 let tempVideoSearchQuery = '';
+let _tempVideoIsChair = false; // 현재 임시영상 모달이 체어용인지
 
 // 임시 영상 전송용 플레이리스트 아이템
 let tempVideoPlaylistItems = [];
@@ -1994,6 +1995,7 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   if (searchInput) searchInput.value = '';
   tempVideoSearchQuery = '';
   selectedTempVideoItem = null;
+  _tempVideoIsChair = playlistName && playlistName.includes('체어');
   
   // 복귀 설정 기본값 리셋 (영상 끝나면 복귀)
   document.getElementById('temp-return-time').value = 'end';
@@ -2013,10 +2015,17 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
     tempVideoPlaylistItems = cachedItems;
     renderTempVideoSharedList();
   } else if (masterItemsCache && masterItemsCache.length > 0) {
-    // masterItemsCache로 즉시 렌더링 (API fetch 없이)
+    // masterItemsCache로 즉시 렌더링 (API fetch 없이) - target_type 필터링 적용
     const basePlaylist = playlists.find(p => p.id == playlistId);
     const userItems = (basePlaylist?.items || []).map(item => ({ ...item, is_master: false }));
-    const masterItemsWithFlag = masterItemsCache.map(item => ({ ...item, is_master: true }));
+    const filteredMasterForTemp = masterItemsCache.filter(function(item) {
+      var tt = item.target_type || 'all';
+      if (tt === 'all') return true;
+      if (_tempVideoIsChair && tt === 'chair') return true;
+      if (!_tempVideoIsChair && tt === 'waitingroom') return true;
+      return false;
+    });
+    const masterItemsWithFlag = filteredMasterForTemp.map(item => ({ ...item, is_master: true }));
     tempVideoPlaylistItems = [...masterItemsWithFlag, ...userItems];
     tempVideoCacheByPlaylist[playlistId] = tempVideoPlaylistItems;
     renderTempVideoSharedList();
@@ -2053,8 +2062,15 @@ async function loadTempVideoPlaylistItems(playlistId) {
     const latestMasterItems = (masterData.items || masterItems || []);
     masterItems = latestMasterItems;
 
-    // 공용 영상 (최신 masterItems)
-    const masterItemsWithFlag = (latestMasterItems || []).map(item => ({
+    // 공용 영상 (최신 masterItems) - target_type 필터링 적용
+    const filteredMasterForTempLoad = (latestMasterItems || []).filter(function(item) {
+      var tt = item.target_type || 'all';
+      if (tt === 'all') return true;
+      if (_tempVideoIsChair && tt === 'chair') return true;
+      if (!_tempVideoIsChair && tt === 'waitingroom') return true;
+      return false;
+    });
+    const masterItemsWithFlag = filteredMasterForTempLoad.map(item => ({
       ...item,
       is_master: true
     }));
