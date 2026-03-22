@@ -11285,26 +11285,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         el._modalOriginalNextSibling = el.nextElementSibling;
       }
       
-      // ── 2) 모달을 body 직접 자식으로 이동 (아임웹 iframe z-index 이슈 해결) ──
-      if (el.parentElement !== document.body) {
-        document.body.appendChild(el);
-      }
-
-      // ── 3) 자식 요소 원래 스타일 백업 ──
+      // ── 2) 숨긴 상태로 먼저 모든 스타일 설정 (깜빡임 방지) ──
+      var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 32, 140) : 0;
+      el.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column; padding-top:' + headerOffset + 'px;';
+      
+      // ── 3) 자식 요소 원래 스타일 백업 + 스타일 적용 ──
       var children = el.children;
       for (var i = 0; i < children.length; i++) {
-        if (children[i]._origStyleCssText === undefined) {
-          children[i]._origStyleCssText = children[i].style.cssText || '';
-        }
-      }
-
-      // ── 4) 모달 표시: position:fixed로 뷰포트 전체 덮기 ──
-      var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 32, 140) : 0;
-      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column; padding-top:' + headerOffset + 'px;';
-      
-      // 내부 absolute 자식들을 flex 자식으로 변환
-      for (var i = 0; i < children.length; i++) {
         var child = children[i];
+        if (child._origStyleCssText === undefined) {
+          child._origStyleCssText = child.style.cssText || '';
+        }
         if (child.classList.contains('bg-black/50') || child.classList.contains('modal-backdrop') || (child.getAttribute('onclick') || '').includes('closeModal') && !child.querySelector('.bg-white')) {
           child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
         } else {
@@ -11315,7 +11306,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
       }
       
-      // ── 5) 배경 스크롤 방지 ──
+      // ── 4) body로 이동 (display:none 상태이므로 깜빡임 없음) ──
+      if (el.parentElement !== document.body) {
+        document.body.appendChild(el);
+      }
+      
+      // ── 5) 표시 (모든 준비 완료 후) ──
+      el.style.display = 'flex';
+      
+      // ── 6) 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
         window._savedScrollY = window.scrollY || window.pageYOffset || 0;
       }
