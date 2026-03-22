@@ -2454,17 +2454,12 @@ app.get('/api/tv/:shortCode', async (c) => {
       ORDER BY sort_order ASC
     `).bind(masterPlaylist.id).all()
     
-    // 숨긴 공용 영상 필터링 + target_type 필터링
+    // 숨긴 공용 영상 필터링 (target_type 필터링은 라이브러리 UI에서만 적용)
+    // TV 재생 시에는 activeItemIds에 명시적으로 추가된 영상은 target_type과 관계없이 재생
     const hiddenIds: number[] = JSON.parse(playlist.hidden_master_items || '[]')
-    const isChairPlaylist = playlist.name && playlist.name.includes('체어')
     masterItems = (masterItemsResult.results || []).filter((item: any) => {
       if (hiddenIds.includes(item.id)) return false
-      // target_type 필터: 'all'이면 모든 플레이리스트에 표시
-      const tt = item.target_type || 'all'
-      if (tt === 'all') return true
-      if (isChairPlaylist && tt === 'chair') return true
-      if (!isChairPlaylist && tt === 'waitingroom') return true
-      return false
+      return true
     })
   }
   
@@ -13220,12 +13215,27 @@ app.get('/tv/:shortCode', async (c) => {
       position: fixed;
       top: 20px;
       left: 20px;
-      z-index: 190;
+      z-index: 9999;
       display: flex;
       gap: 10px;
       opacity: 0;
       transition: opacity 0.3s ease;
       pointer-events: none;
+    }
+    /* 상단 좌측 호버 영역 - iframe 위에서도 마우스 감지 */
+    #controls-hover-zone {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 200px;
+      height: 100px;
+      z-index: 9998;
+      pointer-events: auto;
+    }
+    #controls-hover-zone:hover ~ #fullscreen-controls,
+    #fullscreen-controls:hover {
+      opacity: 1 !important;
+      pointer-events: auto !important;
     }
 
     #fullscreen-hint {
@@ -13248,18 +13258,8 @@ app.get('/tv/:shortCode', async (c) => {
       display: none;
     }
     
-    /* 전체화면일 때 마우스 움직이면 표시 (JS로 제어) */
-    body.is-fullscreen.mouse-active #fullscreen-controls {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    
-    /* 전체화면 아닐 때도 컨트롤 숨김 - CSS 의사 전체화면이므로 마우스 움직일 때만 표시 */
-    body.not-fullscreen #fullscreen-controls {
-      opacity: 0;
-      pointer-events: none;
-    }
-    body.not-fullscreen.mouse-active #fullscreen-controls {
+    /* 마우스 활성시 컨트롤 표시 (전체화면 여부 무관) */
+    body.mouse-active #fullscreen-controls {
       opacity: 1;
       pointer-events: auto;
     }
@@ -13344,6 +13344,8 @@ app.get('/tv/:shortCode', async (c) => {
   
   <div id="sync-indicator">✓ 업데이트됨</div>
   
+  <!-- 상단 좌측 호버 영역 (아이프레임 위에서도 마우스 감지) -->
+  <div id="controls-hover-zone"></div>
   <!-- 전체화면 컨트롤 버튼 (TV에서는 전체화면 진입만 가능) -->
   <div id="fullscreen-controls">
     <button id="btn-fullscreen" class="control-btn" title="전체화면으로 보기">⛶</button>
@@ -15485,13 +15487,21 @@ app.get('/tv/:shortCode', async (c) => {
     // 전체화면에서 마우스 움직이면 버튼 표시 (2초 후 자동 숨김)
     // CSS 의사 전체화면이므로 전체화면 여부와 관계없이 동작
     let mouseTimer = null;
-    document.addEventListener('mousemove', () => {
+    function showControlsBriefly() {
       document.body.classList.add('mouse-active');
       if (mouseTimer) clearTimeout(mouseTimer);
       mouseTimer = setTimeout(() => {
         document.body.classList.remove('mouse-active');
-      }, 2000);
-    });
+      }, 3000);
+    }
+    document.addEventListener('mousemove', showControlsBriefly);
+    document.addEventListener('pointermove', showControlsBriefly);
+    // 호버 존에서도 감지 (iframe 위를 우회)
+    var hoverZone = document.getElementById('controls-hover-zone');
+    if (hoverZone) {
+      hoverZone.addEventListener('mouseenter', showControlsBriefly);
+      hoverZone.addEventListener('touchstart', showControlsBriefly);
+    }
     
     // 전체화면 진입
     function enterFullscreen() {
