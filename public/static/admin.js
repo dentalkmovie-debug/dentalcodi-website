@@ -2245,15 +2245,16 @@ function renderTempVideoSharedList() {
 function renderTempVideoItem(item, idx) {
   const isSelected = String(selectedTempVideoItem?.id) === String(item.id)
     && Boolean(selectedTempVideoItem?.is_master) === Boolean(item.is_master);
-  const itemData = JSON.stringify(item).replace(/"/g, '&quot;');
+  const uniqueKey = (item.is_master ? 'm' : 'u') + '-' + item.id;
   
   return `
     <div class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 transition ${isSelected ? 'bg-indigo-100' : ''}"
-      onclick="selectTempVideoItem(${itemData})">
-      <input type="radio" name="temp-video-item" ${isSelected ? 'checked' : ''} class="text-indigo-600 flex-shrink-0">
+      data-temp-key="${uniqueKey}"
+      onclick="selectTempVideoByKey('${uniqueKey}')">
+      <input type="radio" name="temp-video-item" ${isSelected ? 'checked' : ''} class="text-indigo-600 flex-shrink-0" style="pointer-events:none">
       <div class="w-10 h-10 ${item.is_master ? 'bg-purple-100' : 'bg-gray-100'} rounded overflow-hidden flex-shrink-0">
         ${item.thumbnail_url 
-          ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">`
+          ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover" style="pointer-events:none">`
           : `<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fab fa-${item.item_type}"></i></div>`
         }
       </div>
@@ -2263,6 +2264,17 @@ function renderTempVideoItem(item, idx) {
       <span class="text-xs ${item.is_master ? 'text-purple-400' : 'text-gray-400'} flex-shrink-0">${item.item_type}</span>
     </div>
   `;
+}
+
+// key로 영상 선택 (JSON inline 제거 - 이스케이프 문제 방지)
+function selectTempVideoByKey(key) {
+  var parts = key.split('-');
+  var isMaster = parts[0] === 'm';
+  var itemId = parts.slice(1).join('-');
+  var found = tempVideoPlaylistItems.find(function(i) {
+    return String(i.id) === itemId && Boolean(i.is_master) === isMaster;
+  });
+  if (found) selectTempVideoItem(found);
 }
 
 // 영상 선택
