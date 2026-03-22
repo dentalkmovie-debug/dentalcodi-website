@@ -8158,7 +8158,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           // 상태 업데이트 - 인디케이터와 기본으로 복귀 버튼 표시
           const indicator = document.getElementById('temp-indicator-' + playlistId);
           if (indicator) indicator.classList.remove('hidden');
-          setStopButtonState(playlistId, true);
+          setStopButtonState(playlistId, returnTime === 'manual');
         } else {
           showToast('전송 실패', 'error');
         }
@@ -8172,6 +8172,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     async function stopTempVideo() {
       const playlistId = document.getElementById('temp-video-playlist-id').value;
       await stopTempVideoForPlaylist(playlistId);
+      // 복귀 후 모달 자동 닫기
+      closeModal('temp-video-modal');
     }
     
     // 임시 영상 중지 (기본으로 복귀) - 플레이리스트 카드에서 직접 호출
@@ -10867,6 +10869,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
       document.body.classList.add('modal-open');
+      document.body.style.overflow = 'hidden';
       _openModalSet.add(id);
 
       // 오버레이 모달은 iframe 높이 변경 불필요 (fixed 위치이므로)
@@ -10909,8 +10912,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 열린 모달이 없을 때 공통 처리
       if (_openModalSet.size === 0) {
         document.body.classList.remove('modal-open');
-        // body overflow 강제 복원 (혹시 남아있을 경우)
         document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
       }
 
       // 가이드 모달이 닫힐 때 dashboard 복원 + iframe 높이 원상 복구
