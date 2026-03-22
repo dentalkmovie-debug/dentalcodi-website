@@ -800,7 +800,7 @@ function showTab(tab) {
     }
   }
 
-  ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master', 'subtitles'].forEach(t => {
+  ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
     const content = document.getElementById('content-' + t);
     const tabBtn = document.getElementById('tab-' + t);
     if (content) content.style.display = (t === tab) ? '' : 'none';
@@ -820,7 +820,7 @@ function showTab(tab) {
     showAdminSubTab(_adminSubTab || 'push');
   }
   if (tab === 'settings') initSettingsTab();
-  if (tab === 'subtitles') { if (!_subtitlesLoaded) { _subtitlesLoaded = true; loadSubtitlesAdmin(); } }
+  // 자막 관리는 관리 탭 서브탭으로 통합됨
   if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
 }
 
@@ -5339,12 +5339,12 @@ function saveClinicNameFromSettings() {
 // ============================================
 function showAdminSubTab(sub) {
   _adminSubTab = sub;
-  var allSubs = ['push', 'master-videos', 'overview'];
+  var allSubs = ['push', 'master-videos', 'overview', 'subtitles'];
   allSubs.forEach(function(s) {
     var btn = document.getElementById('admin-sub-' + s);
     if (!btn) return;
     var isFirst = (s === 'push');
-    var isLast = (s === 'overview');
+    var isLast = (s === 'subtitles');
     var radius = isFirst ? '8px 0 0 8px' : isLast ? '0 8px 8px 0' : '0';
     if (s === sub) {
       btn.style.cssText = 'padding:10px 20px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:' + radius;
@@ -5366,7 +5366,37 @@ function showAdminSubTab(sub) {
     ]).then(function() {
       renderAdminOverview();
     });
+  } else if (sub === 'subtitles') {
+    renderAdminSubtitles();
   }
+}
+
+function renderAdminSubtitles() {
+  var body = document.getElementById('admin-body');
+  if (!body) return;
+  body.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 12px;display:flex;align-items:center;gap:8px" id="sub-form-title">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-plus-circle"></i></span>'
+    + '\uC790\uB9C9 \uCD94\uAC00</h3>'
+    + '<div style="display:grid;gap:10px">'
+    + '<div><label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Vimeo URL \uB610\uB294 ID</label>'
+    + '<input type="text" id="sub-vimeo-id" placeholder="\uC608: https://vimeo.com/123456789" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>'
+    + '<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
+    + '<label style="font-size:12px;color:#6b7280">\uC790\uB9C9 \uB0B4\uC6A9 (SRT \uD615\uC2DD)</label>'
+    + '<button type="button" onclick="document.getElementById(\'sub-srt-file\').click()" style="font-size:11px;background:#f5f3ff;color:#7c3aed;padding:4px 10px;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-family:inherit"><i class="fas fa-folder-open" style="margin-right:4px"></i>\uD30C\uC77C \uBD88\uB7EC\uC624\uAE30</button></div>'
+    + '<input type="file" id="sub-srt-file" accept=".srt,.txt" style="display:none" onchange="handleSubSrtFile(event)">'
+    + '<textarea id="sub-content" rows="8" placeholder="1\n00:00:00,000 --> 00:00:03,000\n\uC548\uB155\uD558\uC138\uC694\n\n2\n00:00:03,500 --> 00:00:06,000\n\uCE58\uACFC\uC5D0 \uC624\uC2E0 \uAC83\uC744 \uD658\uC601\uD569\uB2C8\uB2E4" style="width:100%;border:2px dashed #d1d5db;border-radius:8px;padding:8px 12px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea></div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button id="sub-save-btn" onclick="saveSubAdmin()" style="padding:8px 16px;border-radius:8px;border:none;background:#7c3aed;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-save" style="margin-right:4px"></i><span id="sub-save-text">\uC800\uC7A5</span></button>'
+    + '<button onclick="clearSubForm()" style="padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;cursor:pointer;font-family:inherit"><i class="fas fa-times" style="margin-right:4px"></i>\uCD08\uAE30\uD654</button></div></div></div>'
+    + '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-list"></i></span>'
+    + '\uB4F1\uB85D\uB41C \uC790\uB9C9</h3>'
+    + '<span id="sub-count" style="background:#f5f3ff;color:#7c3aed;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">0\uAC1C</span></div>'
+    + '<div id="sub-list"><p style="text-align:center;color:#9ca3af;padding:24px 0;font-size:13px">\uB85C\uB529 \uC911...</p></div></div>';
+  loadSubtitlesAdmin();
 }
 
 function renderAdminClinics() {
