@@ -112,6 +112,7 @@ function restoreMasterItemsFromDOM() {
 }
 const playlistCacheById = {};
 const tempVideoCacheByPlaylist = {};
+const _tempVideoActiveCache = {}; // 임시 영상 활성 상태 캐시 (깜빡임 방지)
 let noticeSettings = { font_size: 32, letter_spacing: 0, text_color: '#ffffff', bg_color: '#1a1a2e', bg_opacity: 100, scroll_speed: 50, position: 'bottom' };
 let playlistSearchQuery = '';
 let masterItemsSignature = '';
@@ -1234,7 +1235,7 @@ function renderPlaylists() {
               <div style="width:36px;height:36px;border-radius:10px;background:${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#6366f1,#818cf8)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
                 <i class="fas fa-tv" style="color:#fff;font-size:14px"></i>
                 ${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
-                <span id="temp-indicator-${p.id}" style="display:none;position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
+                <span id="temp-indicator-${p.id}" style="display:${_tempVideoActiveCache[p.id] ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
               </div>
               <div style="min-width:0;flex:1">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1267,7 +1268,7 @@ function renderPlaylists() {
                 임시 영상 전송
               </button>
               <button id="stop-temp-btn-${p.id}" onclick="stopTempVideoForPlaylist(${p.id})" 
-                style="padding:5px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;font-size:11px;font-weight:500;cursor:not-allowed;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" aria-disabled="true">
+                style="padding:5px 14px;border-radius:8px;border:1px solid ${_tempVideoActiveCache[p.id] ? '#fecaca' : '#e5e7eb'};background:${_tempVideoActiveCache[p.id] ? '#fef2f2' : '#f9fafb'};color:${_tempVideoActiveCache[p.id] ? '#dc2626' : '#9ca3af'};font-size:11px;font-weight:${_tempVideoActiveCache[p.id] ? '600' : '500'};cursor:${_tempVideoActiveCache[p.id] ? 'pointer' : 'not-allowed'};font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap" ${_tempVideoActiveCache[p.id] ? '' : 'aria-disabled="true"'}>
                 <i class="fas fa-stop"></i>
                 <span>기본으로 복귀</span>
               </button>
@@ -1345,6 +1346,15 @@ function renderPlaylists() {
     `;
   }
   
+  // 임시 영상 상태 즉시 복원 (캐시에서 - API 응답 전 깜빡임 방지)
+  for (const pId in _tempVideoActiveCache) {
+    if (_tempVideoActiveCache[pId]) {
+      const indicator = document.getElementById('temp-indicator-' + pId);
+      if (indicator) indicator.style.display = '';
+      setStopButtonState(parseInt(pId), true);
+    }
+  }
+  
   // 임시 영상 상태 확인
   checkTempVideoStatus();
   
@@ -1377,10 +1387,12 @@ async function checkTempVideoStatus() {
       const stopBtn = document.getElementById('stop-temp-btn-' + p.id);
       
       if (data.active) {
+        _tempVideoActiveCache[p.id] = true;
         // 임시 영상 재생 중 - 인디케이터와 복귀 버튼 표시
         if (indicator) indicator.style.display = '';
         setStopButtonState(p.id, true);
       } else {
+        _tempVideoActiveCache[p.id] = false;
         // 임시 영상 없음 (자동복귀 포함) - 인디케이터와 복귀 버튼 숨김
         if (indicator) indicator.style.display = 'none';
         setStopButtonState(p.id, false);
@@ -4638,7 +4650,7 @@ function renderNotices() {
         '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
-        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC') + '" style="padding:6px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s;background:' + (isActive ? '#fef9c3' : '#dcfce7') + ';color:' + (isActive ? '#a16207' : '#16a34a') + '"><i class="fas ' + (isActive ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>' +
+        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;gap:4px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
         '<button onclick="toggleUrgent(' + n.id + ',' + (isUrgent ? '0' : '1') + ')" title="' + (isUrgent ? '\uAE34\uAE09 \uD574\uC81C' : '\uAE34\uAE09 \uC124\uC815') + '" style="padding:6px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + '"><i class="fas fa-exclamation-circle"></i></button>' +
         '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
         '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
