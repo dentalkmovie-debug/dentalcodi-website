@@ -1174,15 +1174,8 @@ function renderPlaylists() {
   const wrSetup = document.getElementById('waitingroom-setup-section');
   const chSetup = document.getElementById('chair-setup-section');
   
-  // TV 연결 설정 토글 상태 미리 저장 (innerHTML 교체 후 복원용)
-  const wrSetupContent = document.getElementById('wr-setup-content');
-  const chSetupContent = document.getElementById('ch-setup-content');
-  var wrSetupOpen = wrSetupContent && wrSetupContent.style.display === 'block';
-  var chSetupOpen = chSetupContent && chSetupContent.style.display === 'block';
-  // 편집 패널 닫기 시 설정 섹션도 강제 닫기
+  // 편집 패널 닫기 플래그 리셋
   if (window._forceCloseSetupSections) {
-    wrSetupOpen = false;
-    chSetupOpen = false;
     window._forceCloseSetupSections = false;
   }
   
@@ -1526,8 +1519,7 @@ function renderPlaylists() {
     });
   }
   
-  // TV 연결 설정 토글 상태 복원
-  restoreSetupToggleState(wrSetupOpen, chSetupOpen);
+  // TV 연결 설정: innerHTML 교체 후 항상 닫힌 상태 (HTML 기본값 display:none 유지)
   
   // 드래그 정렬 초기화
   initPlaylistSortable();
