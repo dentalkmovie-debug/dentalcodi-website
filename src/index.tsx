@@ -11882,17 +11882,38 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             '</div>';
           }).join('') + '</div>';
       
-      // 공용 영상
-      var masterHtml = (masterItems || []).map(function(item) {
-        var thumb = item.thumbnail_url 
-          ? '<img src="' + item.thumbnail_url + '" style="width:56px;height:36px;object-fit:cover;border-radius:6px">'
-          : '<div style="width:56px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:11px"></i></div>';
-        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">' +
-          thumb +
-          '<div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + (item.title || item.url || '') + '</p><p style="font-size:11px;color:#9ca3af;margin:2px 0 0">' + (item.item_type || '') + '</p></div>' +
-          '<button onclick="adminDeleteMasterItem(' + item.id + ')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit"><i class="fas fa-trash"></i></button>' +
+      // 공용 영상 - 대기실/체어/공통 분리 표시
+      var masterAllOnly = (masterItems || []).filter(function(i) { return (i.target_type || 'all') === 'all'; });
+      var masterWr = (masterItems || []).filter(function(i) { return (i.target_type || 'all') === 'waitingroom'; });
+      var masterCh = (masterItems || []).filter(function(i) { return (i.target_type || 'all') === 'chair'; });
+      
+      function renderOverviewMasterGroup(groupItems) {
+        if (groupItems.length === 0) return '<p style="font-size:12px;color:#9ca3af;text-align:center;padding:8px 0;margin:0">없음</p>';
+        return groupItems.map(function(item) {
+          var thumb = item.thumbnail_url 
+            ? '<img src="' + item.thumbnail_url + '" style="width:48px;height:32px;object-fit:cover;border-radius:5px">'
+            : '<div style="width:48px;height:32px;background:#e5e7eb;border-radius:5px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:10px"></i></div>';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f9fafb;border-radius:6px;border:1px solid #f3f4f6">' +
+            thumb +
+            '<div style="flex:1;min-width:0"><p style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + (item.title || item.url || '') + '</p></div>' +
+            '<button onclick="adminDeleteMasterItem(' + item.id + ')" style="padding:3px 6px;font-size:10px;background:#fee2e2;color:#dc2626;border-radius:5px;border:none;cursor:pointer;font-family:inherit"><i class="fas fa-trash"></i></button>' +
+          '</div>';
+        }).join('');
+      }
+      
+      var masterHtml = 
+        '<div style="margin-bottom:12px">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#059669;padding:2px 8px;background:#ecfdf5;border-radius:4px">공통 (' + masterAllOnly.length + ')</span><span style="font-size:10px;color:#9ca3af">대기실+체어 모두 재생</span></div>' +
+          '<div style="display:grid;gap:4px">' + renderOverviewMasterGroup(masterAllOnly) + '</div>' +
+        '</div>' +
+        '<div style="margin-bottom:12px">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#2563eb;padding:2px 8px;background:#dbeafe;border-radius:4px">대기실 전용 (' + masterWr.length + ')</span></div>' +
+          '<div style="display:grid;gap:4px">' + renderOverviewMasterGroup(masterWr) + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#7c3aed;padding:2px 8px;background:#ede9fe;border-radius:4px">체어 전용 (' + masterCh.length + ')</span></div>' +
+          '<div style="display:grid;gap:4px">' + renderOverviewMasterGroup(masterCh) + '</div>' +
         '</div>';
-      }).join('');
       
       body.innerHTML = 
         // 치과 관리 섹션
@@ -11931,17 +11952,20 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       if (!body) return;
       const allItems = masterItems || [];
       
-      // 필터링
+      // 필터링 (완전 분리 - 각 타입만 표시)
       var items = allItems;
       if (_masterFilterType === 'waitingroom') {
-        items = allItems.filter(function(i) { return (i.target_type || 'all') === 'waitingroom' || (i.target_type || 'all') === 'all'; });
+        items = allItems.filter(function(i) { return (i.target_type || 'all') === 'waitingroom'; });
       } else if (_masterFilterType === 'chair') {
-        items = allItems.filter(function(i) { return (i.target_type || 'all') === 'chair' || (i.target_type || 'all') === 'all'; });
+        items = allItems.filter(function(i) { return (i.target_type || 'all') === 'chair'; });
+      } else if (_masterFilterType === 'all_only') {
+        items = allItems.filter(function(i) { return (i.target_type || 'all') === 'all'; });
       }
       
-      // 카운트
-      var wrCount = allItems.filter(function(i) { var t = i.target_type || 'all'; return t === 'waitingroom' || t === 'all'; }).length;
-      var chCount = allItems.filter(function(i) { var t = i.target_type || 'all'; return t === 'chair' || t === 'all'; }).length;
+      // 카운트 (각 타입별 순수 개수)
+      var allOnlyCount = allItems.filter(function(i) { return (i.target_type || 'all') === 'all'; }).length;
+      var wrCount = allItems.filter(function(i) { return (i.target_type || 'all') === 'waitingroom'; }).length;
+      var chCount = allItems.filter(function(i) { return (i.target_type || 'all') === 'chair'; }).length;
       
       var itemsHtml = '';
       if (items.length === 0) {
@@ -11982,6 +12006,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 필터 탭 스타일
       var fAll = _masterFilterType === 'all_filter';
+      var fAllOnly = _masterFilterType === 'all_only';
       var fWr = _masterFilterType === 'waitingroom';
       var fCh = _masterFilterType === 'chair';
       var filterTabBase = 'padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s;';
@@ -11998,7 +12023,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         '</div>' +
         // 필터 탭
         '<div style="display:flex;gap:6px;margin-bottom:14px">' +
-          '<button onclick="_masterFilterType=\'all_filter\';renderAdminMasterItems()" style="' + (fAll ? filterTabOn('#7c3aed','#fff') : filterTabOff) + '">\uC804\uCCB4 ' + allItems.length + '</button>' +
+          '<button onclick="_masterFilterType=\'all_filter\';renderAdminMasterItems()" style="' + (fAll ? filterTabOn('#6b7280','#fff') : filterTabOff) + '">\uBAA8\uB450 ' + allItems.length + '</button>' +
+          '<button onclick="_masterFilterType=\'all_only\';renderAdminMasterItems()" style="' + (fAllOnly ? filterTabOn('#059669','#fff') : filterTabOff) + '">\uACF5\uD1B5 ' + allOnlyCount + '</button>' +
           '<button onclick="_masterFilterType=\'waitingroom\';renderAdminMasterItems()" style="' + (fWr ? filterTabOn('#2563eb','#fff') : filterTabOff) + '">\uB300\uAE30\uC2E4 ' + wrCount + '</button>' +
           '<button onclick="_masterFilterType=\'chair\';renderAdminMasterItems()" style="' + (fCh ? filterTabOn('#7c3aed','#fff') : filterTabOff) + '">\uCCB4\uC5B4 ' + chCount + '</button>' +
         '</div>' +
