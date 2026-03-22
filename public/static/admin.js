@@ -2250,7 +2250,7 @@ function renderTempVideoItem(item, idx) {
   return `
     <div class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 transition ${isSelected ? 'bg-indigo-100' : ''}"
       data-temp-key="${uniqueKey}"
-      onclick="selectTempVideoByKey('${uniqueKey}')">
+      onclick="event.stopPropagation(); selectTempVideoByKey('${uniqueKey}')">
       <input type="radio" name="temp-video-item" ${isSelected ? 'checked' : ''} class="text-indigo-600 flex-shrink-0" style="pointer-events:none">
       <div class="w-10 h-10 ${item.is_master ? 'bg-purple-100' : 'bg-gray-100'} rounded overflow-hidden flex-shrink-0">
         ${item.thumbnail_url 
@@ -5211,6 +5211,8 @@ function openModal(id) {
   // ── 바깥 클릭 시 닫기 (backdrop 대신) ──
   if (!el._outsideClickHandler) {
     el._outsideClickHandler = function(e) {
+      // detached DOM 클릭 무시 (innerHTML 교체로 인한 오탐 방지)
+      if (!document.body.contains(e.target)) return;
       // 모달 카드 내부 클릭이 아니면 닫기
       var c = el.querySelector('.bg-white');
       if (c && !c.contains(e.target)) {
