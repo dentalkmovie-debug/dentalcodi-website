@@ -793,6 +793,16 @@ function showTab(tab) {
     _openModalSet.delete('edit-playlist-modal');
     // 대기실/체어 설정 섹션 자동 닫기
     window._forceCloseSetupSections = true;
+    setTimeout(function() {
+      var wc = document.getElementById('wr-setup-content');
+      var wi = document.getElementById('wr-setup-toggle-icon');
+      if (wc) wc.style.display = 'none';
+      if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
+      var cc = document.getElementById('ch-setup-content');
+      var ci = document.getElementById('ch-setup-toggle-icon');
+      if (cc) cc.style.display = 'none';
+      if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
+    }, 500);
     // _prevDisplay 정리
     var mainContent = document.getElementById('dtv-pg');
     if (mainContent) {
@@ -4794,34 +4804,28 @@ var currentNoticeSubTab = 'normal'; // 'normal' or 'urgent'
 
 function switchNoticeSubTab(tab) {
   currentNoticeSubTab = tab;
-  // 서브탭 스타일 업데이트
   var normalBtn = document.getElementById('notice-subtab-normal');
   var urgentBtn = document.getElementById('notice-subtab-urgent');
   var normalInfo = document.getElementById('notice-info-normal');
   var urgentInfo = document.getElementById('notice-info-urgent');
-  var addBtn = document.getElementById('notice-add-btn');
   if (tab === 'normal') {
-    normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#2563eb;border-bottom:2px solid #2563eb;transition:all .15s';
-    urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-bottom:2px solid transparent;transition:all .15s';
-    normalInfo.style.display = 'block';
+    normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 12px;border:2px solid #2563eb;background:#eff6ff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#2563eb;border-radius:12px;transition:all .15s;box-shadow:0 2px 8px rgba(37,99,235,.15)';
+    urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 12px;border:2px solid #e5e7eb;background:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-radius:12px;transition:all .15s';
+    normalInfo.style.display = 'flex';
     urgentInfo.style.display = 'none';
-    addBtn.style.background = 'linear-gradient(135deg,#2563eb,#3b82f6)';
-    addBtn.style.boxShadow = '0 2px 6px rgba(37,99,235,.2)';
   } else {
-    normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-bottom:2px solid transparent;transition:all .15s';
-    urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#dc2626;border-bottom:2px solid #dc2626;transition:all .15s';
+    normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 12px;border:2px solid #e5e7eb;background:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-radius:12px;transition:all .15s';
+    urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 12px;border:2px solid #dc2626;background:#fef2f2;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#dc2626;border-radius:12px;transition:all .15s;box-shadow:0 2px 8px rgba(220,38,38,.15)';
     normalInfo.style.display = 'none';
-    urgentInfo.style.display = 'block';
-    addBtn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)';
-    addBtn.style.boxShadow = '0 2px 6px rgba(220,38,38,.2)';
+    urgentInfo.style.display = 'flex';
   }
   // 카운트 뱃지 스타일
   var normalCount = document.getElementById('notice-normal-count');
   var urgentCount = document.getElementById('notice-urgent-count');
-  normalCount.style.background = tab === 'normal' ? '#dbeafe' : '#f3f4f6';
-  normalCount.style.color = tab === 'normal' ? '#2563eb' : '#9ca3af';
-  urgentCount.style.background = tab === 'urgent' ? '#fee2e2' : '#f3f4f6';
-  urgentCount.style.color = tab === 'urgent' ? '#dc2626' : '#9ca3af';
+  normalCount.style.background = tab === 'normal' ? '#2563eb' : '#f3f4f6';
+  normalCount.style.color = tab === 'normal' ? '#fff' : '#9ca3af';
+  urgentCount.style.background = tab === 'urgent' ? '#dc2626' : '#f3f4f6';
+  urgentCount.style.color = tab === 'urgent' ? '#fff' : '#9ca3af';
   renderNotices();
 }
 
@@ -5115,7 +5119,7 @@ function openModal(id) {
       child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
     } else {
       // content wrapper: flex로 변환하여 전체 높이 차지
-      child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow-y:auto; overflow-x:hidden; padding:16px; padding-top:8px;';
+      child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:16px; padding-top:8px;';
       // pointer-events 복원
       child.style.pointerEvents = 'none';
       var box = child.querySelector('.bg-white');
@@ -5211,6 +5215,20 @@ function closeModal(id) {
     }
     
     loadPlaylists();
+    // loadPlaylists 완료 후에도 확실하게 설정 섹션 닫기 (DOM 직접 조작)
+    function _forceCloseSetups() {
+      var wc = document.getElementById('wr-setup-content');
+      var wi = document.getElementById('wr-setup-toggle-icon');
+      if (wc) wc.style.display = 'none';
+      if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
+      var cc = document.getElementById('ch-setup-content');
+      var ci = document.getElementById('ch-setup-toggle-icon');
+      if (cc) cc.style.display = 'none';
+      if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
+    }
+    _forceCloseSetups();
+    setTimeout(_forceCloseSetups, 500);
+    setTimeout(_forceCloseSetups, 1500);
     // 스크롤 복원
     setTimeout(function() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
