@@ -5655,21 +5655,24 @@ async function executePush() {
         if (!pRes.ok) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC870\uD68C \uC2E4\uD328'); return; }
         var pData = await pRes.json();
         var targetPlaylists = (pData.playlists || []).filter(function(p) { return !p.is_master_playlist; });
-        var firstPlaylist = targetPlaylists[0];
-        if (!firstPlaylist) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); return; }
-        for (var j = 0; j < pushItems.length; j++) {
-          var item = pushItems[j];
-          var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: item.url, title: item.title })
-          });
-          if (addRes.ok) successCount++;
-          else {
-            failCount++;
-            var errData = {};
-            try { errData = await addRes.json(); } catch(e2) {}
-            failDetails.push(code + ': ' + (errData.error || '\uCD94\uAC00 \uC2E4\uD328'));
+        if (targetPlaylists.length === 0) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); return; }
+        // 모든 플레이리스트에 라이브러리(내 영상)로 추가
+        for (var pi = 0; pi < targetPlaylists.length; pi++) {
+          var playlist = targetPlaylists[pi];
+          for (var j = 0; j < pushItems.length; j++) {
+            var item = pushItems[j];
+            var addRes = await fetch('/api/' + code + '/playlists/' + playlist.id + '/items', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: item.url, title: item.title, add_to_playlist: false })
+            });
+            if (addRes.ok) successCount++;
+            else {
+              failCount++;
+              var errData = {};
+              try { errData = await addRes.json(); } catch(e2) {}
+              failDetails.push(code + ': ' + (errData.error || '\uCD94\uAC00 \uC2E4\uD328'));
+            }
           }
         }
       } catch(e) { failCount++; failDetails.push(code + ': \uB124\uD2B8\uC6CC\uD06C \uC624\uB958'); }
