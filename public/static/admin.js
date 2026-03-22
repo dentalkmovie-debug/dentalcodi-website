@@ -2017,7 +2017,22 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   } else if (masterItemsCache && masterItemsCache.length > 0) {
     // masterItemsCache로 즉시 렌더링 (API fetch 없이) - target_type 필터링 적용
     const basePlaylist = playlists.find(p => p.id == playlistId);
-    const userItems = (basePlaylist?.items || []).map(item => ({ ...item, is_master: false }));
+    const currentItems = (basePlaylist?.items || []);
+    const allUserItemsImmediate = [...currentItems];
+    const seenUrlsImmediate = new Set(currentItems.map(i => i.url));
+    // 다른 플레이리스트의 아이템도 통합
+    if (Array.isArray(playlists)) {
+      playlists.forEach(function(p) {
+        if (String(p.id) === String(playlistId)) return;
+        (p.items || []).forEach(function(item) {
+          if (!seenUrlsImmediate.has(item.url)) {
+            seenUrlsImmediate.add(item.url);
+            allUserItemsImmediate.push(item);
+          }
+        });
+      });
+    }
+    const userItems = allUserItemsImmediate.map(item => ({ ...item, is_master: false }));
     const filteredMasterForTemp = masterItemsCache.filter(function(item) {
       var tt = item.target_type || 'all';
       if (tt === 'all') return true;
@@ -2049,7 +2064,7 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   });
 }
 
-// 플레이리스트 아이템 로드 (공용 + 내 영상)
+// 플레이리스트 아이템 로드 (공용 + 모든 플레이리스트의 내 영상 통합)
 async function loadTempVideoPlaylistItems(playlistId) {
   try {
     const [playlistRes, masterRes] = await Promise.all([
@@ -2075,8 +2090,25 @@ async function loadTempVideoPlaylistItems(playlistId) {
       is_master: true
     }));
     
-    // 내 영상
-    const userItems = (data.playlist?.items || []).map(item => ({
+    // 내 영상: 현재 플레이리스트 + 다른 모든 플레이리스트의 아이템을 통합 (중복 URL 제거)
+    const currentItems = (data.playlist?.items || []);
+    const allUserItems = [...currentItems];
+    const seenUrls = new Set(currentItems.map(i => i.url));
+    
+    // playlists 전역 변수에서 다른 플레이리스트의 아이템도 수집
+    if (typeof playlists !== 'undefined' && Array.isArray(playlists)) {
+      playlists.forEach(function(p) {
+        if (String(p.id) === String(playlistId)) return;
+        (p.items || []).forEach(function(item) {
+          if (!seenUrls.has(item.url)) {
+            seenUrls.add(item.url);
+            allUserItems.push(item);
+          }
+        });
+      });
+    }
+    
+    const userItems = allUserItems.map(item => ({
       ...item,
       is_master: false
     }));
