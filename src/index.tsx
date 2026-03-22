@@ -13305,7 +13305,7 @@ app.get('/tv/:shortCode', async (c) => {
       }
     }
     
-    // 안전한 재생 재시작 (전체화면 유지)
+    // 안전한 재생 재시작 (전체화면 유지, DOM 파괴 최소화)
     function safeRestartPlayback() {
       // 빈 플레이리스트 처리
       if (!playlist || !playlist.items || playlist.items.length === 0) {
@@ -13328,29 +13328,28 @@ app.get('/tv/:shortCode', async (c) => {
       hideSubtitle(); // 자막 타이머 및 표시 정리
       vimeoSessionId++;
       
-      // 기존 플레이어 정리
-      const oldPlayers = Object.values(players).filter(p => p);
+      // 기존 플레이어는 일시정지만 (destroy 하지 않음 - DOM 파괴로 인한 끊김 방지)
+      Object.values(players).forEach(p => {
+        if (p) {
+          try { if (p.pause) p.pause(); } catch(e) {}
+        }
+      });
+      
+      // 플레이어 참조 초기화 (initializeAllMedia에서 새로 생성됨)
       players = {};
       itemsReady = {};
       preloadedPlayers = {};
-      
-      // 기존 플레이어 즉시 파괴 (iframe만 - DOM은 유지하여 전체화면 보존)
-      oldPlayers.forEach(p => {
-        try { p.destroy(); } catch(e) {}
-      });
-      
-      // DOM은 initializeAllMedia에서 안전하게 정리 (전체화면 유지를 위해 innerHTML 사용 안함)
       
       // 인덱스 범위 체크
       if (currentIndex >= playlist.items.length) {
         currentIndex = 0;
       }
       
-      // 새 미디어 초기화
+      // 새 미디어 초기화 (initializeAllMedia가 기존 DOM을 안전하게 정리)
       initializeAllMedia();
       startPlaybackWatchdog();
       
-      // 전체화면 복원 (DOM 조작 후) - CSS 의사 전체화면으로 이미 커버되므로 1회만 시도
+      // 전체화면 복원 (CSS 의사 전체화면으로 이미 커버되므로 1회만 시도)
       if (wasFullscreen && userHasInteracted) {
         setTimeout(() => {
           if (!document.fullscreenElement) {
@@ -13525,9 +13524,9 @@ app.get('/tv/:shortCode', async (c) => {
           const newItemCount = newItems.length;
           const oldItemCount = oldItems.length;
           
-          // 아이템 개수 또는 내용이 변경되었는지 확인
+          // 아이템 개수 또는 내용이 변경되었는지 확인 (가벼운 비교)
           const itemsChanged = newItemCount !== oldItemCount || 
-            JSON.stringify(newItems.map(i => i.id)) !== JSON.stringify(oldItems.map(i => i.id));
+            newItems.some((item, i) => item.id !== oldItems[i]?.id);
           
           if (itemsChanged) {
             console.log('[loadData] Playlist changed, items:', oldItemCount, '->', newItemCount);
@@ -13570,21 +13569,37 @@ app.get('/tv/:shortCode', async (c) => {
           }
         }
         
-        // 공지/설정 항상 업데이트
-        notices = data.notices || [];
-        noticeSettings = { ...noticeSettings, ...(data.noticeSettings || {}) };
-        const parsedLetterSpacing = parseFloat((noticeSettings.letter_spacing ?? 0).toString());
-        noticeSettings.letter_spacing = Number.isFinite(parsedLetterSpacing) ? parsedLetterSpacing : 0;
-        logoSettings = data.logoSettings || logoSettings;
-        scheduleSettings = data.scheduleSettings || scheduleSettings;
-        subtitleSettings = data.subtitleSettings || subtitleSettings;
-        transitionEffect = playlist.transition_effect || 'fade';
-        transitionDuration = playlist.transition_duration || 500;
+        // 공지/설정 항상 업데이트 - 단, 변경된 경우에만 DOM 조작
+        const newNotices = data.notices || [];
+        const newNoticeSettings = { ...noticeSettings, ...(data.noticeSettings || {}) };
+        const parsedLetterSpacing = parseFloat((newNoticeSettings.letter_spacing ?? 0).toString());
+        newNoticeSettings.letter_spacing = Number.isFinite(parsedLetterSpacing) ? parsedLetterSpacing : 0;
+        const newLogoSettings = data.logoSettings || logoSettings;
+        const newScheduleSettings = data.scheduleSettings || scheduleSettings;
+        const newSubtitleSettings = data.subtitleSettings || subtitleSettings;
+        const newTransitionEffect = playlist.transition_effect || 'fade';
+        const newTransitionDuration = playlist.transition_duration || 500;
+        
+        // 변경 감지 후 업데이트 (불필요한 DOM 조작 방지)
+        const noticesChanged = JSON.stringify(newNotices) !== JSON.stringify(notices);
+        const noticeSettingsChanged = JSON.stringify(newNoticeSettings) !== JSON.stringify(noticeSettings);
+        const logoChanged = JSON.stringify(newLogoSettings) !== JSON.stringify(logoSettings);
+        const subtitleChanged = JSON.stringify(newSubtitleSettings) !== JSON.stringify(subtitleSettings);
+        
+        notices = newNotices;
+        noticeSettings = newNoticeSettings;
+        logoSettings = newLogoSettings;
+        scheduleSettings = newScheduleSettings;
+        subtitleSettings = newSubtitleSettings;
+        transitionEffect = newTransitionEffect;
+        transitionDuration = newTransitionDuration;
         
         document.documentElement.style.setProperty('--transition-duration', transitionDuration + 'ms');
         
-        // 자막 스타일 적용
-        applySubtitleSettings();
+        // 자막 스타일 변경 시에만 적용 (매번 호출하면 DOM 리렌더링 발생)
+        if (subtitleChanged) {
+          applySubtitleSettings();
+        }
         
         // 빈 플레이리스트 처리: 오류 대신 대기 화면 표시
         if (!playlist.items || playlist.items.length === 0) {
@@ -13607,15 +13622,19 @@ app.get('/tv/:shortCode', async (c) => {
         // 플레이리스트에 아이템이 있으면 대기 화면 숨기기
         hideEmptyPlaylistScreen();
         
-        // 공지 표시 (여러 공지 연달아) - enabled 체크
-        if (noticeSettings.enabled !== 0) {
-          showNotices();
-        } else {
-          document.getElementById('notice-bar').style.display = 'none';
+        // 공지 표시 (변경 시에만 - 불필요한 CSS 애니메이션 리셋 방지)
+        if (noticesChanged || noticeSettingsChanged) {
+          if (noticeSettings.enabled !== 0) {
+            showNotices();
+          } else {
+            document.getElementById('notice-bar').style.display = 'none';
+          }
         }
         
-        // 로고 표시
-        showLogo();
+        // 로고 표시 (변경 시에만)
+        if (logoChanged) {
+          showLogo();
+        }
         
         if (isInitial) {
           // 필요한 API만 로드 (병렬 로드)
@@ -14391,26 +14410,16 @@ app.get('/tv/:shortCode', async (c) => {
       
       console.log('startVimeoPlayback session:', thisSession, 'idx:', idx);
       
-      // 재생 시작 (실패 시 재시도 - 최대 5회)
+      // 재생 시작 (실패 시 재시도 - 최대 3회, 간격 넓게)
       const tryPlay = (attempt) => {
+        if (thisSession !== vimeoSessionId) return;
         console.log('Vimeo play attempt:', attempt, 'session:', thisSession);
         player.play().then(() => {
           console.log('Vimeo play SUCCESS, attempt:', attempt);
-          // 재생 시작 후 실제로 재생되는지 1초 뒤 확인
-          setTimeout(() => {
-            if (thisSession !== vimeoSessionId) return;
-            player.getPaused().then((paused) => {
-              console.log('Vimeo paused check:', paused, 'attempt:', attempt);
-              if (paused && attempt < 5) {
-                console.log('Vimeo still paused, retrying...');
-                tryPlay(attempt + 1);
-              }
-            }).catch(() => {});
-          }, 1000);
         }).catch((err) => {
-          console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name, err?.message);
-          if (attempt < 5 && thisSession === vimeoSessionId) {
-            setTimeout(() => tryPlay(attempt + 1), 1500);
+          console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
+          if (attempt < 3 && thisSession === vimeoSessionId) {
+            setTimeout(() => tryPlay(attempt + 1), 2000);
           }
         });
       };
@@ -14681,6 +14690,9 @@ app.get('/tv/:shortCode', async (c) => {
       // Vimeo는 prepareAndTransitionVimeo에서 직접 처리함
     }
     
+    // Vimeo API 호출을 최소화한 워치독
+    // Vimeo getPaused()가 iframe 통신을 유발하여 재생 끊김을 일으킬 수 있음
+    let _watchdogCallCount = 0;
     function ensurePlaybackAlive() {
       if (!playlist || !playlist.items || playlist.items.length === 0) return;
       if (isTransitioning) return;
@@ -14688,6 +14700,8 @@ app.get('/tv/:shortCode', async (c) => {
 
       const item = playlist.items[currentIndex];
       if (!item) return;
+      
+      _watchdogCallCount++;
 
       if (item.item_type === 'youtube') {
         const ytPlayer = players[currentIndex];
@@ -14702,13 +14716,19 @@ app.get('/tv/:shortCode', async (c) => {
           }
         }
       } else if (item.item_type === 'vimeo') {
-        const vimeoPlayer = players[currentIndex];
-        if (vimeoPlayer && typeof vimeoPlayer.getPaused === 'function') {
-          vimeoPlayer.getPaused().then((paused) => {
-            if (paused && currentIndex < playlist.items.length) {
-              vimeoPlayer.play().catch(() => {});
-            }
-          }).catch(() => {});
+        // Vimeo: 매 3번째 호출(15초)에만 상태 체크 - API 호출 최소화로 끊김 방지
+        // vimeoPollingInterval이 이미 2초마다 재생 상태를 모니터링하므로
+        // 워치독은 최후의 수단으로만 작동
+        if (_watchdogCallCount % 3 === 0) {
+          const vimeoPlayer = players[currentIndex];
+          if (vimeoPlayer && typeof vimeoPlayer.getPaused === 'function') {
+            vimeoPlayer.getPaused().then((paused) => {
+              if (paused && currentIndex < playlist.items.length) {
+                console.log('[watchdog] Vimeo paused, resuming...');
+                vimeoPlayer.play().catch(() => {});
+              }
+            }).catch(() => {});
+          }
         }
       } else if (item.item_type === 'image') {
         if (!currentTimer) {
@@ -14900,7 +14920,24 @@ app.get('/tv/:shortCode', async (c) => {
         return;
       }
       
-      // 항상 새 플레이어 생성 (기존 플레이어의 에러 상태 문제 방지)
+      // 기존 플레이어가 있으면 seek(0)으로 재사용 시도 (DOM 파괴 없이 전환 - 끊김 방지)
+      const existingPlayer = players[nextIndex];
+      if (existingPlayer && typeof existingPlayer.setCurrentTime === 'function') {
+        console.log('Reusing existing Vimeo player at index:', nextIndex);
+        existingPlayer.setCurrentTime(0).then(() => {
+          if (thisSession !== vimeoSessionId) return;
+          doTransition(prevIndex, nextIndex);
+          existingPlayer.play().catch(() => {});
+          startVimeoPlayback(existingPlayer, nextIndex);
+        }).catch(() => {
+          // seek 실패 시 새 플레이어 생성
+          console.log('Vimeo seek failed, creating new player');
+          createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container);
+        });
+        return;
+      }
+      
+      // 기존 플레이어 없으면 새로 생성
       createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container);
     }
     
@@ -15162,27 +15199,18 @@ app.get('/tv/:shortCode', async (c) => {
     initWatchdog(); // 워치독 시작
     loadData(true);
     
-    // 실시간 동기화 (5초마다 - 네트워크 리소스 절약으로 끊김 방지)
-    setInterval(() => loadData(false), 5 * 1000);
-    
-    // Heartbeat - 사용중 표시 전용 독립 폴링 (5초마다)
-    // 숨겨진 탭에서도 확실히 실행하기 위해 Worker 기반 타이머 사용
-    function sendHeartbeat() {
-      fetch('/api/tv/' + SHORT_CODE + '/heartbeat', { method: 'POST' })
-        .catch(function() {});
-    }
-    setInterval(sendHeartbeat, 5000);
+    // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
+    // loadData가 이미 last_active_at을 업데이트하므로 별도 heartbeat 불필요
+    const POLL_INTERVAL = 10000;
+    setInterval(() => loadData(false), POLL_INTERVAL);
     
     // 탭 닫힘/내비게이션 시에만 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
       navigator.sendBeacon('/api/tv/' + SHORT_CODE + '/deactivate');
     }
-    // visibilitychange: 탭이 보이면 즉시 heartbeat, 숨겨져도 deactivate하지 않음
-    // (브라우저가 hidden 탭의 setInterval을 throttle하지만 loadData(5초)가 서버에서 last_active_at 업데이트함)
+    // visibilitychange: 탭이 보이면 즉시 loadData로 빠른 복원
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
-        // 탭 복귀 시 즉시 heartbeat + loadData로 빠른 복원
-        sendHeartbeat();
         loadData(false);
       }
     }, true);
