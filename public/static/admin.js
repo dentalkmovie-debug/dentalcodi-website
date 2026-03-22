@@ -5346,6 +5346,21 @@ function setupAutoHeight() {
 // ============================================
 // 설정 탭
 // ============================================
+function toggleSettingsUrlAccordion() {
+  var content = document.getElementById('settings-url-content');
+  var chevron = document.getElementById('settings-url-chevron');
+  if (!content) return;
+  var isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? 'block' : 'none';
+  if (chevron) {
+    chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+  }
+  if (typeof postParentHeight === 'function') {
+    setTimeout(postParentHeight, 50);
+    setTimeout(postParentHeight, 300);
+  }
+}
+
 function initSettingsTab() {
   const nameInput = document.getElementById('settings-clinic-name');
   if (nameInput) nameInput.value = clinicName || '';
@@ -5354,18 +5369,16 @@ function initSettingsTab() {
   const codeEl = document.getElementById('settings-admin-code');
   if (codeEl) codeEl.textContent = ADMIN_CODE;
   
-  // TV URLs
+  // TV URLs - 가로로 길게 배치
   const urlsContainer = document.getElementById('settings-tv-urls');
   if (urlsContainer && playlists.length > 0) {
     urlsContainer.innerHTML = playlists.map(p => {
       const tvUrl = location.origin + '/' + p.short_code;
-      return `<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium">${p.name || ''}</p>
-          <p class="text-xs text-blue-600 font-mono truncate">${tvUrl}</p>
-        </div>
-        <button onclick="copyToClipboard('${tvUrl}')" class="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100 flex-shrink-0">\uBCF5\uC0AC</button>
-      </div>`;
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f9fafb;border-radius:8px">'
+        + '<span style="font-size:13px;font-weight:600;color:#374151;white-space:nowrap">' + (p.name || '') + '</span>'
+        + '<span style="flex:1;font-size:12px;color:#2563eb;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + tvUrl + '</span>'
+        + '<button onclick="copyToClipboard(\'' + tvUrl + '\')" style="padding:4px 10px;background:#eff6ff;color:#2563eb;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit">\uBCF5\uC0AC</button>'
+        + '</div>';
     }).join('');
   }
   
@@ -5385,10 +5398,13 @@ async function loadSettingsData() {
     if (logoSize) logoSize.value = data.logo_size || 150;
     if (sizeLabel) sizeLabel.textContent = (data.logo_size || 150) + 'px';
     // 로고 미리보기
-    if (data.logo_url) {
-      const preview = document.getElementById('settings-logo-preview');
-      const img = document.getElementById('logo-preview-img');
-      if (preview && img) { img.src = data.logo_url; preview.classList.remove('hidden'); }
+    var preview = document.getElementById('settings-logo-preview');
+    var img = document.getElementById('logo-preview-img');
+    if (data.logo_url && preview && img) {
+      img.src = data.logo_url;
+      preview.style.display = 'block';
+    } else if (preview) {
+      preview.style.display = 'none';
     }
     // 자막 설정
     const sf = document.getElementById('settings-subtitle-font');
@@ -5415,8 +5431,8 @@ async function saveSettingsTabLogo() {
       showToast('\uB85C\uACE0 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
       const preview = document.getElementById('settings-logo-preview');
       const img = document.getElementById('logo-preview-img');
-      if (logoUrl && preview && img) { img.src = logoUrl; preview.classList.remove('hidden'); }
-      else if (preview) preview.classList.add('hidden');
+      if (logoUrl && preview && img) { img.src = logoUrl; preview.style.display = 'block'; }
+      else if (preview) preview.style.display = 'none';
     }
   } catch(e) { showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'); }
 }

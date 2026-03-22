@@ -2237,6 +2237,10 @@ app.put('/api/:adminCode/settings', async (c) => {
       use_master_playlist = COALESCE(?, use_master_playlist),
       master_playlist_mode = COALESCE(?, master_playlist_mode),
       hidden_master_items = COALESCE(?, hidden_master_items),
+      subtitle_font_size = COALESCE(?, subtitle_font_size),
+      subtitle_bg_opacity = COALESCE(?, subtitle_bg_opacity),
+      subtitle_position = COALESCE(?, subtitle_position),
+      subtitle_bottom_offset = COALESCE(?, subtitle_bottom_offset),
       updated_at = datetime('now')
     WHERE admin_code = ?
   `).bind(
@@ -2258,6 +2262,10 @@ app.put('/api/:adminCode/settings', async (c) => {
     toNull(body.use_master_playlist),
     toNull(body.master_playlist_mode),
     toNull(body.hidden_master_items),
+    toNull(body.subtitle_font_size),
+    toNull(body.subtitle_bg_opacity),
+    toNull(body.subtitle_position),
+    toNull(body.subtitle_bottom_offset),
     adminCode
   ).run()
   
@@ -2287,7 +2295,11 @@ app.get('/api/:adminCode/settings', async (c) => {
     schedule_end: user.schedule_end || '',
     use_master_playlist: user.use_master_playlist ?? 1,
     master_playlist_mode: user.master_playlist_mode || 'before',
-    hidden_master_items: user.hidden_master_items || '[]'
+    hidden_master_items: user.hidden_master_items || '[]',
+    subtitle_font_size: user.subtitle_font_size || 28,
+    subtitle_bg_opacity: user.subtitle_bg_opacity ?? 80,
+    subtitle_position: user.subtitle_position || 'bottom',
+    subtitle_bottom_offset: user.subtitle_bottom_offset || 80
   })
 })
 
@@ -4997,17 +5009,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         
         <!-- 설정 탭 -->
         <div id="content-settings" style="display:none">
-          <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px"><i class="fas fa-cog"></i></span>
-            TV 설정
-          </div>
+          <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px">TV 설정</div>
           
           <!-- 치과명 -->
           <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-hospital"></i></span>
-              치과 정보
-            </h3>
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px">치과 정보</h3>
             <div style="display:flex;gap:8px">
               <input type="text" id="settings-clinic-name" value="" 
                 style="flex:1;padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit" placeholder="치과명을 입력하세요">
@@ -5017,23 +5023,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
           </div>
           
-          <!-- TV 바로가기 URL -->
-          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-link"></i></span>
-              TV 바로가기 URL
-            </h3>
-            <div id="settings-tv-urls" style="display:grid;gap:8px">
-              <p style="font-size:13px;color:#9ca3af">플레이리스트가 없습니다.</p>
+          <!-- TV 바로가기 URL (아코디언) -->
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <button onclick="toggleSettingsUrlAccordion()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:none;border:none;cursor:pointer;font-family:inherit">
+              <span style="font-size:13px;font-weight:700;color:#374151">TV 바로가기 URL</span>
+              <i id="settings-url-chevron" class="fas fa-chevron-down" style="font-size:12px;color:#9ca3af;transition:transform .2s"></i>
+            </button>
+            <div id="settings-url-content" style="display:none;padding:0 16px 16px">
+              <div id="settings-tv-urls" style="display:grid;gap:8px">
+                <p style="font-size:13px;color:#9ca3af">플레이리스트가 없습니다.</p>
+              </div>
             </div>
           </div>
           
           <!-- 로고 설정 -->
           <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-image"></i></span>
-              로고 설정
-            </h3>
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px">로고 설정</h3>
             <div style="display:grid;gap:10px">
               <div>
                 <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">로고 URL</label>
@@ -5060,10 +5065,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           
           <!-- 자막 설정 -->
           <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-closed-captioning"></i></span>
-              자막 설정
-            </h3>
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px">자막 설정</h3>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">
               <div>
                 <label style="display:block;font-size:11px;color:#6b7280;margin-bottom:4px">자막 글자 크기</label>
@@ -5092,10 +5094,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           
           <!-- 계정 정보 -->
           <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;display:flex;align-items:center;gap:8px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#2563eb;font-size:10px"><i class="fas fa-user"></i></span>
-              계정 정보
-            </h3>
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px">계정 정보</h3>
             <div id="settings-account-info" style="font-size:13px;color:#6b7280">
               <p style="margin:0">관리자 코드: <span id="settings-admin-code" style="font-family:monospace;background:#f3f4f6;padding:2px 8px;border-radius:4px;font-size:12px"></span></p>
             </div>
@@ -5105,10 +5104,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         <!-- 관리 탭 (최고관리자 전용) - 모바일코디 구조 -->
         <div id="content-admin" style="display:none">
           <!-- 최고관리자 헤더 -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px"><i class="fas fa-crown"></i></span>
-            <span style="font-size:18px;font-weight:700;color:#1f2937">최고관리자</span>
-          </div>
+          <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px">최고관리자</div>
           <!-- 관리 서브탭 -->
           <div style="display:flex;gap:0;margin-bottom:16px">
             <button onclick="showAdminSubTab('push')" id="admin-sub-push" 
@@ -11523,6 +11519,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // ============================================
     // 설정 탭
     // ============================================
+    function toggleSettingsUrlAccordion() {
+      var content = document.getElementById('settings-url-content');
+      var chevron = document.getElementById('settings-url-chevron');
+      if (!content) return;
+      var isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      if (chevron) {
+        chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+      }
+      if (typeof postParentHeight === 'function') {
+        setTimeout(postParentHeight, 50);
+        setTimeout(postParentHeight, 300);
+      }
+    }
+
     function initSettingsTab() {
       const nameInput = document.getElementById('settings-clinic-name');
       if (nameInput) nameInput.value = clinicName || '';
@@ -11531,18 +11542,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const codeEl = document.getElementById('settings-admin-code');
       if (codeEl) codeEl.textContent = ADMIN_CODE;
       
-      // TV URLs
+      // TV URLs - 가로로 길게 배치
       const urlsContainer = document.getElementById('settings-tv-urls');
       if (urlsContainer && playlists.length > 0) {
         urlsContainer.innerHTML = playlists.map(p => {
           const tvUrl = location.origin + '/' + p.short_code;
-          return \`<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium">\${p.name || ''}</p>
-              <p class="text-xs text-blue-600 font-mono truncate">\${tvUrl}</p>
-            </div>
-            <button onclick="copyToClipboard('\${tvUrl}')" class="px-3 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100 flex-shrink-0">\uBCF5\uC0AC</button>
-          </div>\`;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f9fafb;border-radius:8px">'
+            + '<span style="font-size:13px;font-weight:600;color:#374151;white-space:nowrap">' + (p.name || '') + '</span>'
+            + '<span style="flex:1;font-size:12px;color:#2563eb;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + tvUrl + '</span>'
+            + '<button onclick="copyToClipboard(\'' + tvUrl + '\')" style="padding:4px 10px;background:#eff6ff;color:#2563eb;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit">\uBCF5\uC0AC</button>'
+            + '</div>';
         }).join('');
       }
       
@@ -11562,10 +11571,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (logoSize) logoSize.value = data.logo_size || 150;
         if (sizeLabel) sizeLabel.textContent = (data.logo_size || 150) + 'px';
         // 로고 미리보기
-        if (data.logo_url) {
-          const preview = document.getElementById('settings-logo-preview');
-          const img = document.getElementById('logo-preview-img');
-          if (preview && img) { img.src = data.logo_url; preview.classList.remove('hidden'); }
+        var preview = document.getElementById('settings-logo-preview');
+        var img = document.getElementById('logo-preview-img');
+        if (data.logo_url && preview && img) {
+          img.src = data.logo_url;
+          preview.style.display = 'block';
+        } else if (preview) {
+          preview.style.display = 'none';
         }
         // 자막 설정
         const sf = document.getElementById('settings-subtitle-font');
@@ -11592,8 +11604,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           showToast('\uB85C\uACE0 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
           const preview = document.getElementById('settings-logo-preview');
           const img = document.getElementById('logo-preview-img');
-          if (logoUrl && preview && img) { img.src = logoUrl; preview.classList.remove('hidden'); }
-          else if (preview) preview.classList.add('hidden');
+          if (logoUrl && preview && img) { img.src = logoUrl; preview.style.display = 'block'; }
+          else if (preview) preview.style.display = 'none';
         }
       } catch(e) { showToast('\uC800\uC7A5 \uC2E4\uD328', 'error'); }
     }
