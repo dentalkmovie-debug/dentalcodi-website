@@ -863,11 +863,19 @@ async function loadMasterItems() {
       return;
     }
     
-    container.innerHTML = items.map((item, idx) => `
+    function _isValidThumb(url) {
+      if (!url) return false;
+      if (url.match(/^https?:\/\/(www\.)?vimeo\.com\/\d+$/)) return false;
+      return true;
+    }
+    
+    container.innerHTML = items.map((item, idx) => {
+      const hasThumb = _isValidThumb(item.thumbnail_url);
+      return `
       <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
         <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm">${idx + 1}</span>
         <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 master-thumb-loading" data-item-id="${item.id}" data-type="${item.item_type}" data-url="${item.url}">
-          ${item.thumbnail_url ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover">` : 
+          ${hasThumb ? `<img src="${item.thumbnail_url}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center bg-blue-100\\' ><i class=\\'fab fa-vimeo text-blue-400 text-xl\\'></i></div>'">` : 
             `<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-spinner fa-spin"></i></div>`}
         </div>
         <div class="flex-1 min-w-0">
@@ -878,7 +886,7 @@ async function loadMasterItems() {
           <i class="fas fa-trash"></i>
         </button>
       </div>
-    `).join('');
+    `}).join('');
     
     loadMasterThumbnails();
   } catch (e) {

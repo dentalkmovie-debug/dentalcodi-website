@@ -365,13 +365,18 @@ app.post('/api/master/items', async (c) => {
   
   // URL 타입 감지
   let itemType = 'image'
-  let thumbnailUrl = url
+  let thumbnailUrl = ''
   let itemTitle = title || ''
+  let videoId = ''
   
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
     return c.json({ error: 'Vimeo URL만 지원됩니다.' }, 400)
   } else if (url.includes('vimeo.com')) {
     itemType = 'vimeo'
+    // Vimeo ID 추출
+    const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+    videoId = vimeoMatch ? vimeoMatch[1] : ''
+    
     // Vimeo oEmbed API로 썸네일과 제목 가져오기
     try {
       const oembedRes = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`)
@@ -382,8 +387,20 @@ app.post('/api/master/items', async (c) => {
           itemTitle = oembedData.title
         }
       }
-    } catch (e) {
-      thumbnailUrl = ''
+    } catch (e) { /* ignore */ }
+    
+    // oEmbed 실패 시 v2 API 폴백
+    if (!thumbnailUrl && videoId) {
+      try {
+        const v2Res = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`)
+        if (v2Res.ok) {
+          const v2Data = await v2Res.json() as any[]
+          if (v2Data && v2Data[0]) {
+            thumbnailUrl = v2Data[0].thumbnail_large || v2Data[0].thumbnail_medium || ''
+            if (!itemTitle && v2Data[0].title) itemTitle = v2Data[0].title
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
   }
   
@@ -411,6 +428,101 @@ app.delete('/api/master/items/:itemId', async (c) => {
   ).bind(itemId).run()
   
   return c.json({ success: true })
+})
+
+// 마스터 플레이리스트 아이템 수정 (제목, display_time)
+app.put('/api/master/items/:itemId', async (c) => {
+  const itemId = c.req.param('itemId')
+  const { title, display_time } = await c.req.json()
+  
+  const updates: string[] = []
+  const values: any[] = []
+  
+  if (title !== undefined) {
+    updates.push('title = ?')
+    values.push(title)
+  }
+  if (display_time !== undefined) {
+    updates.push('display_time = ?')
+    values.push(display_time)
+  }
+  
+  if (updates.length === 0) {
+    return c.json({ error: '수정할 항목이 없습니다.' }, 400)
+  }
+  
+  values.push(itemId)
+  await c.env.DB.prepare(
+    `UPDATE playlist_items SET ${updates.join(', ')} WHERE id = ?`
+  ).bind(...values).run()
+  
+  return c.json({ success: true })
+})
+
+// 마스터 아이템 썸네일 리프레시
+app.post('/api/master/items/:itemId/refresh-thumbnail', async (c) => {
+  const itemId = c.req.param('itemId')
+  
+  const item = await c.env.DB.prepare(
+    'SELECT * FROM playlist_items WHERE id = ?'
+  ).bind(itemId).first() as any
+  
+  if (!item) {
+    return c.json({ error: '아이템을 찾을 수 없습니다.' }, 404)
+  }
+  
+  if (item.item_type !== 'vimeo') {
+    return c.json({ error: 'Vimeo 영상만 지원됩니다.' }, 400)
+  }
+  
+  const vimeoMatch = item.url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+  const videoId = vimeoMatch ? vimeoMatch[1] : ''
+  
+  if (!videoId) {
+    return c.json({ error: 'Vimeo ID를 추출할 수 없습니다.' }, 400)
+  }
+  
+  let thumbnailUrl = ''
+  let newTitle = ''
+  
+  // oEmbed API 시도
+  try {
+    const oembedRes = await fetch(`https://vimeo.com/api/oembed.json?url=https://vimeo.com/${videoId}`)
+    if (oembedRes.ok) {
+      const oembedData = await oembedRes.json() as any
+      thumbnailUrl = oembedData.thumbnail_url || ''
+      newTitle = oembedData.title || ''
+    }
+  } catch (e) { /* ignore */ }
+  
+  // v2 API 폴백
+  if (!thumbnailUrl) {
+    try {
+      const v2Res = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`)
+      if (v2Res.ok) {
+        const v2Data = await v2Res.json() as any[]
+        if (v2Data && v2Data[0]) {
+          thumbnailUrl = v2Data[0].thumbnail_large || v2Data[0].thumbnail_medium || ''
+          if (!newTitle) newTitle = v2Data[0].title || ''
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  
+  if (thumbnailUrl) {
+    await c.env.DB.prepare(
+      'UPDATE playlist_items SET thumbnail_url = ? WHERE id = ?'
+    ).bind(thumbnailUrl, itemId).run()
+  }
+  
+  // 제목이 없으면 업데이트
+  if (newTitle && !item.title) {
+    await c.env.DB.prepare(
+      'UPDATE playlist_items SET title = ? WHERE id = ?'
+    ).bind(newTitle, itemId).run()
+  }
+  
+  return c.json({ success: true, thumbnail_url: thumbnailUrl, title: newTitle || item.title })
 })
 
 // 마스터 플레이리스트 아이템 순서 저장
@@ -6770,11 +6882,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           return;
         }
         
-        container.innerHTML = items.map((item, idx) => \`
+        function _isValidThumb(url) {
+          if (!url) return false;
+          if (url.match(/^https?:\\/\\/(www\\.)?vimeo\\.com\\/\\d+$/)) return false;
+          return true;
+        }
+        
+        container.innerHTML = items.map((item, idx) => {
+          const hasThumb = _isValidThumb(item.thumbnail_url);
+          return \`
           <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm">\${idx + 1}</span>
             <div class="w-24 h-16 bg-gray-200 rounded overflow-hidden flex-shrink-0 master-thumb-loading" data-item-id="\${item.id}" data-type="\${item.item_type}" data-url="\${item.url}">
-              \${item.thumbnail_url ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\` : 
+              \${hasThumb ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\\\'w-full h-full flex items-center justify-center bg-blue-100\\\\' ><i class=\\\\'fab fa-vimeo text-blue-400 text-xl\\\\'></i></div>'">\` : 
                 \`<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-spinner fa-spin"></i></div>\`}
             </div>
             <div class="flex-1 min-w-0">
@@ -6785,7 +6905,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               <i class="fas fa-trash"></i>
             </button>
           </div>
-        \`).join('');
+        \`}).join('');
         
         loadMasterThumbnails();
       } catch (e) {
@@ -16801,27 +16921,108 @@ app.get('/master', (c) => {
           return;
         }
         
-        container.innerHTML = items.map((item, idx) => \`
-          <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg" data-master-item="1" data-item-id="\${item.id}">
+        function isValidThumb(url) {
+          if (!url) return false;
+          // vimeo.com 페이지 URL은 유효한 썸네일이 아님
+          if (url.match(/^https?:\\/\\/(www\\.)?vimeo\\.com\\/\\d+$/)) return false;
+          return true;
+        }
+        
+        container.innerHTML = items.map((item, idx) => {
+          const hasThumb = isValidThumb(item.thumbnail_url);
+          return \`
+          <div class="group flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors" data-master-item="1" data-item-id="\${item.id}">
             <i class="fas fa-grip-vertical text-gray-300 cursor-move master-drag-handle"></i>
-            <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm master-order-badge">\${idx + 1}</span>
-            <div class="w-16 h-10 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-              \${item.thumbnail_url ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover">\` : 
-                \`<div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-video"></i></div>\`}
+            <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 master-order-badge">\${idx + 1}</span>
+            <div class="w-20 h-14 bg-gray-200 rounded overflow-hidden flex-shrink-0 relative" id="thumb-\${item.id}">
+              \${hasThumb 
+                ? \`<img src="\${item.thumbnail_url}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\\\'w-full h-full flex items-center justify-center bg-blue-50\\\\' ><i class=\\\\'fab fa-vimeo text-blue-400 text-lg\\\\'></i></div>'">\` 
+                : \`<div class="w-full h-full flex items-center justify-center bg-blue-50"><i class="fab fa-vimeo text-blue-400 text-lg"></i></div>\`}
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-800 truncate">\${item.title || item.url}</p>
-              <p class="text-xs text-gray-500">\${item.item_type.toUpperCase()}</p>
+              <p class="font-medium text-gray-800 truncate text-sm" id="item-title-\${item.id}">\${item.title || item.url}</p>
+              <p class="text-xs text-gray-400 truncate">\${item.url}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">\${item.item_type.toUpperCase()}</span>
+                <span class="text-xs text-gray-400">\${item.display_time || 10}초</span>
+              </div>
             </div>
-            <button onclick="deleteItem(\${item.id})" class="text-red-500 hover:text-red-600 p-2">
-              <i class="fas fa-trash"></i>
-            </button>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onclick="editItemTitle(\${item.id})" class="text-blue-500 hover:text-blue-600 p-2" title="제목 수정">
+                <i class="fas fa-pen text-xs"></i>
+              </button>
+              <button onclick="refreshItemThumbnail(\${item.id})" class="text-green-500 hover:text-green-600 p-2" title="썸네일 새로고침">
+                <i class="fas fa-sync-alt text-xs"></i>
+              </button>
+              <button onclick="deleteItem(\${item.id})" class="text-red-500 hover:text-red-600 p-2" title="삭제">
+                <i class="fas fa-trash text-xs"></i>
+              </button>
+            </div>
           </div>
-        \`).join('');
+        \`}).join('');
 
         initMasterSortable();
+        
+        // 잘못된 썸네일 자동 리프레시
+        for (const item of items) {
+          if (!isValidThumb(item.thumbnail_url)) {
+            refreshItemThumbnail(item.id, true);
+          }
+        }
       } catch (e) {
         console.error(e);
+      }
+    }
+    
+    async function editItemTitle(itemId) {
+      const titleEl = document.getElementById('item-title-' + itemId);
+      if (!titleEl) return;
+      const currentTitle = titleEl.textContent;
+      const newTitle = prompt('제목 수정', currentTitle);
+      if (newTitle === null || newTitle === currentTitle) return;
+      
+      try {
+        const res = await fetch(API_BASE + '/items/' + itemId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle })
+        });
+        if (res.ok) {
+          titleEl.textContent = newTitle;
+          showToast('제목이 수정되었습니다.');
+        } else {
+          showToast('수정 실패', 'error');
+        }
+      } catch (e) {
+        showToast('수정 실패', 'error');
+      }
+    }
+    
+    async function refreshItemThumbnail(itemId, silent) {
+      const thumbEl = document.getElementById('thumb-' + itemId);
+      if (thumbEl && !silent) {
+        thumbEl.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-blue-50"><i class="fas fa-spinner fa-spin text-blue-400"></i></div>';
+      }
+      
+      try {
+        const res = await fetch(API_BASE + '/items/' + itemId + '/refresh-thumbnail', { method: 'POST' });
+        const data = await res.json();
+        if (data.success && data.thumbnail_url && thumbEl) {
+          thumbEl.innerHTML = '<img src="' + data.thumbnail_url + '" class="w-full h-full object-cover">';
+          if (!silent) showToast('썸네일이 업데이트되었습니다.');
+        } else if (!silent) {
+          if (thumbEl) thumbEl.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-blue-50"><i class="fab fa-vimeo text-blue-400 text-lg"></i></div>';
+          showToast('썸네일을 가져올 수 없습니다.', 'error');
+        }
+        // 제목도 업데이트
+        if (data.title) {
+          const titleEl = document.getElementById('item-title-' + itemId);
+          if (titleEl && (!titleEl.textContent || titleEl.textContent === '')) {
+            titleEl.textContent = data.title;
+          }
+        }
+      } catch (e) {
+        if (!silent) showToast('썸네일 새로고침 실패', 'error');
       }
     }
     
