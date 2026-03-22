@@ -11186,13 +11186,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // iframe 높이 변경 차단
       modalHeightLocked = true;
-      
-      // ── 4) 부모 iframe에 스크롤 최상단 요청 ──
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'scrollToTop' }, '*');
-        }
-      } catch(e) {}
     }
 
 
