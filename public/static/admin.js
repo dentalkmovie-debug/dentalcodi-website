@@ -2488,6 +2488,14 @@ async function openPlaylistEditor(id) {
     librarySearchResults.classList.add('hidden');
   }
 
+  // ★ 이전 대기실 데이터가 보이지 않도록 즉시 컨테이너 비우기
+  var _playlistCont = document.getElementById('playlist-items-container');
+  if (_playlistCont) _playlistCont.innerHTML = '<div style="text-align:center;padding:24px;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>불러오는 중...</div>';
+  var _libMasterList = document.getElementById('library-master-list');
+  if (_libMasterList) _libMasterList.innerHTML = '';
+  var _libUserList = document.getElementById('library-user-list');
+  if (_libUserList) _libUserList.innerHTML = '';
+
   // sortable 인스턴스 제거
   if (sortableInstance) {
     sortableInstance.destroy();
@@ -2569,39 +2577,40 @@ async function openPlaylistEditor(id) {
       }
     };
 
-    // 캐시에 있으면 즉시 사용
-    const cachedPlaylist = playlistCacheById[id];
-    let fullPlaylist = cachedPlaylist || null;
-
-    if (!fullPlaylist) {
-      let res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?ts=' + Date.now(), 3000);
-      if (!res || !res.ok) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?retry=1', 3000);
-      }
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data && data.playlist) {
-          fullPlaylist = data.playlist;
-          playlistCacheById[id] = fullPlaylist;
-        }
+    // ★ 항상 API에서 최신 데이터 가져오기 (캐시 사용 안 함 - 다른 대기실 데이터 방지)
+    let fullPlaylist = null;
+    let res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?ts=' + Date.now(), 3000);
+    if (!res || !res.ok) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      res = await fetchWithTimeout(API_BASE + '/playlists/' + id + '?retry=1', 3000);
+    }
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && data.playlist) {
+        fullPlaylist = data.playlist;
+        playlistCacheById[id] = fullPlaylist;
       }
     }
 
     if (fullPlaylist) {
-      currentPlaylist = fullPlaylist;
-      document.getElementById('edit-playlist-title').textContent = (currentPlaylist.name || '재생목록') + ' 편집';
-      document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
-      document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
-      updateDurationLabel();
-    }
+      // 현재 편집 중인 대기실 ID가 바뀌지 않았는지 확인
+      if (currentPlaylist && currentPlaylist.id == id) {
+        currentPlaylist = fullPlaylist;
+        document.getElementById('edit-playlist-title').textContent = (currentPlaylist.name || '재생목록') + ' 편집';
+        document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
+        document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
+        updateDurationLabel();
 
-    // 완전한 데이터로 전체 렌더링
-    const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-    playlistEditorSignature = newSignature;
-    await renderLibraryAndPlaylist();
-    ensureMasterLibraryVisible();
-    loadPlaylistOrder();
+        // 완전한 데이터로 전체 렌더링
+        const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
+        if (newSignature !== playlistEditorSignature) {
+          playlistEditorSignature = newSignature;
+          await renderLibraryAndPlaylist();
+          ensureMasterLibraryVisible();
+          loadPlaylistOrder();
+        }
+      }
+    }
 
     // 설정은 렌더링 완료 후 백그라운드에서 로드 (UI 블로킹 없음)
     loadPlaylistSettings().catch(() => {});
@@ -5419,7 +5428,8 @@ function renderAdminMasterItems() {
         : '<div style="width:72px;height:48px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-video" style="color:#9ca3af;font-size:14px"></i></div>';
       var typeLabel = (item.item_type || 'vimeo').toUpperCase();
       var typeBg = typeLabel === 'VIMEO' ? '#7c3aed' : '#dc2626';
-      return '<div id="admin-master-item-' + item.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;background:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;transition:all .15s" onmouseover="this.style.borderColor=\'#c7d2fe\';this.style.background=\'#faf5ff\'" onmouseout="this.style.borderColor=\'#f3f4f6\';this.style.background=\'#f9fafb\'">' +
+      return '<div id="admin-master-item-' + item.id + '" data-id="' + item.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;background:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;transition:all .15s" onmouseover="this.style.borderColor=\'#c7d2fe\';this.style.background=\'#faf5ff\'" onmouseout="this.style.borderColor=\'#f3f4f6\';this.style.background=\'#f9fafb\'">' +
+        '<div class="admin-drag-handle" style="cursor:grab;color:#9ca3af;padding:2px 4px;font-size:14px"><i class="fas fa-grip-vertical"></i></div>' +
         '<span style="font-size:11px;color:#9ca3af;font-weight:600;min-width:20px;text-align:center">' + (idx + 1) + '</span>' +
         thumb +
         '<div style="flex:1;min-width:0">' +
@@ -5455,6 +5465,49 @@ function renderAdminMasterItems() {
     '</div>' +
     '<div id="admin-master-items-list" style="display:grid;gap:6px">' + itemsHtml + '</div>' +
   '</div>';
+  // Sortable 초기화 (드래그 순서 변경)
+  initAdminMasterSortable();
+}
+
+var _adminMasterSortable = null;
+function initAdminMasterSortable() {
+  var list = document.getElementById('admin-master-items-list');
+  if (!list || typeof Sortable === 'undefined') return;
+  if (_adminMasterSortable) { try { _adminMasterSortable.destroy(); } catch(e){} }
+  _adminMasterSortable = new Sortable(list, {
+    handle: '.admin-drag-handle',
+    animation: 200,
+    ghostClass: 'sortable-ghost',
+    onEnd: function() {
+      var items = list.querySelectorAll('[data-id]');
+      var reorderData = [];
+      items.forEach(function(el, idx) {
+        var id = parseInt(el.getAttribute('data-id'));
+        reorderData.push({ id: id, sort_order: idx + 1 });
+        var badge = el.querySelector('span[style*="min-width:20px"]');
+        if (badge) badge.textContent = (idx + 1);
+      });
+      // 서버에 순서 저장
+      fetch('/api/master/items/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: reorderData })
+      }).then(function(res) {
+        if (res.ok) {
+          // masterItems 순서도 업데이트
+          var newOrder = reorderData.map(function(r) { return r.id; });
+          masterItems = newOrder.map(function(id) {
+            return (masterItems || []).find(function(i) { return i.id === id; });
+          }).filter(Boolean);
+          cachedMasterItems = masterItems;
+          masterItemsCache = masterItems;
+          showToast('\uC21C\uC11C \uBCC0\uACBD \uC644\uB8CC');
+        } else {
+          showToast('\uC21C\uC11C \uC800\uC7A5 \uC2E4\uD328', 'error');
+        }
+      }).catch(function() { showToast('\uC21C\uC11C \uC800\uC7A5 \uC2E4\uD328', 'error'); });
+    }
+  });
 }
 
 async function adminAddMasterItem() {
