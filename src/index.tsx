@@ -6956,7 +6956,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     }
     
+    var _currentTab = 'waitingrooms';
+    
     function showTab(tab) {
+      var isTabChanged = (_currentTab !== tab);
+      _currentTab = tab;
+      
       // ── 탭 전환 시 열려있는 플레이리스트 에디터 닫기 ──
       var editModal = document.getElementById('edit-playlist-modal');
       if (editModal && editModal.style.display !== 'none' && editModal.style.display !== '') {
@@ -6968,18 +6973,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         _openModalSet.delete('edit-playlist-modal');
-        // 대기실/체어 설정 섹션 자동 닫기
-        window._forceCloseSetupSections = true;
-        setTimeout(function() {
-          var wc = document.getElementById('wr-setup-content');
-          var wi = document.getElementById('wr-setup-toggle-icon');
-          if (wc) wc.style.display = 'none';
-          if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
-          var cc = document.getElementById('ch-setup-content');
-          var ci = document.getElementById('ch-setup-toggle-icon');
-          if (cc) cc.style.display = 'none';
-          if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
-        }, 500);
         // _prevDisplay 정리
         var mainContent = document.getElementById('dtv-pg');
         if (mainContent) {
@@ -6989,8 +6982,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
       }
 
-      // ── 탭 전환 시 항상 설정 아코디언 닫기 ──
-      (function() {
+      // ── 다른 탭으로 전환될 때만 아코디언 닫기 ──
+      if (isTabChanged) {
         var wc = document.getElementById('wr-setup-content');
         var wi = document.getElementById('wr-setup-toggle-icon');
         if (wc) wc.style.display = 'none';
@@ -6999,7 +6992,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         var ci = document.getElementById('ch-setup-toggle-icon');
         if (cc) cc.style.display = 'none';
         if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
-      })();
+      }
 
       ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
         const content = document.getElementById('content-' + t);
@@ -11398,20 +11391,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
         
         loadPlaylists();
-        // loadPlaylists 완료 후에도 확실하게 설정 섹션 닫기 (DOM 직접 조작)
-        function _forceCloseSetups() {
-          var wc = document.getElementById('wr-setup-content');
-          var wi = document.getElementById('wr-setup-toggle-icon');
-          if (wc) wc.style.display = 'none';
-          if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
-          var cc = document.getElementById('ch-setup-content');
-          var ci = document.getElementById('ch-setup-toggle-icon');
-          if (cc) cc.style.display = 'none';
-          if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
-        }
-        _forceCloseSetups();
-        setTimeout(_forceCloseSetups, 500);
-        setTimeout(_forceCloseSetups, 1500);
         // 스크롤 복원
         setTimeout(function() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
