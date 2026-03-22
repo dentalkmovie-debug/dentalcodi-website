@@ -13778,6 +13778,16 @@ app.get('/tv/:shortCode', async (c) => {
         }
         if (isInitial) {
           console.log('[TV Initial] items:', (data.playlist?.items || []).map(i => i.id + ':' + (i.title || '?')));
+          // URL에 ?debug=1이면 화면에 디버그 오버레이 표시
+          if (new URLSearchParams(window.location.search).get('debug') === '1' && data._debug) {
+            var dbgDiv = document.createElement('div');
+            dbgDiv.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;padding:12px;border-radius:8px;font-size:11px;max-width:400px;max-height:50vh;overflow:auto;font-family:monospace';
+            dbgDiv.innerHTML = '<b>TV Debug</b><pre style="margin:4px 0;white-space:pre-wrap">' + JSON.stringify(data._debug, null, 1) + '</pre>'
+              + '<b>Items (' + (data.playlist?.items?.length||0) + ')</b><pre style="margin:4px 0">' 
+              + (data.playlist?.items || []).map(function(i){return i.id+': '+i.title}).join('\\n') + '</pre>';
+            document.body.appendChild(dbgDiv);
+            setTimeout(function(){ dbgDiv.remove(); }, 30000);
+          }
         }
         
         // 이전에 에러 화면이 표시되었다면 숨기고 정상 복구
