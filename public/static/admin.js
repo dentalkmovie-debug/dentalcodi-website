@@ -4859,7 +4859,7 @@ function renderNotices() {
   var html = '';
   filtered.forEach(function(n, index) {
     var isActive = n.is_active;
-    var borderColor = isUrgentTab ? (isActive ? '#ef4444' : '#fecaca') : (isActive ? '#22c55e' : '#e5e7eb');
+    var borderColor = isUrgentTab ? (isActive ? '#ef4444' : '#fecaca') : (isActive ? '#3b82f6' : '#e5e7eb');
     var bgColor = isUrgentTab ? '#fef2f2' : '#fff';
     var borderSide = isUrgentTab ? '#fecaca' : '#f3f4f6';
     
@@ -4870,7 +4870,7 @@ function renderNotices() {
         '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
-        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
+        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bfdbfe' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dbeafe' : '#f9fafb') + ';color:' + (isActive ? '#1d4ed8' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
         '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:' + (isUrgentTab ? '#fef2f2' : '#eff6ff') + ';color:' + (isUrgentTab ? '#dc2626' : '#2563eb') + ';border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
         '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
       '</div>' +

@@ -2709,7 +2709,7 @@ app.get('/embed-old/:memberCode', async (c) => {
     html, body { margin: 0; padding: 0; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { display:none !important; }
-    .modal-card-shadow { box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.06); }
+    .modal-card-shadow { box-shadow: 0 12px 48px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05); border-radius: 16px; }
     .toast { animation: slideIn 0.3s ease; }
     @keyframes slideIn {
       from { transform: translateY(-100%); opacity: 0; }
@@ -2847,7 +2847,7 @@ app.get('/embed-old/:memberCode', async (c) => {
         <!-- 공지 목록 -->
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-bold text-gray-800">공지사항 목록</h2>
-          <button onclick="openNoticeModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 text-sm">
+          <button onclick="openNoticeModal()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
             <i class="fas fa-plus mr-1"></i>새 공지사항
           </button>
         </div>
@@ -4675,7 +4675,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { display:none !important; }
-    .modal-card-shadow { box-shadow: 0 8px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.06); }
+    .modal-card-shadow { box-shadow: 0 12px 48px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05); border-radius: 16px; }
     .toast { animation: slideIn 0.3s ease; }
     .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
     .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
@@ -5496,7 +5496,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   
   <!-- 삭제 확인 모달 -->
   <div id="delete-confirm-modal" style="display:none" class="fixed inset-0 z-[10000]">
-    <div class="absolute inset-0 bg-black/50" onclick="cancelDeleteConfirm()"></div>
+    <div class="modal-backdrop absolute inset-0" onclick="cancelDeleteConfirm()"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs pointer-events-auto animate-in">
         <div class="p-5 text-center">
@@ -6047,8 +6047,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </div>
   
   <!-- 임시 영상 전송 모달 -->
-  <div id="temp-video-modal" style="display:none">
-    <div class="absolute inset-0 bg-black/50" onclick="closeModal('temp-video-modal')"></div>
+  <div id="temp-video-modal" style="display:none" class="fixed inset-0 z-50">
+    <div class="modal-backdrop absolute inset-0" onclick="closeModal('temp-video-modal')"></div>
     <div class="absolute inset-0 flex items-start justify-center overflow-y-auto p-4 pt-2" style="pointer-events:none">
       <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[600px] my-2" style="pointer-events:auto;flex-shrink:0">
         <div class="p-6">
@@ -11036,7 +11036,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       var html = '';
       filtered.forEach(function(n, index) {
         var isActive = n.is_active;
-        var borderColor = isUrgentTab ? (isActive ? '#ef4444' : '#fecaca') : (isActive ? '#22c55e' : '#e5e7eb');
+        var borderColor = isUrgentTab ? (isActive ? '#ef4444' : '#fecaca') : (isActive ? '#3b82f6' : '#e5e7eb');
         var bgColor = isUrgentTab ? '#fef2f2' : '#fff';
         var borderSide = isUrgentTab ? '#fecaca' : '#f3f4f6';
         
@@ -11047,7 +11047,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
-            '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
+            '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bfdbfe' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dbeafe' : '#f9fafb') + ';color:' + (isActive ? '#1d4ed8' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
             '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:' + (isUrgentTab ? '#fef2f2' : '#eff6ff') + ';color:' + (isUrgentTab ? '#dc2626' : '#2563eb') + ';border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
             '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
           '</div>' +
