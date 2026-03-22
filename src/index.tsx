@@ -12857,6 +12857,15 @@ app.get('/tv/:shortCode', async (c) => {
     }
     #sync-indicator.show { opacity: 1; }
     
+    /* CSS 기반 의사 전체화면 - API 전체화면이 풀려도 항상 전체화면처럼 보임 */
+    html, body {
+      width: 100vw !important;
+      height: 100vh !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    
     /* 전체화면 컨트롤 버튼 */
     #fullscreen-controls {
       position: fixed;
@@ -12885,8 +12894,9 @@ app.get('/tv/:shortCode', async (c) => {
       user-select: none;
     }
 
+    /* 전체화면 아닐 때도 힌트는 숨김 - CSS 의사 전체화면으로 보이므로 */
     body.not-fullscreen #fullscreen-hint {
-      display: block;
+      display: none;
     }
     
     /* 전체화면일 때 마우스 움직이면 표시 (JS로 제어) */
@@ -12895,8 +12905,12 @@ app.get('/tv/:shortCode', async (c) => {
       pointer-events: auto;
     }
     
-    /* 전체화면 아닐 때는 항상 표시 */
+    /* 전체화면 아닐 때도 컨트롤 숨김 - CSS 의사 전체화면이므로 마우스 움직일 때만 표시 */
     body.not-fullscreen #fullscreen-controls {
+      opacity: 0;
+      pointer-events: none;
+    }
+    body.not-fullscreen.mouse-active #fullscreen-controls {
       opacity: 1;
       pointer-events: auto;
     }
@@ -13320,16 +13334,12 @@ app.get('/tv/:shortCode', async (c) => {
       itemsReady = {};
       preloadedPlayers = {};
       
-      // 기존 플레이어 즉시 파괴
+      // 기존 플레이어 즉시 파괴 (iframe만 - DOM은 유지하여 전체화면 보존)
       oldPlayers.forEach(p => {
         try { p.destroy(); } catch(e) {}
       });
       
-      // 기존 미디어 컨테이너 내용 완전 제거
-      const container = document.getElementById('media-container');
-      if (container) {
-        container.innerHTML = '';
-      }
+      // DOM은 initializeAllMedia에서 안전하게 정리 (전체화면 유지를 위해 innerHTML 사용 안함)
       
       // 인덱스 범위 체크
       if (currentIndex >= playlist.items.length) {
@@ -13340,14 +13350,15 @@ app.get('/tv/:shortCode', async (c) => {
       initializeAllMedia();
       startPlaybackWatchdog();
       
-      // 전체화면 명시적 복원 (DOM 조작 후)
+      // 전체화면 복원 (DOM 조작 후) - CSS 의사 전체화면으로 이미 커버되므로 1회만 시도
       if (wasFullscreen && userHasInteracted) {
         setTimeout(() => {
           if (!document.fullscreenElement) {
-            console.log('safeRestartPlayback: restoring fullscreen');
-            document.documentElement.requestFullscreen().catch(() => {});
+            document.documentElement.requestFullscreen().catch(() => {
+              // 실패해도 CSS 의사 전체화면이 유지됨
+            });
           }
-        }, 150);
+        }, 300);
       }
     }
     
@@ -15042,6 +15053,8 @@ app.get('/tv/:shortCode', async (c) => {
     // 전체화면 상태 관리 - TV에서는 항상 전체화면 유지
     let userHasInteracted = false; // 사용자 상호작용 여부
     let fullscreenRestoreTimer = null; // 전체화면 복원 타이머
+    let fullscreenRestoreAttempts = 0; // 복원 시도 횟수
+    const MAX_RESTORE_ATTEMPTS = 3; // 최대 복원 시도 횟수
     
     function updateFullscreenState() {
       if (document.fullscreenElement) {
@@ -15049,6 +15062,7 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.remove('not-fullscreen');
         shouldBeFullscreen = true;
         userHasInteracted = true;
+        fullscreenRestoreAttempts = 0; // 성공하면 카운터 리셋
         // 복원 타이머 취소
         if (fullscreenRestoreTimer) {
           clearTimeout(fullscreenRestoreTimer);
@@ -15059,20 +15073,20 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.add('not-fullscreen');
         document.body.classList.remove('mouse-active');
         
-        // 전체화면이 풀리면 무조건 복원 시도
-        if (shouldBeFullscreen) {
-          console.log('Fullscreen exited, scheduling restore...');
-          // 기존 타이머 취소 후 새로 설정
+        // 전체화면이 풀리면 제한된 횟수만 복원 시도 (무한루프 방지)
+        if (shouldBeFullscreen && userHasInteracted && fullscreenRestoreAttempts < MAX_RESTORE_ATTEMPTS) {
+          fullscreenRestoreAttempts++;
+          console.log('Fullscreen exited, restore attempt', fullscreenRestoreAttempts, '/', MAX_RESTORE_ATTEMPTS);
           if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
           fullscreenRestoreTimer = setTimeout(() => {
             if (!document.fullscreenElement && shouldBeFullscreen) {
-              console.log('Restoring fullscreen now');
               document.documentElement.requestFullscreen().catch((e) => {
-                console.log('Fullscreen restore failed:', e.message);
+                console.log('Fullscreen restore failed:', e.message, '- CSS pseudo-fullscreen active');
               });
             }
-          }, 100);
+          }, 500); // 500ms 지연 (기존 100ms → 안정성 향상)
         }
+        // 복원 실패해도 CSS로 전체화면처럼 보이므로 사용자 경험에 영향 없음
       }
     }
     
@@ -15083,21 +15097,21 @@ app.get('/tv/:shortCode', async (c) => {
     updateFullscreenState();
     
     // 전체화면에서 마우스 움직이면 버튼 표시 (2초 후 자동 숨김)
+    // CSS 의사 전체화면이므로 전체화면 여부와 관계없이 동작
     let mouseTimer = null;
     document.addEventListener('mousemove', () => {
-      if (document.fullscreenElement) {
-        document.body.classList.add('mouse-active');
-        if (mouseTimer) clearTimeout(mouseTimer);
-        mouseTimer = setTimeout(() => {
-          document.body.classList.remove('mouse-active');
-        }, 2000);
-      }
+      document.body.classList.add('mouse-active');
+      if (mouseTimer) clearTimeout(mouseTimer);
+      mouseTimer = setTimeout(() => {
+        document.body.classList.remove('mouse-active');
+      }, 2000);
     });
     
     // 전체화면 진입
     function enterFullscreen() {
       shouldBeFullscreen = true;
       userHasInteracted = true;
+      fullscreenRestoreAttempts = 0; // 사용자 의도적 진입 시 카운터 리셋
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
       }
@@ -15185,12 +15199,8 @@ app.get('/tv/:shortCode', async (c) => {
       document.removeEventListener('click', autoFullscreen);
     }, { once: true });
     
-    // 주기적으로 전체화면 상태 확인 및 복원 (1초마다)
-    setInterval(() => {
-      if (shouldBeFullscreen && !document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    }, 1000);
+    // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
+    // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
   </script>
 </body>
 </html>
