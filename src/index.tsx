@@ -6987,6 +6987,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
       }
 
+      // ── 탭 전환 시 항상 설정 아코디언 닫기 ──
+      (function() {
+        var wc = document.getElementById('wr-setup-content');
+        var wi = document.getElementById('wr-setup-toggle-icon');
+        if (wc) wc.style.display = 'none';
+        if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
+        var cc = document.getElementById('ch-setup-content');
+        var ci = document.getElementById('ch-setup-toggle-icon');
+        if (cc) cc.style.display = 'none';
+        if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
+      })();
+
       ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
         const content = document.getElementById('content-' + t);
         const tabBtn = document.getElementById('tab-' + t);
@@ -11275,34 +11287,43 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const el = document.getElementById(id);
       if (!el) return;
 
-      // ── 1) 모달을 body 직접 자식으로 이동 ──
+      // ── 1) 원래 부모/위치 저장 (closeModal에서 복원용) ──
+      if (!el._modalOriginalParent) {
+        el._modalOriginalParent = el.parentElement;
+        el._modalOriginalNextSibling = el.nextElementSibling;
+      }
+      
+      // ── 2) 모달을 body 직접 자식으로 이동 (아임웹 iframe z-index 이슈 해결) ──
       if (el.parentElement !== document.body) {
         document.body.appendChild(el);
       }
 
-      // ── 2) 모달 표시: position:fixed로 뷰포트 전체 덮기 ──
-      // 아임웹 헤더 보정: iframePageTop > 0이면 아임웹 환경
+      // ── 3) 자식 요소 원래 스타일 백업 ──
+      var children = el.children;
+      for (var i = 0; i < children.length; i++) {
+        if (children[i]._origStyleCssText === undefined) {
+          children[i]._origStyleCssText = children[i].style.cssText || '';
+        }
+      }
+
+      // ── 4) 모달 표시: position:fixed로 뷰포트 전체 덮기 ──
       var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 32, 140) : 0;
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column; padding-top:' + headerOffset + 'px;';
       
       // 내부 absolute 자식들을 flex 자식으로 변환
-      var children = el.children;
       for (var i = 0; i < children.length; i++) {
         var child = children[i];
-        // backdrop: 절대 위치 유지 (뒤에 깔림)
         if (child.classList.contains('bg-black/50') || child.classList.contains('modal-backdrop') || (child.getAttribute('onclick') || '').includes('closeModal') && !child.querySelector('.bg-white')) {
           child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
         } else {
-          // content wrapper: flex로 변환하여 전체 높이 차지
           child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:16px; padding-top:8px;';
-          // pointer-events 복원
           child.style.pointerEvents = 'none';
           var box = child.querySelector('.bg-white');
           if (box) box.style.pointerEvents = 'auto';
         }
       }
       
-      // ── 3) 배경 스크롤 방지 ──
+      // ── 5) 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
         window._savedScrollY = window.scrollY || window.pageYOffset || 0;
       }
@@ -11320,15 +11341,36 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
-        // cssText로 일괄 초기화
-        el.style.cssText = 'display:none;';
-        // 자식 요소 스타일 초기화 (openModal에서 변경한 것 되돌리기)
+        // 자식 요소 스타일 복원 (openModal에서 백업한 원래 스타일로)
         var children = el.children;
         for (var i = 0; i < children.length; i++) {
-          children[i].style.cssText = '';
+          if (children[i]._origStyleCssText !== undefined) {
+            children[i].style.cssText = children[i]._origStyleCssText;
+            delete children[i]._origStyleCssText;
+          } else {
+            children[i].style.cssText = '';
+          }
           var box = children[i].querySelector('.bg-white');
           if (box) box.style.pointerEvents = '';
         }
+        
+        // 모달 숨김
+        el.style.cssText = 'display:none;';
+        
+        // ── 모달을 원래 DOM 위치로 복원 ──
+        if (el._modalOriginalParent && el._modalOriginalParent !== document.body) {
+          try {
+            if (el._modalOriginalNextSibling && el._modalOriginalNextSibling.parentElement === el._modalOriginalParent) {
+              el._modalOriginalParent.insertBefore(el, el._modalOriginalNextSibling);
+            } else {
+              el._modalOriginalParent.appendChild(el);
+            }
+          } catch(e) {
+            // 원래 부모가 더 이상 존재하지 않으면 body에 그대로 둠
+          }
+        }
+        delete el._modalOriginalParent;
+        delete el._modalOriginalNextSibling;
       }
       
       // 추적 Set에서 제거
@@ -11351,6 +11393,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           setTimeout(function() { window.scrollTo(0, window._savedScrollY); window._savedScrollY = 0; }, 150);
         }
       }
+      
+      // ── 안전장치: 모달 닫았는데 overflow가 hidden인 경우 강제 복원 ──
+      setTimeout(function() {
+        if (_openModalSet.size === 0) {
+          document.body.classList.remove('modal-open');
+          document.documentElement.classList.remove('modal-open');
+          document.body.style.overflow = '';
+          document.documentElement.style.overflow = '';
+        }
+      }, 300);
 
       // 가이드 모달이 닫힐 때 iframe 높이 원상 복구
       if (GUIDE_MODALS.has(id)) {
