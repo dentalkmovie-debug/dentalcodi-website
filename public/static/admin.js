@@ -471,6 +471,9 @@ function init() {
   // 캐시에 현재 데이터 저장
   saveToCache({ playlists, notices, clinicName });
   
+  // 즉시 API에서 최신 플레이리스트 로드 (SSR 시점의 is_tv_active가 stale할 수 있으므로)
+  loadPlaylists();
+  
   // 백그라운드에서 최신 masterItems API 로드 (INITIAL_DATA 덮어쓰기)
   fetch('/api/master/items?ts=' + Date.now(), { cache: 'no-store' })
     .then(function(r) { return r.json(); })
@@ -1078,7 +1081,7 @@ function renderPlaylists() {
       wrContainer.innerHTML = `
       <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
         ${waitingRooms.map((p, idx) => {
-          const isActive = p.is_tv_active === true;
+          const isActive = !!(p.is_tv_active);
           const neverConnected = !p.last_active_at && !p.external_short_url;
           const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
           return `
@@ -1225,7 +1228,7 @@ function renderPlaylists() {
       chContainer.innerHTML = `
       <div id="chair-sortable-container" style="display:grid;gap:10px">
         ${chairs.map((p, idx) => {
-          const isActive = p.is_tv_active === true;
+          const isActive = !!(p.is_tv_active);
           const neverConnected = !p.last_active_at && !p.external_short_url;
           const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
           return `
@@ -2455,7 +2458,7 @@ async function deletePlaylist(id) {
   
   // 사용중(TV 활성) 플레이리스트 삭제 차단
   const targetPlaylist = playlists.find(p => p.id === id || p.id === Number(id));
-  if (targetPlaylist && targetPlaylist.is_tv_active === true) {
+  if (targetPlaylist && !!(targetPlaylist.is_tv_active)) {
     showToast('사용중인 대기실/체어는 삭제할 수 없습니다. TV 연결을 해제한 후 삭제해주세요.', 'error');
     return;
   }

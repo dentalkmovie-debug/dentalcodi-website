@@ -6538,6 +6538,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 캐시에 현재 데이터 저장
       saveToCache({ playlists, notices, clinicName });
       
+      // 즉시 API에서 최신 플레이리스트 로드 (SSR 시점의 is_tv_active가 stale할 수 있으므로)
+      loadPlaylists();
+      
       // 백그라운드에서 최신 masterItems API 로드 (INITIAL_DATA 덮어쓰기)
       fetch('/api/master/items?ts=' + Date.now(), { cache: 'no-store' })
         .then(function(r) { return r.json(); })
@@ -7145,7 +7148,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           wrContainer.innerHTML = \`
           <div id="waitingroom-sortable-container" style="display:grid;gap:10px">
             \${waitingRooms.map((p, idx) => {
-              const isActive = p.is_tv_active === true;
+              const isActive = !!(p.is_tv_active);
               const neverConnected = !p.last_active_at && !p.external_short_url;
               const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
               return \`
@@ -7292,7 +7295,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           chContainer.innerHTML = \`
           <div id="chair-sortable-container" style="display:grid;gap:10px">
             \${chairs.map((p, idx) => {
-              const isActive = p.is_tv_active === true;
+              const isActive = !!(p.is_tv_active);
               const neverConnected = !p.last_active_at && !p.external_short_url;
               const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url);
               return \`
@@ -8522,7 +8525,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 사용중(TV 활성) 플레이리스트 삭제 차단
       const targetPlaylist = playlists.find(p => p.id === id || p.id === Number(id));
-      if (targetPlaylist && targetPlaylist.is_tv_active === true) {
+      if (targetPlaylist && !!(targetPlaylist.is_tv_active)) {
         showToast('사용중인 대기실/체어는 삭제할 수 없습니다. TV 연결을 해제한 후 삭제해주세요.', 'error');
         return;
       }
@@ -14917,22 +14920,29 @@ app.get('/tv/:shortCode', async (c) => {
     setInterval(() => loadData(false), 3 * 1000);
     
     // Heartbeat - 사용중 표시 전용 독립 폴링 (5초마다)
-    setInterval(function() {
+    // 숨겨진 탭에서도 확실히 실행하기 위해 Worker 기반 타이머 사용
+    function sendHeartbeat() {
       fetch('/api/tv/' + SHORT_CODE + '/heartbeat', { method: 'POST' })
         .catch(function() {});
-    }, 5000);
+    }
+    setInterval(sendHeartbeat, 5000);
     
-    // 탭 닫힘 시 즉시 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
+    // 탭 닫힘/내비게이션 시에만 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
       navigator.sendBeacon('/api/tv/' + SHORT_CODE + '/deactivate');
     }
-    // capture:true 로 visibilitychange 차단 리스너보다 먼저 실행
+    // visibilitychange: 탭이 보이면 즉시 heartbeat, 숨겨져도 deactivate하지 않음
+    // (브라우저가 hidden 탭의 setInterval을 throttle하지만 loadData(3초)가 서버에서 last_active_at 업데이트함)
     document.addEventListener('visibilitychange', function() {
-      if (document.hidden) {
-        deactivateTV();
+      if (!document.hidden) {
+        // 탭 복귀 시 즉시 heartbeat + loadData로 빠른 복원
+        sendHeartbeat();
+        loadData(false);
       }
     }, true);
+    // pagehide/beforeunload: 실제로 탭 닫기/페이지 떠남 시에만 비활성화
     window.addEventListener('pagehide', deactivateTV, true);
+    window.addEventListener('beforeunload', deactivateTV, true);
     
     // 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
     document.addEventListener('click', function autoFullscreen() {
