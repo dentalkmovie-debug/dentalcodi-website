@@ -5752,6 +5752,11 @@ function renderAdminMasterItems() {
         : '<div style="width:72px;height:48px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-video" style="color:#9ca3af;font-size:14px"></i></div>';
       var typeLabel = (item.item_type || 'vimeo').toUpperCase();
       var typeBg = typeLabel === 'VIMEO' ? '#7c3aed' : '#dc2626';
+      var tt = item.target_type || 'all';
+      var targetBadge = '';
+      if (tt === 'waitingroom') targetBadge = '<span style="font-size:9px;padding:1px 5px;background:#dbeafe;color:#1d4ed8;border-radius:3px;font-weight:600">\uB300\uAE30\uC2E4</span>';
+      else if (tt === 'chair') targetBadge = '<span style="font-size:9px;padding:1px 5px;background:#ede9fe;color:#7c3aed;border-radius:3px;font-weight:600">\uCCB4\uC5B4</span>';
+      else targetBadge = '<span style="font-size:9px;padding:1px 5px;background:#f3f4f6;color:#6b7280;border-radius:3px;font-weight:600">\uC804\uCCB4</span>';
       return '<div id="admin-master-item-' + item.id + '" data-id="' + item.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;background:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;transition:all .15s" onmouseover="this.style.borderColor=\'#c7d2fe\';this.style.background=\'#faf5ff\'" onmouseout="this.style.borderColor=\'#f3f4f6\';this.style.background=\'#f9fafb\'">' +
         '<div class="admin-drag-handle" style="cursor:grab;color:#9ca3af;padding:2px 4px;font-size:14px"><i class="fas fa-grip-vertical"></i></div>' +
         '<span style="font-size:11px;color:#9ca3af;font-weight:600;min-width:20px;text-align:center">' + (idx + 1) + '</span>' +
@@ -5760,10 +5765,12 @@ function renderAdminMasterItems() {
           '<p id="admin-master-title-' + item.id + '" style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;color:#1f2937">' + (item.title || 'Untitled') + '</p>' +
           '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">' +
             '<span style="font-size:10px;padding:1px 6px;background:' + typeBg + ';color:#fff;border-radius:4px;font-weight:600">' + typeLabel + '</span>' +
+            targetBadge +
             '<span style="font-size:10px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (item.url || '') + '</span>' +
           '</div>' +
         '</div>' +
         '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button onclick="adminToggleTargetType(' + item.id + ')" title="\uB300\uC0C1 \uBCC0\uACBD (\uC804\uCCB4/\uB300\uAE30\uC2E4/\uCCB4\uC5B4)" style="padding:6px 8px;font-size:12px;background:#f0fdf4;color:#16a34a;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#dcfce7\'" onmouseout="this.style.background=\'#f0fdf4\'"><i class="fas fa-exchange-alt"></i></button>' +
           '<button onclick="adminEditMasterItem(' + item.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:12px;background:#ede9fe;color:#7c3aed;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#ddd6fe\'" onmouseout="this.style.background=\'#ede9fe\'"><i class="fas fa-pen"></i></button>' +
           '<button onclick="adminRefreshMasterThumb(' + item.id + ')" title="\uC378\uB124\uC77C \uC0C8\uB85C\uACE0\uCE68" style="padding:6px 8px;font-size:12px;background:#e0f2fe;color:#0284c7;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#bae6fd\'" onmouseout="this.style.background=\'#e0f2fe\'"><i class="fas fa-sync-alt"></i></button>' +
           '<button onclick="adminDeleteMasterItem(' + item.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:12px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#fecaca\'" onmouseout="this.style.background=\'#fee2e2\'"><i class="fas fa-trash"></i></button>' +
@@ -5782,9 +5789,15 @@ function renderAdminMasterItems() {
     '</div>' +
     '<div style="background:#f5f3ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px">' +
       '<p style="font-size:11px;color:#6b7280;margin:0 0 8px"><i class="fas fa-info-circle" style="margin-right:4px;color:#7c3aed"></i>\uC5EC\uAE30\uC11C \uCD94\uAC00\uD55C \uC601\uC0C1\uC740 \uBAA8\uB4E0 \uCE58\uACFC\uC5D0 \uACF5\uC6A9\uB429\uB2C8\uB2E4.</p>' +
-      '<div style="display:flex;gap:8px">' +
+      '<div style="display:flex;gap:8px;margin-bottom:8px">' +
         '<input type="text" id="admin-new-url" placeholder="Vimeo URL \uC785\uB825 (https://vimeo.com/...)" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit">' +
         '<button onclick="adminAddMasterItem()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap"><i class="fas fa-plus" style="margin-right:4px"></i>\uCD94\uAC00</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;align-items:center">' +
+        '<span style="font-size:11px;color:#6b7280">\uB300\uC0C1:</span>' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#374151;cursor:pointer"><input type="radio" name="admin-target-type" value="all" checked style="accent-color:#7c3aed"> \uC804\uCCB4</label>' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#2563eb;cursor:pointer"><input type="radio" name="admin-target-type" value="waitingroom" style="accent-color:#2563eb"> \uB300\uAE30\uC2E4</label>' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#7c3aed;cursor:pointer"><input type="radio" name="admin-target-type" value="chair" style="accent-color:#7c3aed"> \uCCB4\uC5B4</label>' +
       '</div>' +
     '</div>' +
     '<div id="admin-master-items-list" style="display:grid;gap:6px">' + itemsHtml + '</div>' +
@@ -5837,11 +5850,13 @@ function initAdminMasterSortable() {
 async function adminAddMasterItem() {
   const urlInput = document.getElementById('admin-new-url');
   if (!urlInput || !urlInput.value.trim()) return;
+  var targetTypeRadio = document.querySelector('input[name="admin-target-type"]:checked');
+  var targetType = targetTypeRadio ? targetTypeRadio.value : 'all';
   try {
     const res = await fetch('/api/master/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlInput.value.trim() })
+      body: JSON.stringify({ url: urlInput.value.trim(), target_type: targetType })
     });
     if (res.ok) {
       urlInput.value = '';
@@ -5887,6 +5902,28 @@ async function adminEditMasterItem(itemId) {
       showToast('\uC218\uC815 \uC2E4\uD328', 'error');
     }
   } catch(e) { showToast('\uC218\uC815 \uC2E4\uD328', 'error'); }
+}
+
+async function adminToggleTargetType(itemId) {
+  var item = (masterItems || []).find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  var current = item.target_type || 'all';
+  var nextMap = { 'all': 'waitingroom', 'waitingroom': 'chair', 'chair': 'all' };
+  var next = nextMap[current] || 'all';
+  try {
+    var res = await fetch('/api/master/items/' + itemId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_type: next })
+    });
+    if (res.ok) {
+      item.target_type = next;
+      cachedMasterItems = masterItems; masterItemsCache = masterItems;
+      renderAdminMasterItems();
+      var labels = { 'all': '\uC804\uCCB4', 'waitingroom': '\uB300\uAE30\uC2E4', 'chair': '\uCCB4\uC5B4' };
+      showToast('\uB300\uC0C1 \uBCC0\uACBD: ' + labels[next]);
+    } else { showToast('\uBCC0\uACBD \uC2E4\uD328', 'error'); }
+  } catch(e) { showToast('\uBCC0\uACBD \uC2E4\uD328', 'error'); }
 }
 
 async function adminRefreshMasterThumb(itemId) {
