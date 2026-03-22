@@ -5020,10 +5020,11 @@ function openModal(id) {
   const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
   if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-  // ── 4) 모달을 absolute로 전체 화면 배치 ──
-  // iframe 환경에서 fixed가 동작하지 않으므로 absolute + 뷰포트 높이 사용
+  // ── 4) 모달 표시 ──
+  // dashboard를 숨겼으므로 iframe은 모달 높이만큼만 됨
+  // position:relative로 내부 absolute 자식이 올바르게 배치되도록
   const vh = window.innerHeight || document.documentElement.clientHeight || 700;
-  el.style.cssText = 'display:flex !important; position:absolute; top:0; left:0; width:100%; min-height:' + vh + 'px; z-index:99999; overflow-y:auto; align-items:flex-start; justify-content:center;';
+  el.style.cssText = 'display:block !important; position:relative; width:100%; height:' + vh + 'px; z-index:99999; overflow:hidden;';
   
   // ── 5) 배경 스크롤 방지 ──
   if (_openModalSet.size === 0) {
