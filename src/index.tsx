@@ -14,6 +14,9 @@ app.use('*', cors({
   allowHeaders: ['Content-Type'],
 }))
 
+// favicon 요청 처리 (500 에러 방지)
+app.get('/favicon.ico', (c) => new Response(null, { status: 204 }))
+
 // ============================================
 // 유틸리티 함수
 // ============================================
@@ -13171,12 +13174,34 @@ app.get('/tv/:shortCode', async (c) => {
         
         // 이전에 에러 화면이 표시되었다면 숨기고 정상 복구
         const errorScreen = document.getElementById('error-screen');
-        if (errorScreen && errorScreen.style.display !== 'none') {
+        const wasErrorVisible = errorScreen && errorScreen.style.display !== 'none';
+        if (wasErrorVisible) {
           errorScreen.style.display = 'none';
-          console.log('[loadData] Recovered from error screen, resuming playback');
-          // 에러 복구 시 재생 다시 시작
+          console.log('[loadData] Recovered from error screen');
+          // 에러 복구 시: 현재 재생 중인 플레이어가 있으면 재시작하지 않음 (끊김 방지)
+          // 재생 중이 아닌 경우에만 재시작
           if (!isInitial) {
-            try { safeRestartPlayback(); } catch(_) {}
+            const currentItem = playlist?.items?.[currentIndex];
+            const currentPlayer = players?.[currentIndex];
+            let isPlaying = false;
+            if (currentItem?.item_type === 'vimeo' && currentPlayer && typeof currentPlayer.getPaused === 'function') {
+              try {
+                const paused = await currentPlayer.getPaused();
+                isPlaying = !paused;
+              } catch(e) {}
+            } else if (currentItem?.item_type === 'youtube' && currentPlayer && typeof currentPlayer.getPlayerState === 'function') {
+              try {
+                isPlaying = currentPlayer.getPlayerState() === 1;
+              } catch(e) {}
+            } else if (currentItem?.item_type === 'image') {
+              isPlaying = !!currentTimer;
+            }
+            if (!isPlaying) {
+              console.log('[loadData] Not playing, restarting playback');
+              try { safeRestartPlayback(); } catch(_) {}
+            } else {
+              console.log('[loadData] Already playing, skipping restart (preventing stutter)');
+            }
           }
         }
         _consecutive404Count = 0;
@@ -14269,20 +14294,24 @@ app.get('/tv/:shortCode', async (c) => {
               startSubtitleSync(player, vimeoId, idx);
             } else {
               // 커스텀 자막이 없으면 Vimeo 내장 자막 활성화 시도
-              player.getTextTracks().then((tracks) => {
+              // 재생 안정 후 3초 지연하여 호출 (끊김 방지)
+              setTimeout(() => {
                 if (thisSession !== vimeoSessionId) return;
-                console.log('Vimeo text tracks available:', tracks.length, tracks.map(t => t.language + '/' + t.kind));
-                if (tracks.length > 0) {
-                  // 한국어 우선, 없으면 첫 번째 트랙
-                  const koTrack = tracks.find(t => t.language === 'ko');
-                  const targetTrack = koTrack || tracks[0];
-                  player.enableTextTrack(targetTrack.language, targetTrack.kind).then(() => {
-                    console.log('Vimeo text track enabled:', targetTrack.language, targetTrack.kind);
-                  }).catch((e) => {
-                    console.log('Failed to enable text track:', e);
-                  });
-                }
-              }).catch(() => {});
+                player.getTextTracks().then((tracks) => {
+                  if (thisSession !== vimeoSessionId) return;
+                  console.log('Vimeo text tracks available:', tracks.length, tracks.map(t => t.language + '/' + t.kind));
+                  if (tracks.length > 0) {
+                    // 한국어 포함 트랙 우선 (ko, ko-x-autogen 등), 없으면 첫 번째 트랙
+                    const koTrack = tracks.find(t => t.language && t.language.startsWith('ko'));
+                    const targetTrack = koTrack || tracks[0];
+                    player.enableTextTrack(targetTrack.language, targetTrack.kind).then(() => {
+                      console.log('Vimeo text track enabled:', targetTrack.language, targetTrack.kind);
+                    }).catch((e) => {
+                      console.log('Failed to enable text track:', e);
+                    });
+                  }
+                }).catch(() => {});
+              }, 3000);
             }
           });
         }
