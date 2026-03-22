@@ -2372,10 +2372,27 @@ app.get('/api/tv/:shortCode', async (c) => {
 
 // 아임웹 코드 위젯에서 iframe으로 호출 - 회원 코드 기반
 app.get('/embed/:memberCode', async (c) => {
-  const memberCode = c.req.param('memberCode')
+  let memberCode = c.req.param('memberCode')
   const memberName = c.req.query('name') || ''
   const memberEmail = c.req.query('email') || ''
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
+
+  // admin_code(imweb_xxx)가 memberCode로 들어온 경우 → admin_code로 직접 매칭
+  if (memberCode.startsWith('imweb_')) {
+    const userByAdminCode = await c.env.DB.prepare(
+      'SELECT * FROM users WHERE admin_code = ?'
+    ).bind(memberCode).first() as any
+    if (userByAdminCode) {
+      const normalizedEmail = normalizeEmail(memberEmail)
+      const adminCode = userByAdminCode.admin_code
+      const rawEmail = normalizedEmail || userByAdminCode.imweb_email || ''
+      const isMasterAdmin = adminCode === 'master_admin'
+      const isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes' || isMasterAdmin
+      return handleAdminPage(c, adminCode, rawEmail, isAdminFlag, memberName)
+    }
+    // admin_code로 못 찾으면 imweb_ prefix 제거 후 member_code로 시도
+    memberCode = memberCode.replace(/^imweb_/, '')
+  }
 
   const normalizedEmail = normalizeEmail(memberEmail)
 
