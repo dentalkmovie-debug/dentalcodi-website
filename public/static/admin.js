@@ -1217,7 +1217,7 @@ function renderPlaylists() {
                   <span style="font-size:14px;font-weight:700;color:#1f2937">${p.name}</span>
                   ${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
                   ${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
-                  ${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                  ${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">체어 설정 필요</span>' : ''}
                 </div>
                 <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                   <span style="color:#2563eb;font-family:monospace;font-size:10px">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -1365,7 +1365,7 @@ function renderPlaylists() {
                   <span style="font-size:14px;font-weight:700;color:#1f2937">${p.name}</span>
                   ${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
                   ${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
-                  ${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                  ${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">체어 설정 필요</span>' : ''}
                 </div>
                 <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                   <span style="color:#6366f1;font-family:monospace;font-size:10px">${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -4246,7 +4246,7 @@ async function generateShortUrl(playlistId, shortCode) {
         showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
       }
       
-      // 플레이리스트 새로고침 (배지 업데이트: TV 설정 필요 → 오프라인)
+      // 플레이리스트 새로고침 (배지 업데이트: 체어 설정 필요 → 오프라인)
       loadPlaylists();
       
       // TV 연결 설정 패널 자동 닫기
@@ -4331,7 +4331,7 @@ function _showScriptModal(el) {
   // iframePageTop: 위젯에서 받은 iframe의 페이지 내 top (= 아임웹 헤더 높이)
   // 이 값만큼 top을 내려야 모달이 iframe 뷰포트 최상단에 표시됨
   var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
-  el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:40px; box-sizing:border-box;';
+  el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:10px; box-sizing:border-box; overflow-y:auto;';
   document.body.classList.add('modal-open');
   document.body.style.overflow = 'hidden';
   document.documentElement.style.overflow = 'hidden';
@@ -4370,6 +4370,8 @@ function copyInstallLink() {
     document.body.removeChild(ta);
   });
   showToast(selected.length + '개 체어 URL 복사됨');
+  // 설치 마킹 (체어 설정 필요 배지 제거)
+  markChairsSetup(selected);
 }
 
 // 선택된 체어의 스크립트 다운로드
@@ -4388,9 +4390,31 @@ function downloadInstallScript() {
     selected.forEach(c => downloadSingleScript(c.code, c.name));
   }
   showToast(selected.length + '개 스크립트 다운로드');
+  // 설치 마킹 (체어 설정 필요 배지 제거)
+  markChairsSetup(selected);
+}
+// 체어 설치 마킹 (서버에 알려서 '체어 설정 필요' 배지 제거)
+function markChairsSetup(chairs) {
+  chairs.forEach(c => {
+    fetch('/api/' + ADMIN_CODE + '/playlists/' + c.id + '/mark-setup', { method: 'POST' })
+      .catch(() => {});
+  });
+  // UI 즉시 반영: 배지 제거
+  chairs.forEach(c => {
+    const card = document.getElementById('playlist-card-main-' + c.id);
+    if (card) {
+      const badges = card.querySelectorAll('span');
+      badges.forEach(badge => {
+        if (badge.textContent.includes('체어 설정 필요')) {
+          badge.textContent = '● 오프라인';
+          badge.style.background = 'linear-gradient(135deg,#f3f4f6,#e5e7eb)';
+          badge.style.color = '#6b7280';
+        }
+      });
+    }
+  });
 }
 
-// 개별 스크립트 다운로드 (설명 포함)
 function downloadSingleScript(shortCode, name) {
   const today = new Date().toLocaleDateString('ko-KR');
   const url = location.origin + '/' + shortCode;

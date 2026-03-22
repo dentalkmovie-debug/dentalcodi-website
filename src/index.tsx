@@ -2023,6 +2023,30 @@ app.post('/api/tv/:shortCode/heartbeat', async (c) => {
   return c.json({ ok: true })
 })
 
+// 체어 설치 마킹 (링크 복사/다운로드 시 호출 → '체어 설정 필요' 배지 제거)
+app.post('/api/:adminCode/playlists/:playlistId/mark-setup', async (c) => {
+  const adminCode = c.req.param('adminCode')
+  const playlistId = c.req.param('playlistId')
+  const user = await getOrCreateUser(c.env.DB, adminCode)
+  
+  const playlist = await c.env.DB.prepare(`
+    SELECT id, last_active_at FROM playlists WHERE id = ? AND user_id = ?
+  `).bind(playlistId, user.id).first() as any
+  
+  if (!playlist) {
+    return c.json({ error: '권한이 없습니다.' }, 403)
+  }
+  
+  // last_active_at이 없는 경우에만 마킹 (이미 접속한 적 있으면 불필요)
+  if (!playlist.last_active_at) {
+    await c.env.DB.prepare(`
+      UPDATE playlists SET last_active_at = '1970-01-01 00:00:00' WHERE id = ?
+    `).bind(playlistId).run()
+  }
+  
+  return c.json({ ok: true })
+})
+
 // 임시 영상 해제 (기본으로 복귀)
 app.delete('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   const adminCode = c.req.param('adminCode')
@@ -5099,8 +5123,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+    <div class="absolute inset-0 flex items-start justify-center pt-2 px-4 pointer-events-none" style="overflow-y:auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto" style="flex-shrink:0;margin-bottom:16px">
         <!-- 헤더 -->
         <div class="px-5 py-4 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold"><i class="fas fa-tv mr-2"></i>TV 연결 방법</h3>
@@ -5147,8 +5171,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- TV 설치 방법 모달 (통합) -->
   <div id="script-download-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('script-download-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center px-4 pt-10 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
+    <div class="absolute inset-0 flex items-start justify-center px-4 pt-2 pointer-events-none" style="overflow-y:auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto" style="margin-bottom:16px;flex-shrink:0">
         <!-- 헤더 -->
         <div class="px-4 py-3 border-b bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold text-sm">유니트체어 모니터 설치 방법</h3>
@@ -5239,8 +5263,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 바로가기 생성 가이드 모달 -->
   <div id="shortcut-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('shortcut-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+    <div class="absolute inset-0 flex items-start justify-center pt-2 px-4 pointer-events-none" style="overflow-y:auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto" style="flex-shrink:0;margin-bottom:16px">
         <div class="px-5 py-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold"><i class="fas fa-link mr-2"></i>바로가기 직접 만들기</h3>
           <button onclick="closeModal('shortcut-guide-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
@@ -5287,8 +5311,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 자동 실행 가이드 모달 -->
   <div id="autorun-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('autorun-guide-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center pt-4 px-4 pointer-events-none">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto">
+    <div class="absolute inset-0 flex items-start justify-center pt-2 px-4 pointer-events-none" style="overflow-y:auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm pointer-events-auto" style="flex-shrink:0;margin-bottom:16px">
         <div class="px-5 py-4 border-b bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-t-xl flex justify-between items-center">
           <h3 class="font-bold"><i class="fas fa-check-circle mr-2"></i>다운로드 완료!</h3>
           <button onclick="closeModal('autorun-guide-modal')" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
@@ -6003,8 +6027,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 임시 영상 전송 모달 -->
   <div id="temp-video-modal" class="fixed inset-0 z-50 hidden">
     <div class="fixed inset-0 bg-black/50" onclick="closeModal('temp-video-modal')"></div>
-    <div class="fixed inset-0 flex items-start justify-center overflow-y-auto p-4" style="pointer-events:none">
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[600px] my-4" style="pointer-events:auto">
+    <div class="fixed inset-0 flex items-start justify-center overflow-y-auto p-4 pt-2" style="pointer-events:none">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[600px] my-2" style="pointer-events:auto;flex-shrink:0">
         <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <div>
@@ -7348,7 +7372,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                       <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
                       \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
                       \${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
-                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">체어 설정 필요</span>' : ''}
                     </div>
                     <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                       <span style="color:#2563eb;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -7496,7 +7520,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                       <span style="font-size:14px;font-weight:700;color:#1f2937">\${p.name}</span>
                       \${isActive ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>' : ''}
                       \${isOffline ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>' : ''}
-                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">TV 설정 필요</span>' : ''}
+                      \${neverConnected ? '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">체어 설정 필요</span>' : ''}
                     </div>
                     <p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                       <span style="color:#6366f1;font-family:monospace;font-size:10px">\${p.external_short_url ? p.external_short_url.replace('https://', '') : location.host + '/' + p.short_code}</span>
@@ -10377,7 +10401,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             showToast('✅ 단축 URL 생성 완료! ' + shortUrlDisplay, 'success', 5000);
           }
           
-          // 플레이리스트 새로고침 (배지 업데이트: TV 설정 필요 → 오프라인)
+          // 플레이리스트 새로고침 (배지 업데이트: 체어 설정 필요 → 오프라인)
           loadPlaylists();
           
           // TV 연결 설정 패널 자동 닫기
@@ -10462,7 +10486,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // iframePageTop: 위젯에서 받은 iframe의 페이지 내 top (= 아임웹 헤더 높이)
       // 이 값만큼 top을 내려야 모달이 iframe 뷰포트 최상단에 표시됨
       var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
-      el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:40px; box-sizing:border-box;';
+      el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:10px; box-sizing:border-box; overflow-y:auto;';
       document.body.classList.add('modal-open');
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
@@ -10501,6 +10525,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.body.removeChild(ta);
       });
       showToast(selected.length + '개 체어 URL 복사됨');
+      // 설치 마킹 (체어 설정 필요 배지 제거)
+      markChairsSetup(selected);
     }
     
     // 선택된 체어의 스크립트 다운로드
@@ -10519,9 +10545,31 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         selected.forEach(c => downloadSingleScript(c.code, c.name));
       }
       showToast(selected.length + '개 스크립트 다운로드');
+      // 설치 마킹 (체어 설정 필요 배지 제거)
+      markChairsSetup(selected);
     }
-    
-    // 개별 스크립트 다운로드 (설명 포함)
+    // 체어 설치 마킹 (서버에 알려서 '체어 설정 필요' 배지 제거)
+    function markChairsSetup(chairs) {
+      chairs.forEach(c => {
+        fetch('/api/' + ADMIN_CODE + '/playlists/' + c.id + '/mark-setup', { method: 'POST' })
+          .catch(() => {});
+      });
+      // UI 즉시 반영: 배지 제거
+      chairs.forEach(c => {
+        const card = document.getElementById('playlist-card-main-' + c.id);
+        if (card) {
+          const badges = card.querySelectorAll('span');
+          badges.forEach(badge => {
+            if (badge.textContent.includes('체어 설정 필요')) {
+              badge.textContent = '● 오프라인';
+              badge.style.background = 'linear-gradient(135deg,#f3f4f6,#e5e7eb)';
+              badge.style.color = '#6b7280';
+            }
+          });
+        }
+      });
+    }
+
     function downloadSingleScript(shortCode, name) {
       const today = new Date().toLocaleDateString('ko-KR');
       const url = location.origin + '/' + shortCode;
