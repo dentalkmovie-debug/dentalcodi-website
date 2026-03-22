@@ -2495,9 +2495,17 @@ app.get('/api/tv/:shortCode', async (c) => {
   userItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item))
   
   // activeItemIds에 있는 것만 순서대로 재생 (자동 포함 없음)
+  console.log('[TV API] playlist.id:', playlist.id, 'name:', playlist.name,
+    'activeItemIds:', JSON.stringify(activeItemIds),
+    'masterItems count:', masterItems.length, 'masterItems ids:', masterItems.map((i:any)=>i.id),
+    'userItems count:', userItemsWithFlag.length, 'userItems ids:', userItemsWithFlag.map((i:any)=>i.id),
+    'allItemsMap keys:', [...allItemsMap.keys()])
+  
   combinedItems = activeItemIds
     .filter(id => allItemsMap.has(id))
     .map(id => allItemsMap.get(id))
+  
+  console.log('[TV API] combinedItems:', combinedItems.map((i:any)=> `${i.id}:${i.title}`))
   
   const items = { results: combinedItems }
   
@@ -2539,6 +2547,17 @@ app.get('/api/tv/:shortCode', async (c) => {
       items: items.results,
       transition_effect: playlist.transition_effect || 'fade',
       transition_duration: playlist.transition_duration || 500
+    },
+    _debug: {
+      playlistId: playlist.id,
+      activeItemIds,
+      masterItemCount: masterItems.length,
+      masterItemIds: masterItems.map((i: any) => i.id),
+      userItemCount: userItemsWithFlag.length,
+      userItemIds: userItemsWithFlag.map((i: any) => i.id),
+      useMasterPlaylist,
+      hiddenIds: JSON.parse(playlist.hidden_master_items || '[]'),
+      combinedCount: combinedItems.length
     },
     // TV 화면에서 관리자 페이지 이동 시 올바른 계정으로 연결하기 위해 adminCode 포함
     adminCode: (playlist as any).admin_code || null,
