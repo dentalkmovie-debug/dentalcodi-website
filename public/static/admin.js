@@ -36,7 +36,15 @@ function showDeleteConfirm(message, callback, options) {
   }
   if (modal) {
     modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    // 배경 스크롤 방지 (body fixed)
+    if (_openModalSet.size === 0 && document.body.style.position !== 'fixed') {
+      document.body.dataset.scrollY = String(window.scrollY || document.documentElement.scrollTop || 0);
+      document.body.style.position = 'fixed';
+      document.body.style.top = '-' + document.body.dataset.scrollY + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.overflow = 'hidden';
+    }
     document.documentElement.style.overflow = 'hidden';
   }
 }
@@ -45,8 +53,15 @@ function cancelDeleteConfirm() {
   var modal = document.getElementById('delete-confirm-modal');
   if (modal) modal.style.display = 'none';
   if (_openModalSet.size === 0) {
+    var savedY = parseInt(document.body.dataset.scrollY || '0', 10);
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
     document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
     document.documentElement.style.overflow = '';
+    window.scrollTo(0, savedY);
   }
 }
 function executeDeleteConfirm() {
@@ -55,8 +70,15 @@ function executeDeleteConfirm() {
   var modal = document.getElementById('delete-confirm-modal');
   if (modal) modal.style.display = 'none';
   if (_openModalSet.size === 0) {
+    var savedY = parseInt(document.body.dataset.scrollY || '0', 10);
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
     document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
     document.documentElement.style.overflow = '';
+    window.scrollTo(0, savedY);
   }
   if (typeof cb === 'function') cb();
 }
@@ -1818,6 +1840,11 @@ function showTempVideoModal(playlistId, playlistName, shortCode) {
   if (searchInput) searchInput.value = '';
   tempVideoSearchQuery = '';
   selectedTempVideoItem = null;
+  
+  // 복귀 설정 기본값 리셋 (영상 끝나면 복귀)
+  document.getElementById('temp-return-time').value = 'end';
+  var radios = document.querySelectorAll('input[name="return-type"]');
+  radios.forEach(function(r) { r.checked = (r.value === 'end'); });
   
   // 모달 즉시 열기
   openModal('temp-video-modal');
@@ -4650,7 +4677,7 @@ function renderNotices() {
         '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
-        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;gap:4px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
+        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
         '<button onclick="toggleUrgent(' + n.id + ',' + (isUrgent ? '0' : '1') + ')" title="' + (isUrgent ? '\uAE34\uAE09 \uD574\uC81C' : '\uAE34\uAE09 \uC124\uC815') + '" style="padding:6px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + '"><i class="fas fa-exclamation-circle"></i></button>' +
         '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
         '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
@@ -4865,8 +4892,22 @@ function openModal(id) {
   const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
   el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
+  
+  // 배경 스크롤 완전 방지: body를 fixed로 고정하여 스크롤 위치 유지
+  if (_openModalSet.size === 0) {
+    // 첫 모달 열릴 때만 스크롤 위치 저장
+    document.body.dataset.scrollY = String(window.scrollY || document.documentElement.scrollTop || 0);
+    var scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + document.body.dataset.scrollY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.overflow = 'hidden';
+    if (scrollBarWidth > 0) {
+      document.body.style.paddingRight = scrollBarWidth + 'px';
+    }
+  }
   document.body.classList.add('modal-open');
-  document.body.style.overflow = 'hidden';
   document.documentElement.style.overflow = 'hidden';
   _openModalSet.add(id);
   // 부모 iframe에 스크롤 잠금 요청
@@ -4912,8 +4953,16 @@ function closeModal(id) {
   // 열린 모달이 없을 때 공통 처리
   if (_openModalSet.size === 0) {
     document.body.classList.remove('modal-open');
+    // body fixed 해제 및 스크롤 위치 복원
+    var savedScrollY = parseInt(document.body.dataset.scrollY || '0', 10);
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
     document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
     document.documentElement.style.overflow = '';
+    window.scrollTo(0, savedScrollY);
     // 부모 iframe에 스크롤 잠금 해제 요청
     try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'unlockScroll' }, '*'); } catch(e) {}
   }
