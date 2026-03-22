@@ -5352,13 +5352,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 SSR=${initialData.masterItems?.length || 0}개
               </div>
               <!-- 공용 영상 (SSR로 미리 렌더링) -->
-              <div id="library-master-section" class="mb-4" ${initialData.masterItems && initialData.masterItems.length > 0 ? '' : 'style="display:none"'}>
+              <div id="library-master-section" class="mb-4">
                 <div class="flex items-center gap-2 mb-2 text-sm">
                   <i class="fas fa-crown text-purple-500"></i>
                   <span class="font-medium text-purple-700">공용 영상</span>
                 </div>
                 <div id="library-master-list" class="space-y-2">
-                  ${(initialData.masterItems || []).map((item: any) => `
+                  ${(initialData.masterItems || []).length > 0 
+                    ? (initialData.masterItems || []).map((item: any) => `
                     <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
                          data-library-id="${item.id}" data-library-master="1"
                          onclick="addToPlaylistFromLibrary(${item.id})">
@@ -5374,7 +5375,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                       </div>
                       <i class="fas fa-plus text-purple-400"></i>
                     </div>
-                  `).join('')}
+                  `).join('')
+                    : '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>'
+                  }
                 </div>
               </div>
               
@@ -6400,9 +6403,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               }).join('');
               console.log('[Library] Failsafe ' + delay + 'ms: rendered', items.length, 'from API');
             } else if (items.length === 0) {
-              // 서버에 공용 영상이 없으면 섹션 숨기기
-              sec.style.display = 'none';
-              console.log('[Library] Failsafe ' + delay + 'ms: no master items on server, hiding section');
+              // 서버에 공용 영상이 없어도 섹션은 유지 (빈 상태 메시지)
+              sec.style.display = '';
+              list.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
+              console.log('[Library] Failsafe ' + delay + 'ms: no master items, showing empty message');
             }
           }).catch(function(e) {
             console.error('[Library] Failsafe ' + delay + 'ms: API error', e);
@@ -9265,10 +9269,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           _updateLibraryPlusButtons();
         }
       } else {
-        // 공용 영상이 없으면 섹션 숨기기
-        section.classList.add('hidden');
-        section.style.display = 'none';
-        if (list) list.innerHTML = '';
+        // 공용 영상이 없어도 섹션은 항상 보이게 유지
+        section.classList.remove('hidden');
+        section.style.display = '';
+        if (list) list.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
       }
     }
     
@@ -9335,11 +9339,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
         \`).join('');
       } else if (libraryMasterSection) {
-        // 서버에 공용 영상이 없으면 섹션 숨기기
-        libraryMasterSection.classList.add('hidden');
-        libraryMasterSection.style.display = 'none';
-        if (libraryMasterList) libraryMasterList.innerHTML = '';
-        _dbg('공용영상 0개 - 섹션 숨김');
+        // 공용 영상이 없어도 섹션은 항상 보이게 유지 (빈 상태 메시지 표시)
+        libraryMasterSection.classList.remove('hidden');
+        libraryMasterSection.style.display = '';
+        if (libraryMasterList) libraryMasterList.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
+        _dbg('공용영상 0개 - 빈 상태 메시지 표시');
       }
       
       // 라이브러리: 내 영상

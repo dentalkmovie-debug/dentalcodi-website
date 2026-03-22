@@ -531,9 +531,10 @@ if (document.readyState === 'loading') {
           }).join('');
           console.log('[Library] Failsafe ' + delay + 'ms: rendered', items.length, 'from API');
         } else if (items.length === 0) {
-          // 서버에 공용 영상이 없으면 섹션 숨기기
-          sec.style.display = 'none';
-          console.log('[Library] Failsafe ' + delay + 'ms: no master items on server, hiding section');
+          // 서버에 공용 영상이 없어도 섹션은 유지 (빈 상태 메시지)
+          sec.style.display = '';
+          list.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
+          console.log('[Library] Failsafe ' + delay + 'ms: no master items, showing empty message');
         }
       }).catch(function(e) {
         console.error('[Library] Failsafe ' + delay + 'ms: API error', e);
@@ -3396,10 +3397,10 @@ function ensureMasterLibraryVisible() {
       _updateLibraryPlusButtons();
     }
   } else {
-    // 공용 영상이 없으면 섹션 숨기기
-    section.classList.add('hidden');
-    section.style.display = 'none';
-    if (list) list.innerHTML = '';
+    // 공용 영상이 없어도 섹션은 항상 보이게 유지
+    section.classList.remove('hidden');
+    section.style.display = '';
+    if (list) list.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
   }
 }
 
@@ -3466,11 +3467,11 @@ async function renderLibraryAndPlaylist() {
       </div>
     `).join('');
   } else if (libraryMasterSection) {
-    // 서버에 공용 영상이 없으면 섹션 숨기기
-    libraryMasterSection.classList.add('hidden');
-    libraryMasterSection.style.display = 'none';
-    if (libraryMasterList) libraryMasterList.innerHTML = '';
-    _dbg('공용영상 0개 - 섹션 숨김');
+    // 공용 영상이 없어도 섹션은 항상 보이게 유지 (빈 상태 메시지 표시)
+    libraryMasterSection.classList.remove('hidden');
+    libraryMasterSection.style.display = '';
+    if (libraryMasterList) libraryMasterList.innerHTML = '<div class="text-xs text-gray-400 text-center py-3"><i class="fas fa-info-circle mr-1"></i>공용 영상이 없습니다.<br>마스터 관리에서 추가해주세요.</div>';
+    _dbg('공용영상 0개 - 빈 상태 메시지 표시');
   }
   
   // 라이브러리: 내 영상
