@@ -728,6 +728,20 @@ function setNoticePosition(position) {
   saveGlobalNoticeSettings();
 }
 
+// 스타일 패널 접기/펼치기
+function toggleNoticeStylePanel() {
+  var body = document.getElementById('notice-style-body');
+  var chevron = document.getElementById('notice-style-chevron');
+  if (!body) return;
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    body.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
 function updateNoticePositionButtons(position) {
   const topBtn = document.getElementById('position-top-btn');
   const bottomBtn = document.getElementById('position-bottom-btn');
@@ -4567,116 +4581,35 @@ function renderNotices() {
   }
   
   if (notices.length === 0) {
-    container.innerHTML = `
-      <div class="bg-white rounded-xl shadow-sm p-8 text-center">
-        <i class="fas fa-bullhorn text-4xl text-gray-300 mb-4"></i>
-        <p class="text-gray-500">공지사항이 없습니다.</p>
-        <p class="text-sm text-gray-400 mt-2">새 공지사항을 추가해보세요.</p>
-      </div>
-    `;
+    container.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-bullhorn" style="font-size:28px;margin-bottom:10px;display:block;color:#d1d5db"></i><p style="margin:0;font-size:13px;color:#6b7280">\uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p><p style="margin:4px 0 0;font-size:11px;color:#d1d5db">\uC0C8 \uACF5\uC9C0\uC0AC\uD56D\uC744 \uCD94\uAC00\uD574\uBCF4\uC138\uC694.</p></div>';
     return;
   }
   
-  // 긴급공지와 일반공지 분리
-  const urgentNotices = notices.filter(n => n.is_urgent);
-  const normalNotices = notices.filter(n => !n.is_urgent);
-  
-  let html = '';
-  
-  // 긴급공지 섹션
-  if (urgentNotices.length > 0) {
-    html += `
-      <div class="mb-4">
-        <h4 class="text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
-          <i class="fas fa-exclamation-circle"></i>긴급공지 (${urgentNotices.length}개)
-        </h4>
-        <div class="bg-red-50 rounded-xl p-3 space-y-2">
-    `;
-    urgentNotices.forEach((n, index) => {
-      html += `
-        <div class="notice-item bg-white rounded-lg p-3 border-l-4 border-red-500" data-id="${n.id}">
-          <div class="flex items-center justify-between">
-            <div class="notice-drag-handle text-gray-400 hover:text-gray-600 p-1 cursor-grab active:cursor-grabbing mr-2">
-              <i class="fas fa-grip-vertical"></i>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-600">긴급</span>
-                <span class="px-2 py-0.5 rounded text-xs font-medium ${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
-                  ${n.is_active ? '✓ TV에 표시중' : '숨김'}
-                </span>
-              </div>
-              <p class="text-gray-800 whitespace-pre-wrap">${n.content}</p>
-            </div>
-            <div class="flex items-center gap-1 ml-4">
-              <button onclick="toggleUrgent(${n.id}, 0)"
-                class="px-2 py-1 rounded text-xs bg-red-100 text-red-600 hover:bg-red-200">
-                긴급해제
-              </button>
-              <button onclick="toggleNotice(${n.id}, ${n.is_active ? 0 : 1})"
-                class="px-2 py-1 rounded text-xs ${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
-                ${n.is_active ? '숨기기' : '표시'}
-              </button>
-              <button onclick="editNotice(${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
-                수정
-              </button>
-              <button onclick="deleteNotice(${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    html += `</div></div>`;
-  }
-  
-  // 일반공지 섹션
-  if (normalNotices.length > 0) {
-    html += `
-      <div>
-        <h4 class="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2">
-          <i class="fas fa-bullhorn"></i>일반공지 (${normalNotices.length}개)
-        </h4>
-        <div class="space-y-2">
-    `;
-    normalNotices.forEach((n, index) => {
-      html += `
-        <div class="notice-item bg-white rounded-xl shadow-sm p-3" data-id="${n.id}">
-          <div class="flex items-center justify-between">
-            <div class="notice-drag-handle text-gray-400 hover:text-gray-600 p-1 cursor-grab active:cursor-grabbing mr-2">
-              <i class="fas fa-grip-vertical"></i>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="px-2 py-0.5 rounded text-xs font-medium ${n.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}">
-                  ${n.is_active ? '✓ TV에 표시중' : '숨김'}
-                </span>
-              </div>
-              <p class="text-gray-800 whitespace-pre-wrap">${n.content}</p>
-            </div>
-            <div class="flex items-center gap-1 ml-4">
-              <button onclick="toggleUrgent(${n.id}, 1)"
-                class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-500 hover:bg-gray-200">
-                긴급설정
-              </button>
-              <button onclick="toggleNotice(${n.id}, ${n.is_active ? 0 : 1})"
-                class="px-2 py-1 rounded text-xs ${n.is_active ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}">
-                ${n.is_active ? '숨기기' : '표시'}
-              </button>
-              <button onclick="editNotice(${n.id})" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200">
-                수정
-              </button>
-              <button onclick="deleteNotice(${n.id})" class="p-1.5 text-red-400 hover:text-red-600" title="삭제">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    });
-    html += `</div></div>`;
-  }
+  var html = '';
+  notices.forEach(function(n, index) {
+    var isUrgent = n.is_urgent;
+    var isActive = n.is_active;
+    var borderColor = isUrgent ? '#ef4444' : (isActive ? '#22c55e' : '#e5e7eb');
+    var bgColor = isUrgent ? '#fef2f2' : '#fff';
+    
+    html += '<div class="notice-item" data-id="' + n.id + '" style="display:flex;align-items:stretch;gap:0;background:' + bgColor + ';border-radius:10px;border:1px solid ' + (isUrgent ? '#fecaca' : '#f3f4f6') + ';border-left:4px solid ' + borderColor + ';overflow:hidden;transition:all .15s" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.06)\'" onmouseout="this.style.boxShadow=\'none\'">' +
+      '<div class="notice-drag-handle" style="display:flex;align-items:center;padding:0 10px;cursor:grab;color:#d1d5db;font-size:12px;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div>' +
+      '<div style="display:flex;align-items:center;padding:12px 4px 12px 0;flex-shrink:0"><span class="notice-number" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + ';font-size:11px;font-weight:700">' + (index + 1) + '</span></div>' +
+      '<div style="flex:1;padding:12px 8px;min-width:0">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
+          (isUrgent ? '<span style="font-size:10px;padding:2px 6px;background:#fee2e2;color:#dc2626;border-radius:4px;font-weight:600"><i class="fas fa-exclamation-circle" style="margin-right:2px"></i>\uAE34\uAE09</span>' : '') +
+          '<span style="font-size:10px;padding:2px 6px;background:' + (isActive ? '#dcfce7' : '#f3f4f6') + ';color:' + (isActive ? '#16a34a' : '#9ca3af') + ';border-radius:4px;font-weight:600">' + (isActive ? 'TV \uD45C\uC2DC\uC911' : '\uC228\uAE40') + '</span>' +
+        '</div>' +
+        '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
+        '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC') + '" style="padding:6px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s;background:' + (isActive ? '#fef9c3' : '#dcfce7') + ';color:' + (isActive ? '#a16207' : '#16a34a') + '"><i class="fas ' + (isActive ? 'fa-eye-slash' : 'fa-eye') + '"></i></button>' +
+        '<button onclick="toggleUrgent(' + n.id + ',' + (isUrgent ? '0' : '1') + ')" title="' + (isUrgent ? '\uAE34\uAE09 \uD574\uC81C' : '\uAE34\uAE09 \uC124\uC815') + '" style="padding:6px 8px;font-size:11px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + '"><i class="fas fa-exclamation-circle"></i></button>' +
+        '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
+        '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
+      '</div>' +
+    '</div>';
+  });
   
   container.innerHTML = html;
   
