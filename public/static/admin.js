@@ -237,7 +237,7 @@ function renderLibrarySearchResults() {
   }
 
   const items = currentPlaylist?.items || [];
-  const masterItemsList = masterItemsCache || [];
+  const masterItemsList = filterMasterItemsByPlaylist(masterItemsCache || []);
   const allItems = [
     ...masterItemsList.map(item => ({ ...item, is_master: true })),
     ...items.map(item => ({ ...item, is_master: false }))
@@ -545,14 +545,15 @@ if (document.readyState === 'loading') {
         masterItemsCache = items;
         cachedMasterItems = items;
         masterItems = items;
-        if (items.length > 0 && list.children.length === 0) {
-          list.innerHTML = items.map(function(item) {
+        var filteredForFailsafe = filterMasterItemsByPlaylist(items);
+        if (filteredForFailsafe.length > 0 && list.children.length === 0) {
+          list.innerHTML = filteredForFailsafe.map(function(item) {
             return '<div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition" data-library-id="' + item.id + '" data-library-master="1" onclick="addToPlaylistFromLibrary(' + item.id + ')">' +
               '<div class="w-16 h-10 bg-purple-200 rounded overflow-hidden flex-shrink-0">' +
               (item.thumbnail_url ? '<img src="' + item.thumbnail_url + '" class="w-full h-full object-cover">' : '<div class="w-full h-full flex items-center justify-center"><i class="fab fa-vimeo text-purple-400"></i></div>') +
-              '</div><div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || '') + '</p><p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p></div><i class="fas fa-plus text-purple-400"></i></div>';
+              '</div><div class="flex-1 min-w-0"><p class="text-xs font-medium text-purple-800 truncate">' + (item.title || '') + '</p><p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p></div><i class="fas fa-plus text-purple-400"></i></div>';
           }).join('');
-          console.log('[Library] Failsafe ' + delay + 'ms: rendered', items.length, 'from API');
+          console.log('[Library] Failsafe ' + delay + 'ms: rendered', filteredForFailsafe.length, 'from API (filtered)');
         } else if (items.length === 0) {
           // 서버에 공용 영상이 없어도 섹션은 유지 (빈 상태 메시지)
           sec.style.display = '';
@@ -3636,6 +3637,26 @@ function loadPlaylistOrder() {
   console.log('[Playlist] Loaded activeItemIds:', currentPlaylist.activeItemIds);
 }
 
+// 공용 영상 target_type 필터링 (대기실/체어 구분)
+function filterMasterItemsByPlaylist(items) {
+  if (!items || !currentPlaylist) return items || [];
+  var isChair = currentPlaylist.name && currentPlaylist.name.includes('체어');
+  return items.filter(function(item) {
+    var tt = item.target_type || 'all';
+    if (tt === 'all') return true;
+    if (isChair && tt === 'chair') return true;
+    if (!isChair && tt === 'waitingroom') return true;
+    return false;
+  });
+}
+
+function getMasterTargetBadge(item) {
+  var tt = item.target_type || 'all';
+  if (tt === 'waitingroom') return '<span style="font-size:9px;padding:0px 4px;background:#dbeafe;color:#1d4ed8;border-radius:3px;font-weight:600">대기실</span>';
+  if (tt === 'chair') return '<span style="font-size:9px;padding:0px 4px;background:#ede9fe;color:#7c3aed;border-radius:3px;font-weight:600">체어</span>';
+  return '<span style="font-size:9px;padding:0px 4px;background:#ecfdf5;color:#059669;border-radius:3px;font-weight:600">공통</span>';
+}
+
 // 공용 영상 라이브러리 표시/숨기기 (API 결과 기반)
 function ensureMasterLibraryVisible() {
   const section = document.getElementById('library-master-section');
@@ -3643,14 +3664,15 @@ function ensureMasterLibraryVisible() {
   if (!section) return;
   
   // masterItemsCache가 서버에서 로드된 최신 데이터
-  if (masterItemsCache && masterItemsCache.length > 0) {
+  var filteredMaster = filterMasterItemsByPlaylist(masterItemsCache);
+  if (filteredMaster && filteredMaster.length > 0) {
     section.classList.remove('hidden');
     section.style.display = '';
     if (section.style.visibility === 'hidden') section.style.visibility = '';
     
     if (list && (!list.innerHTML || list.innerHTML.trim() === '' || list.children.length === 0)) {
-      console.log('[Library] Rendering master items:', masterItemsCache.length);
-      list.innerHTML = masterItemsCache.map(item => `
+      console.log('[Library] Rendering master items:', filteredMaster.length);
+      list.innerHTML = filteredMaster.map(item => `
         <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
              data-library-id="${item.id}" data-library-master="1"
              onclick="addToPlaylistFromLibrary(${item.id})">
@@ -3662,7 +3684,7 @@ function ensureMasterLibraryVisible() {
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
-            <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+            <p class="text-xs text-purple-500">${getMasterTargetBadge(item)}</p>
           </div>
           <i class="fas fa-plus text-purple-400"></i>
         </div>
@@ -3716,13 +3738,14 @@ async function renderLibraryAndPlaylist() {
   const isEditOpen = editModal && !editModal.classList.contains('hidden');
 
   
-  // 라이브러리: 공용 영상
-  _dbg('렌더링 진입: cache=' + (masterItemsCache ? masterItemsCache.length : 'null'));
-  if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
+  // 라이브러리: 공용 영상 (target_type 필터링 적용)
+  var filteredMasterForLib = filterMasterItemsByPlaylist(masterItemsCache);
+  _dbg('렌더링 진입: cache=' + (masterItemsCache ? masterItemsCache.length : 'null') + ', filtered=' + filteredMasterForLib.length);
+  if (filteredMasterForLib && filteredMasterForLib.length > 0 && libraryMasterSection) {
     libraryMasterSection.classList.remove('hidden');
     libraryMasterSection.style.display = '';
-    _dbg('✅ 공용영상 ' + masterItemsCache.length + '개 렌더링');
-    libraryMasterList.innerHTML = masterItemsCache.map(item => `
+    _dbg('공용영상 ' + filteredMasterForLib.length + '개 렌더링');
+    libraryMasterList.innerHTML = filteredMasterForLib.map(item => `
       <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
            data-library-id="${item.id}" data-library-master="1"
            onclick="addToPlaylistFromLibrary(${item.id})">
@@ -3734,7 +3757,7 @@ async function renderLibraryAndPlaylist() {
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
-          <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+          <p class="text-xs text-purple-500">${getMasterTargetBadge(item)}</p>
         </div>
         <i class="fas fa-plus text-purple-400"></i>
       </div>
@@ -3820,7 +3843,7 @@ async function renderLibraryAndPlaylist() {
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
-        ${item.is_master ? '<p class="text-xs text-purple-400"><i class="fas fa-crown mr-1"></i>공용</p>' : ''}
+        ${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
       </div>
       <button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
     </div>
@@ -3869,7 +3892,7 @@ function _renderPlaylistOnly() {
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
-        ${item.is_master ? '<p class="text-xs text-purple-400"><i class="fas fa-crown mr-1"></i>공용</p>' : ''}
+        ${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
       </div>
       <button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
     </div>
@@ -3911,10 +3934,11 @@ function renderLibraryOnly() {
   const libraryMasterSection = document.getElementById('library-master-section');
   const items = currentPlaylist.items || [];
 
-  if (masterItemsCache && masterItemsCache.length > 0 && libraryMasterSection) {
+  var filteredMasterForLibOnly = filterMasterItemsByPlaylist(masterItemsCache);
+  if (filteredMasterForLibOnly && filteredMasterForLibOnly.length > 0 && libraryMasterSection) {
     libraryMasterSection.classList.remove('hidden');
     libraryMasterSection.style.display = '';
-    libraryMasterList.innerHTML = masterItemsCache.map(item => `
+    libraryMasterList.innerHTML = filteredMasterForLibOnly.map(item => `
       <div class="flex items-center gap-2 p-2 bg-purple-100 rounded cursor-pointer hover:bg-purple-200 transition"
            data-library-id="${item.id}" data-library-master="1"
            onclick="addToPlaylistFromLibrary(${item.id})">
@@ -3926,7 +3950,7 @@ function renderLibraryOnly() {
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-xs font-medium text-purple-800 truncate">${item.title || item.url}</p>
-          <p class="text-xs text-purple-500"><i class="fas fa-crown mr-1"></i>공용</p>
+          <p class="text-xs text-purple-500">${getMasterTargetBadge(item)}</p>
         </div>
         <i class="fas fa-plus text-purple-400"></i>
       </div>
