@@ -8389,14 +8389,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         console.log('[Editor] Failed to load masterItems from API:', e);
       }
       
-      // ── 2-b단계: 즉시 렌더링 또는 SSR 콘텐츠 유지 ──
-      // 공용 영상 섹션은 절대 스켈레톤으로 덮어쓰지 않음!
-      // SSR이 이미 올바르게 렌더링한 내용을 보존
-      const _ssrMasterList = document.getElementById('library-master-list');
-      const _hasSsrMasterContent = _ssrMasterList && _ssrMasterList.children.length > 0;
-      
-      if (masterItemsCache && masterItemsCache.length > 0 && currentPlaylist) {
-        playlistEditorSignature = getPlaylistEditorSignature(masterItemsCache, currentPlaylist);
+      // ── 2-b단계: 즉시 렌더링 (masterItems 유무와 무관하게 항상 실행) ──
+      if (currentPlaylist) {
+        playlistEditorSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
         await renderLibraryAndPlaylist();
         ensureMasterLibraryVisible();
         loadPlaylistOrder();
@@ -8413,22 +8408,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             }
           })
           .catch(() => {});
-        isOpeningEditor = false;
-        return;
-      } else {
-        // masterItemsCache가 비어있음 = 서버에 공용 영상이 없음
-        console.log('[Editor] No master items on server, hiding master section');
-        const _masterSection = document.getElementById('library-master-section');
-        if (_masterSection) {
-          _masterSection.classList.add('hidden');
-          _masterSection.style.display = 'none';
-        }
-        // 내 영상/재생목록만 스켈레톤 표시
-        const skeletonItem = '<div class="animate-pulse flex items-center gap-3 p-3 border-b"><div class="w-20 h-14 bg-gray-200 rounded flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="h-3 bg-gray-200 rounded w-3/4"></div><div class="h-3 bg-gray-200 rounded w-1/2"></div></div></div>';
-        const libraryUserList = document.getElementById('library-user-list');
-        if (libraryUserList) libraryUserList.innerHTML = skeletonItem.repeat(3);
-        const playlistContainer = document.getElementById('playlist-items-container');
-        if (playlistContainer) playlistContainer.innerHTML = skeletonItem.repeat(4);
       }
 
       // ── 3단계: 백그라운드에서 playlist 상세(items) fetch ──
