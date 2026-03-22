@@ -13772,6 +13772,14 @@ app.get('/tv/:shortCode', async (c) => {
         }
         const serverTempVideo = data.tempVideo;
         
+        // 디버그: TV API 응답 로깅
+        if (data._debug) {
+          console.log('[TV DEBUG]', JSON.stringify(data._debug));
+        }
+        if (isInitial) {
+          console.log('[TV Initial] items:', (data.playlist?.items || []).map(i => i.id + ':' + (i.title || '?')));
+        }
+        
         // 이전에 에러 화면이 표시되었다면 숨기고 정상 복구
         const errorScreen = document.getElementById('error-screen');
         const wasErrorVisible = errorScreen && errorScreen.style.display !== 'none';
