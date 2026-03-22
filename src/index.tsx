@@ -11808,7 +11808,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 var addRes = await fetch('/api/' + code + '/playlists/' + playlist.id + '/items', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url: item.url, title: item.title, add_to_playlist: true })
+                  body: JSON.stringify({ url: item.url, title: item.title, add_to_playlist: false })
                 });
                 if (addRes.ok) successCount++;
                 else {
