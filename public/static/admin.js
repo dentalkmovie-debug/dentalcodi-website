@@ -5206,26 +5206,28 @@ function saveClinicNameFromSettings() {
 // ============================================
 function showAdminSubTab(sub) {
   _adminSubTab = sub;
-  // 모바일코디 스타일 2탭: push / overview
-  ['push', 'overview'].forEach(s => {
-    const btn = document.getElementById('admin-sub-' + s);
-    if (btn) {
-      if (s === sub) {
-        btn.style.cssText = 'padding:10px 20px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:' + (s === 'push' ? '8px 0 0 8px' : '0 8px 8px 0');
-      } else {
-        btn.style.cssText = 'padding:10px 20px;border:1px solid #e5e7eb;' + (s === 'overview' ? 'border-left:none;' : 'border-right:none;') + 'background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border-radius:' + (s === 'push' ? '8px 0 0 8px' : '0 8px 8px 0');
-      }
+  var allSubs = ['push', 'master-videos', 'overview'];
+  allSubs.forEach(function(s) {
+    var btn = document.getElementById('admin-sub-' + s);
+    if (!btn) return;
+    var isFirst = (s === 'push');
+    var isLast = (s === 'overview');
+    var radius = isFirst ? '8px 0 0 8px' : isLast ? '0 8px 8px 0' : '0';
+    if (s === sub) {
+      btn.style.cssText = 'padding:10px 20px;border:none;background:#3b82f6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:' + radius;
+    } else {
+      btn.style.cssText = 'padding:10px 20px;border:1px solid #e5e7eb;border-left:none;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border-radius:' + radius;
     }
   });
-  const body = document.getElementById('admin-body');
+  var body = document.getElementById('admin-body');
   if (!body) return;
   body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>\uB85C\uB529 \uC911...</div>';
   if (sub === 'push') {
-    // 링크 배포 탭: 최신 치과 목록 로드 후 렌더링
     refreshAdminClinics().catch(function(){});
     renderAdminPush();
+  } else if (sub === 'master-videos') {
+    loadMasterItemsForAdmin().then(function() { renderAdminMasterItems(); }).catch(function() { renderAdminMasterItems(); });
   } else if (sub === 'overview') {
-    // 전체 현황 탭: 최신 마스터 아이템 + 치과 목록 로드 후 렌더링
     Promise.all([
       loadMasterItemsForAdmin(),
       refreshAdminClinics().catch(function(){})
@@ -5425,33 +5427,54 @@ function renderAdminOverview() {
 function renderAdminMasterItems() {
   const body = document.getElementById('admin-body');
   if (!body) return;
+  const items = masterItems || [];
   
-  body.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0;display:flex;align-items:center;gap:8px">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-video"></i></span>
-        \uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC (${(masterItems || []).length}\uAC1C)
-      </h3>
-    </div>
-    <div style="background:#f5f3ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px">
-      <div style="display:flex;gap:8px">
-        <input type="text" id="admin-new-url" placeholder="YouTube \uB610\uB294 Vimeo URL" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit">
-        <button onclick="adminAddMasterItem()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-plus" style="margin-right:4px"></i>\uCD94\uAC00</button>
-      </div>
-    </div>
-    <div id="admin-master-items-list" style="display:grid;gap:6px">
-      ${(masterItems || []).map(item => {
-        const thumb = item.thumbnail_url 
-          ? '<img src="' + item.thumbnail_url + '" style="width:56px;height:36px;object-fit:cover;border-radius:6px">'
-          : '<div style="width:56px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center"><i class="fas fa-video" style="color:#9ca3af;font-size:11px"></i></div>';
-        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9fafb;border-radius:8px;border:1px solid #f3f4f6">' +
-          thumb +
-          '<div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + (item.title || item.url || '') + '</p><p style="font-size:11px;color:#9ca3af;margin:2px 0 0">' + (item.item_type || '') + '</p></div>' +
-          '<button onclick="adminDeleteMasterItem(' + item.id + ')" style="padding:4px 8px;font-size:11px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit"><i class="fas fa-trash"></i></button>' +
-          '</div>';
-      }).join('')}
-    </div>
-  </div>`;
+  var itemsHtml = '';
+  if (items.length === 0) {
+    itemsHtml = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-video" style="font-size:24px;margin-bottom:8px;display:block"></i><p style="margin:0;font-size:13px">\uB4F1\uB85D\uB41C \uACF5\uC6A9 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p><p style="margin:4px 0 0;font-size:11px;color:#d1d5db">Vimeo URL\uC744 \uC785\uB825\uD558\uC5EC \uCD94\uAC00\uD558\uC138\uC694.</p></div>';
+  } else {
+    itemsHtml = items.map(function(item, idx) {
+      var thumb = item.thumbnail_url && !item.thumbnail_url.includes('vimeo.com/')
+        ? '<img src="' + item.thumbnail_url + '" style="width:72px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0">'
+        : '<div style="width:72px;height:48px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-video" style="color:#9ca3af;font-size:14px"></i></div>';
+      var typeLabel = (item.item_type || 'vimeo').toUpperCase();
+      var typeBg = typeLabel === 'VIMEO' ? '#7c3aed' : '#dc2626';
+      return '<div id="admin-master-item-' + item.id + '" style="display:flex;align-items:center;gap:12px;padding:12px;background:#f9fafb;border-radius:10px;border:1px solid #f3f4f6;transition:all .15s" onmouseover="this.style.borderColor=\'#c7d2fe\';this.style.background=\'#faf5ff\'" onmouseout="this.style.borderColor=\'#f3f4f6\';this.style.background=\'#f9fafb\'">' +
+        '<span style="font-size:11px;color:#9ca3af;font-weight:600;min-width:20px;text-align:center">' + (idx + 1) + '</span>' +
+        thumb +
+        '<div style="flex:1;min-width:0">' +
+          '<p id="admin-master-title-' + item.id + '" style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;color:#1f2937">' + (item.title || 'Untitled') + '</p>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">' +
+            '<span style="font-size:10px;padding:1px 6px;background:' + typeBg + ';color:#fff;border-radius:4px;font-weight:600">' + typeLabel + '</span>' +
+            '<span style="font-size:10px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (item.url || '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0">' +
+          '<button onclick="adminEditMasterItem(' + item.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:12px;background:#ede9fe;color:#7c3aed;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#ddd6fe\'" onmouseout="this.style.background=\'#ede9fe\'"><i class="fas fa-pen"></i></button>' +
+          '<button onclick="adminRefreshMasterThumb(' + item.id + ')" title="\uC378\uB124\uC77C \uC0C8\uB85C\uACE0\uCE68" style="padding:6px 8px;font-size:12px;background:#e0f2fe;color:#0284c7;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#bae6fd\'" onmouseout="this.style.background=\'#e0f2fe\'"><i class="fas fa-sync-alt"></i></button>' +
+          '<button onclick="adminDeleteMasterItem(' + item.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:12px;background:#fee2e2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#fecaca\'" onmouseout="this.style.background=\'#fee2e2\'"><i class="fas fa-trash"></i></button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+  
+  body.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+      '<h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0;display:flex;align-items:center;gap:8px">' +
+        '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-video"></i></span>' +
+        '\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC <span style="font-size:12px;font-weight:500;color:#6b7280">(' + items.length + '\uAC1C)</span>' +
+      '</h3>' +
+      '<button onclick="adminRefreshMasterList()" style="font-size:12px;color:#7c3aed;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button>' +
+    '</div>' +
+    '<div style="background:#f5f3ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px">' +
+      '<p style="font-size:11px;color:#6b7280;margin:0 0 8px"><i class="fas fa-info-circle" style="margin-right:4px;color:#7c3aed"></i>\uC5EC\uAE30\uC11C \uCD94\uAC00\uD55C \uC601\uC0C1\uC740 \uBAA8\uB4E0 \uCE58\uACFC\uC5D0 \uACF5\uC6A9\uB429\uB2C8\uB2E4.</p>' +
+      '<div style="display:flex;gap:8px">' +
+        '<input type="text" id="admin-new-url" placeholder="Vimeo URL \uC785\uB825 (https://vimeo.com/...)" style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit">' +
+        '<button onclick="adminAddMasterItem()" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap"><i class="fas fa-plus" style="margin-right:4px"></i>\uCD94\uAC00</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="admin-master-items-list" style="display:grid;gap:6px">' + itemsHtml + '</div>' +
+  '</div>';
 }
 
 async function adminAddMasterItem() {
@@ -5484,6 +5507,63 @@ async function adminDeleteMasterItem(itemId) {
       }
     } catch(e) { showToast('\uC0AD\uC81C \uC2E4\uD328', 'error'); }
   });
+}
+
+async function adminEditMasterItem(itemId) {
+  var item = (masterItems || []).find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  var newTitle = prompt('\uC601\uC0C1 \uC81C\uBAA9\uC744 \uC785\uB825\uD558\uC138\uC694:', item.title || '');
+  if (newTitle === null || newTitle.trim() === '') return;
+  try {
+    var res = await fetch('/api/master/items/' + itemId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim() })
+    });
+    if (res.ok) {
+      item.title = newTitle.trim();
+      var titleEl = document.getElementById('admin-master-title-' + itemId);
+      if (titleEl) titleEl.textContent = newTitle.trim();
+      cachedMasterItems = masterItems; masterItemsCache = masterItems;
+      showToast('\uC81C\uBAA9 \uC218\uC815 \uC644\uB8CC');
+    } else {
+      showToast('\uC218\uC815 \uC2E4\uD328', 'error');
+    }
+  } catch(e) { showToast('\uC218\uC815 \uC2E4\uD328', 'error'); }
+}
+
+async function adminRefreshMasterThumb(itemId) {
+  var btn = event && event.currentTarget;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+  try {
+    var res = await fetch('/api/master/items/' + itemId + '/refresh-thumbnail', { method: 'POST' });
+    if (res.ok) {
+      var data = await res.json();
+      var item = (masterItems || []).find(function(i) { return i.id === itemId; });
+      if (item && data.thumbnail_url) { item.thumbnail_url = data.thumbnail_url; }
+      if (item && data.title) { item.title = data.title; }
+      cachedMasterItems = masterItems; masterItemsCache = masterItems;
+      renderAdminMasterItems();
+      showToast('\uC378\uB124\uC77C \uC0C8\uB85C\uACE0\uCE68 \uC644\uB8CC');
+    } else {
+      showToast('\uC378\uB124\uC77C \uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error');
+    }
+  } catch(e) { showToast('\uC378\uB124\uC77C \uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error'); }
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i>'; }
+}
+
+async function adminRefreshMasterList() {
+  try {
+    var res = await fetch('/api/master/items?ts=' + Date.now(), { cache: 'no-store' });
+    if (res.ok) {
+      var data = await res.json();
+      masterItems = data.items || [];
+      cachedMasterItems = masterItems;
+      masterItemsCache = masterItems;
+      renderAdminMasterItems();
+      showToast('\uBAA9\uB85D \uC0C8\uB85C\uACE0\uCE68 \uC644\uB8CC');
+    }
+  } catch(e) { showToast('\uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error'); }
 }
 
 function renderAdminPush() {
