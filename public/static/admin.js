@@ -5230,14 +5230,13 @@ function showAdminSubTab(sub) {
   if (!body) return;
   body.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>\uB85C\uB529 \uC911...</div>';
   if (sub === 'push') {
-    refreshAdminClinics().catch(function(){});
-    renderAdminPush();
+    refreshAdminClinics(true).then(function() { renderAdminPush(); }).catch(function() { renderAdminPush(); });
   } else if (sub === 'master-videos') {
     loadMasterItemsForAdmin().then(function() { renderAdminMasterItems(); }).catch(function() { renderAdminMasterItems(); });
   } else if (sub === 'overview') {
     Promise.all([
       loadMasterItemsForAdmin(),
-      refreshAdminClinics().catch(function(){})
+      refreshAdminClinics(true).catch(function(){})
     ]).then(function() {
       renderAdminOverview();
     });
@@ -5308,16 +5307,18 @@ function renderAdminClinics() {
   </div>`;
 }
 
-async function refreshAdminClinics() {
+async function refreshAdminClinics(skipRender) {
   try {
     const res = await fetch('/api/master/users');
     if (res.ok) {
       const data = await res.json();
       _allClinics = (data.users || []).filter(u => !u.is_master);
-      renderAdminOverview();
-      showToast('\uC0C8\uB85C\uACE0\uCE68 \uC644\uB8CC');
+      if (!skipRender) {
+        if (_adminSubTab === 'overview') renderAdminOverview();
+        else if (_adminSubTab === 'push') renderAdminPush();
+      }
     }
-  } catch(e) { showToast('\uC0C8\uB85C\uACE0\uCE68 \uC2E4\uD328', 'error'); }
+  } catch(e) { /* silent */ }
 }
 
 async function adminSuspendClinic(adminCode) {
