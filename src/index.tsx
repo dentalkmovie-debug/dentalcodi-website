@@ -4680,9 +4680,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     /* 모달 열릴 때 body 고정 (아임웹 iframe 환경 배경 이동 완전 차단) */
     body.modal-open {
       overflow: hidden !important;
-      position: fixed !important;
       width: 100% !important;
-      height: 100% !important;
       touch-action: none !important;
     }
     html.modal-open {
@@ -11166,15 +11164,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const isGuideModal = GUIDE_MODALS.has(id);
       const isOverlayModal = OVERLAY_MODALS.has(id);
 
-      if (isGuideModal) {
-        const dashboard = document.getElementById('dashboard');
-        if (dashboard) dashboard.style.display = 'none';
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      }
+      // ── 1) 대시보드 숨기기 (모든 모달에서 적용) ──
+      const dashboard = document.getElementById('dashboard');
+      if (dashboard) dashboard.style.display = 'none';
 
-      // 모달을 body 직접 자식으로 이동
+      // ── 2) iframe 내부 스크롤을 맨 위로 ──
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+
+      // ── 3) 모달을 body 직접 자식으로 이동 ──
       if (el.parentElement !== document.body) {
         document.body.appendChild(el);
       }
@@ -11183,16 +11182,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const wrapperEl = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
       if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
-      // 아임웹 헤더 높이 계산
-      const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
-
-      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:99999; overflow-y:auto; align-items:flex-start; justify-content:center;';
+      // ── 4) 모달을 absolute로 전체 화면 배치 ──
+      // iframe 환경에서 fixed가 동작하지 않으므로 absolute + 뷰포트 높이 사용
+      const vh = window.innerHeight || document.documentElement.clientHeight || 700;
+      el.style.cssText = 'display:flex !important; position:absolute; top:0; left:0; width:100%; min-height:' + vh + 'px; z-index:99999; overflow-y:auto; align-items:flex-start; justify-content:center;';
       
-      // 배경 스크롤 완전 방지 (position:fixed + 스크롤 위치 보존)
+      // ── 5) 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
-        // 첫 모달 오픈 시에만 스크롤 위치 저장
         window._savedScrollY = window.scrollY || window.pageYOffset || 0;
-        document.body.style.top = '-' + window._savedScrollY + 'px';
       }
       document.body.classList.add('modal-open');
       document.documentElement.classList.add('modal-open');
@@ -11200,36 +11197,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       document.documentElement.style.overflow = 'hidden';
       _openModalSet.add(id);
       
-      // iframe 높이 변경 차단 (MutationObserver가 postParentHeight를 호출하는 것 방지)
+      // iframe 높이 변경 차단
       modalHeightLocked = true;
       
-      // 부모 iframe에 스크롤 잠금 + 맨 위로 이동 요청
+      // ── 6) 부모 iframe에 높이 설정 + 스크롤 최상단 요청 ──
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({ type: 'lockScroll' }, '*');
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          // iframe 높이를 뷰포트 크기로 설정 (모달이 전체 보이도록)
+          const screenH = Math.max(Math.round(window.screen.height * 0.95), vh, 700);
+          window.parent.postMessage({ type: 'setHeight', height: screenH }, '*');
         }
       } catch(e) {}
-
-      // 오버레이 모달은 iframe 높이 변경 불필요 (fixed 위치이므로)
-      if (!isOverlayModal) {
-        try {
-          if (window.parent && window.parent !== window) {
-            const needH = isGuideModal
-              ? (() => {
-                  const box = wrapperEl ? wrapperEl.querySelector(':scope > div') : null;
-                  return Math.max(box ? box.scrollHeight + 80 : 650, 600);
-                })()
-              : Math.max(Math.round(window.screen.height * 0.92), 700);
-            window.parent.postMessage({ type: 'setHeight', height: needH }, '*');
-            window.parent.postMessage({ type: 'scrollToTop' }, '*');
-          }
-        } catch(e) {}
-      }
-
-      if (isGuideModal) {
-        try { if (typeof postParentHeight === 'function') postParentHeight(); } catch(e) {}
-      }
     }
 
 
@@ -11250,16 +11230,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 열린 모달이 없을 때 공통 처리
       if (_openModalSet.size === 0) {
+        // 대시보드 복원
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) dashboard.style.display = '';
+        
         document.body.classList.remove('modal-open');
         document.documentElement.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.body.style.top = '';
         document.documentElement.style.overflow = '';
-        // 스크롤 위치 복원
-        if (typeof window._savedScrollY === 'number') {
-          window.scrollTo(0, window._savedScrollY);
-          window._savedScrollY = 0;
-        }
         // iframe 높이 변경 차단 해제
         modalHeightLocked = false;
         // 부모 iframe에 스크롤 잠금 해제 + 높이 복원
@@ -11268,8 +11247,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             window.parent.postMessage({ type: 'unlockScroll' }, '*');
           }
         } catch(e) {}
-        // iframe 높이 복원
-        try { if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100); } catch(e) {}
+        // iframe 높이 복원 + 스크롤 위치 복원
+        try { 
+          if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
+        } catch(e) {}
+        // 스크롤 위치 복원
+        if (typeof window._savedScrollY === 'number' && window._savedScrollY > 0) {
+          setTimeout(function() { window.scrollTo(0, window._savedScrollY); window._savedScrollY = 0; }, 150);
+        }
       }
 
       // 가이드 모달이 닫힐 때 dashboard 복원 + iframe 높이 원상 복구
