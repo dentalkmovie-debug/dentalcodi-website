@@ -11353,6 +11353,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         
+        // ── 대기실/체어 설정 섹션 자동 닫기 ──
+        var wrContent = document.getElementById('wr-setup-content');
+        var wrIcon = document.getElementById('wr-setup-toggle-icon');
+        if (wrContent) wrContent.style.display = 'none';
+        if (wrIcon) { wrIcon.classList.remove('fa-chevron-up'); wrIcon.classList.add('fa-chevron-down'); }
+        var chContent = document.getElementById('ch-setup-content');
+        var chIcon = document.getElementById('ch-setup-toggle-icon');
+        if (chContent) chContent.style.display = 'none';
+        if (chIcon) { chIcon.classList.remove('fa-chevron-up'); chIcon.classList.add('fa-chevron-down'); }
+        
         // ── 인라인 편집 패널 닫기: 원래 탭 콘텐츠 복원 ──
         var mainContent = document.getElementById('dtv-pg');
         if (mainContent) {
