@@ -6091,18 +6091,30 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         btnEl.textContent = opt.confirmText || '\uD655\uC778';
         btnEl.className = 'flex-1 py-3 rounded-br-xl font-bold text-sm border-l ' + (opt.type === 'info' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50');
       }
-      if (modal) modal.style.display = 'flex';
+      if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+      }
     }
     function cancelDeleteConfirm() {
       _deleteConfirmCallback = null;
       var modal = document.getElementById('delete-confirm-modal');
       if (modal) modal.style.display = 'none';
+      if (_openModalSet.size === 0) {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      }
     }
     function executeDeleteConfirm() {
       var cb = _deleteConfirmCallback;
       _deleteConfirmCallback = null;
       var modal = document.getElementById('delete-confirm-modal');
       if (modal) modal.style.display = 'none';
+      if (_openModalSet.size === 0) {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      }
       if (typeof cb === 'function') cb();
     }
 
@@ -7423,11 +7435,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           
           if (data.active) {
             // 임시 영상 재생 중 - 인디케이터와 복귀 버튼 표시
-            if (indicator) indicator.classList.remove('hidden');
+            if (indicator) indicator.style.display = '';
             setStopButtonState(p.id, true);
           } else {
             // 임시 영상 없음 (자동복귀 포함) - 인디케이터와 복귀 버튼 숨김
-            if (indicator) indicator.classList.add('hidden');
+            if (indicator) indicator.style.display = 'none';
             setStopButtonState(p.id, false);
           }
         } catch (e) {}
@@ -8109,23 +8121,23 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const stopBtn = document.getElementById('stop-temp-btn-' + playlistId);
       if (!stopBtn) return;
 
-      stopBtn.classList.remove('opacity-0', 'pointer-events-none', 'invisible', 'hidden');
-      stopBtn.classList.add('opacity-100', 'visible', 'inline-flex', 'items-center', 'justify-center', 'gap-1');
-      stopBtn.style.opacity = '1';
-      stopBtn.style.visibility = 'visible';
-      stopBtn.removeAttribute('disabled');
-
+      // inline style로 직접 제어 (Tailwind 클래스보다 우선순위 높음)
       if (active) {
-        stopBtn.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200', 'cursor-not-allowed');
-        stopBtn.classList.add('bg-red-50', 'text-red-600', 'hover:bg-red-100');
+        stopBtn.style.background = '#fef2f2';
+        stopBtn.style.color = '#dc2626';
+        stopBtn.style.borderColor = '#fecaca';
+        stopBtn.style.cursor = 'pointer';
         stopBtn.removeAttribute('aria-disabled');
-        delete stopBtn.dataset.disabled;
+        stopBtn.removeAttribute('disabled');
+        stopBtn.onclick = function() { stopTempVideoForPlaylist(playlistId); };
         stopBtn.innerHTML = '<i class="fas fa-stop"></i><span>기본으로 복귀</span>';
       } else {
-        stopBtn.classList.remove('bg-red-50', 'text-red-600', 'hover:bg-red-100');
-        stopBtn.classList.add('bg-gray-50', 'text-gray-600', 'border-gray-200', 'cursor-not-allowed');
+        stopBtn.style.background = '#f9fafb';
+        stopBtn.style.color = '#9ca3af';
+        stopBtn.style.borderColor = '#e5e7eb';
+        stopBtn.style.cursor = 'not-allowed';
         stopBtn.setAttribute('aria-disabled', 'true');
-        stopBtn.dataset.disabled = 'true';
+        stopBtn.onclick = null;
         stopBtn.innerHTML = '<i class="fas fa-stop"></i><span>기본으로 복귀</span>';
       }
     }
@@ -8180,7 +8192,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           closeModal('temp-video-modal');
           // 상태 업데이트 - 인디케이터와 기본으로 복귀 버튼 표시
           const indicator = document.getElementById('temp-indicator-' + playlistId);
-          if (indicator) indicator.classList.remove('hidden');
+          if (indicator) indicator.style.display = '';
           setStopButtonState(playlistId, returnTime === 'manual');
         } else {
           showToast('전송 실패', 'error');
@@ -8202,7 +8214,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // 임시 영상 중지 (기본으로 복귀) - 플레이리스트 카드에서 직접 호출
     async function stopTempVideoForPlaylist(playlistId) {
       const stopBtn = document.getElementById('stop-temp-btn-' + playlistId);
-      if (stopBtn?.dataset?.disabled === 'true') return;
+      if (stopBtn?.getAttribute('aria-disabled') === 'true') return;
 
       console.log('stopTempVideoForPlaylist called:', playlistId);
       console.log('API_BASE:', API_BASE);
@@ -8218,7 +8230,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           document.getElementById('temp-video-current-status')?.classList.add('hidden');
           // 인디케이터 숨기기
           const indicator = document.getElementById('temp-indicator-' + playlistId);
-          if (indicator) indicator.classList.add('hidden');
+          if (indicator) indicator.style.display = 'none';
           // 기본으로 복귀 버튼 숨기기
           setStopButtonState(playlistId, false);
         } else {
@@ -10900,7 +10912,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       el.style.cssText = 'display:flex !important; position:fixed; top:' + headerH + 'px; left:0; right:0; bottom:0; width:100%; z-index:9999;';
       document.body.classList.add('modal-open');
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       _openModalSet.add(id);
+      // 부모 iframe에 스크롤 잠금 요청
+      try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'lockScroll' }, '*'); } catch(e) {}
 
       // 오버레이 모달은 iframe 높이 변경 불필요 (fixed 위치이므로)
       if (!isOverlayModal) {
@@ -10944,6 +10959,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.documentElement.style.overflow = '';
+        // 부모 iframe에 스크롤 잠금 해제 요청
+        try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'unlockScroll' }, '*'); } catch(e) {}
       }
 
       // 가이드 모달이 닫힐 때 dashboard 복원 + iframe 높이 원상 복구
