@@ -2708,7 +2708,8 @@ app.get('/embed-old/:memberCode', async (c) => {
   <style>
     html, body { margin: 0; padding: 0; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-    .modal-backdrop { background: rgba(0,0,0,0.5); }
+    .modal-backdrop { background: rgba(0,0,0,0.5); opacity:0; transition: opacity 0.15s ease; }
+    .modal-backdrop.active { opacity:1; }
     .toast { animation: slideIn 0.3s ease; }
     @keyframes slideIn {
       from { transform: translateY(-100%); opacity: 0; }
@@ -4673,7 +4674,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       overflow: hidden !important;
     }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-    .modal-backdrop { background: rgba(0,0,0,0.5); }
+    .modal-backdrop { background: rgba(0,0,0,0.5); opacity:0; transition: opacity 0.15s ease; }
+    .modal-backdrop.active { opacity:1; }
     .toast { animation: slideIn 0.3s ease; }
     .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
     .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
@@ -11282,6 +11284,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // ── 단순 표시: HTML의 fixed inset-0 z-50 클래스가 이미 올바른 위치를 잡음 ──
       el.style.display = 'flex';
       
+      // ── backdrop fade-in ──
+      var bd = el.querySelector('.modal-backdrop');
+      if (bd) requestAnimationFrame(function() { bd.classList.add('active'); });
+      
       // ── 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
         window._savedScrollY = window.scrollY || window.pageYOffset || 0;
@@ -11300,6 +11306,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
+        // backdrop fade-out 초기화
+        var bd = el.querySelector('.modal-backdrop');
+        if (bd) bd.classList.remove('active');
         // ── 단순 숨김 ──
         el.style.display = 'none';
       }

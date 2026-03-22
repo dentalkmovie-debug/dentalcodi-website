@@ -5107,6 +5107,10 @@ function openModal(id) {
   // ── 단순 표시: HTML의 fixed inset-0 z-50 클래스가 이미 올바른 위치를 잡음 ──
   el.style.display = 'flex';
   
+  // ── backdrop fade-in ──
+  var bd = el.querySelector('.modal-backdrop');
+  if (bd) requestAnimationFrame(function() { bd.classList.add('active'); });
+  
   // ── 배경 스크롤 방지 ──
   if (_openModalSet.size === 0) {
     window._savedScrollY = window.scrollY || window.pageYOffset || 0;
@@ -5125,6 +5129,9 @@ function openModal(id) {
 function closeModal(id) {
   const el = document.getElementById(id);
   if (el) {
+    // backdrop fade-out 초기화
+    var bd = el.querySelector('.modal-backdrop');
+    if (bd) bd.classList.remove('active');
     // ── 단순 숨김 ──
     el.style.display = 'none';
   }
