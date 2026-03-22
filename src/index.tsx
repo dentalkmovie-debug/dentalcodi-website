@@ -4677,8 +4677,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <style>
     /* body: 스크롤 가능 (imweb이 iframe 높이를 콘텐츠에 맞게 자동 조정) */
     html, body { margin: 0; padding: 0; width: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
-    /* 모달 열릴 때 body 스크롤 잠금 */
-    body.modal-open { overflow: hidden; }
+    /* 모달 열릴 때 body 고정 (아임웹 iframe 환경 배경 이동 완전 차단) */
+    body.modal-open {
+      overflow: hidden !important;
+      position: fixed !important;
+      width: 100% !important;
+      height: 100% !important;
+      touch-action: none !important;
+    }
+    html.modal-open {
+      overflow: hidden !important;
+    }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     .modal-backdrop { background: rgba(0,0,0,0.5); }
     .toast { animation: slideIn 0.3s ease; }
@@ -7392,7 +7401,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     TV로 내보내기
                   </button>
-                  <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
+                  <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}'); markSingleChairSetup(\${p.id})" 
                     style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
@@ -7550,7 +7559,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     <i class="fas fa-stop"></i>
                     <span>기본으로 복귀</span>
                   </button>
-                  <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}')" 
+                  <button onclick="copyToClipboard('\${p.external_short_url || location.origin + '/' + p.short_code}'); markSingleChairSetup(\${p.id})" 
                     style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
@@ -10479,15 +10488,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function _showScriptModal(el) {
       if (!el) return;
       if (el.parentElement !== document.body) document.body.appendChild(el);
+      // 스크롤 위치 저장 (첫 모달 오픈 시)
+      if (_openModalSet.size === 0) {
+        window._savedScrollY = window.scrollY || window.pageYOffset || 0;
+        document.body.style.top = '-' + window._savedScrollY + 'px';
+      }
       // iframe 내부를 스크롤 최상단으로
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      // iframePageTop: 위젯에서 받은 iframe의 페이지 내 top (= 아임웹 헤더 높이)
-      // 이 값만큼 top을 내려야 모달이 iframe 뷰포트 최상단에 표시됨
-      var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
-      el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:10px; box-sizing:border-box; overflow-y:auto;';
+      el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:10px; box-sizing:border-box; overflow-y:auto;';
       document.body.classList.add('modal-open');
+      document.documentElement.classList.add('modal-open');
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
       modalHeightLocked = true;
@@ -10498,6 +10510,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           var h = Math.max(Math.round(window.screen.height * 0.92), 700);
           window.parent.postMessage({ type: 'setHeight', height: h }, '*');
           window.parent.postMessage({ type: 'scrollToTop' }, '*');
+          window.parent.postMessage({ type: 'lockScroll' }, '*');
         }
       } catch(e) {}
     }
@@ -10548,6 +10561,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 설치 마킹 (체어 설정 필요 배지 제거)
       markChairsSetup(selected);
     }
+    // 단일 체어 설치 마킹 (URL 복사 등에서 사용)
+    function markSingleChairSetup(playlistId) {
+      markChairsSetup([{id: playlistId}]);
+    }
+
     // 체어 설치 마킹 (서버에 알려서 '체어 설정 필요' 배지 제거)
     function markChairsSetup(chairs) {
       chairs.forEach(c => {
@@ -11185,8 +11203,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; overflow-y:auto;';
       
-      // 배경 스크롤 완전 방지
+      // 배경 스크롤 완전 방지 (position:fixed + 스크롤 위치 보존)
+      if (_openModalSet.size === 0) {
+        // 첫 모달 오픈 시에만 스크롤 위치 저장
+        window._savedScrollY = window.scrollY || window.pageYOffset || 0;
+        document.body.style.top = '-' + window._savedScrollY + 'px';
+      }
       document.body.classList.add('modal-open');
+      document.documentElement.classList.add('modal-open');
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
       _openModalSet.add(id);
@@ -11242,8 +11266,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 열린 모달이 없을 때 공통 처리
       if (_openModalSet.size === 0) {
         document.body.classList.remove('modal-open');
+        document.documentElement.classList.remove('modal-open');
         document.body.style.overflow = '';
+        document.body.style.top = '';
         document.documentElement.style.overflow = '';
+        // 스크롤 위치 복원
+        if (typeof window._savedScrollY === 'number') {
+          window.scrollTo(0, window._savedScrollY);
+          window._savedScrollY = 0;
+        }
         // iframe 높이 변경 차단 해제
         modalHeightLocked = false;
         // 부모 iframe에 스크롤 잠금 해제 + 높이 복원
