@@ -9087,7 +9087,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (fullPlaylist) {
           // 현재 편집 중인 대기실 ID가 바뀌지 않았는지 확인
           if (currentPlaylist && currentPlaylist.id == id) {
+            // ★ 레이스 컨디션 방지: 사용자가 편집 중인 activeItemIds를 항상 보존
+            // 백그라운드 fetch 중 사용자가 아이템을 추가/제거했을 수 있으므로
+            // 로컬 activeItemIds를 우선시함 (빈 배열도 사용자의 의도적 삭제일 수 있음)
+            const savedActiveIds = currentPlaylist.activeItemIds;
             currentPlaylist = fullPlaylist;
+            if (Array.isArray(savedActiveIds)) {
+              // 로컬에 activeItemIds가 이미 설정되어 있으면 항상 로컬 상태 유지
+              currentPlaylist.activeItemIds = savedActiveIds;
+            }
             document.getElementById('edit-playlist-title').textContent = (currentPlaylist.name || '재생목록') + ' 편집';
             document.getElementById('transition-effect').value = currentPlaylist.transition_effect || 'fade';
             document.getElementById('transition-duration').value = currentPlaylist.transition_duration || 1000;
@@ -9801,28 +9809,72 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       });
     }
     
-    // 활성 아이템 목록 서버에 저장 (공용 영상 포함 모든 ID 저장)
-    async function saveActiveItems() {
+    // 활성 아이템 목록 서버에 저장 (공용 영상 포함 모든 ID 저장, 실패 시 자동 재시도)
+    let _saveActiveItemsPending = false;
+    async function saveActiveItems(retryCount = 0) {
       // 모든 activeItemIds를 그대로 저장 (공용/사용자 모두 포함)
-      const allItemIds = currentPlaylist.activeItemIds || [];
+      const allItemIds = [...(currentPlaylist.activeItemIds || [])]; // 스냅샷 저장
+      const playlistId = currentPlaylist.id;
+      
+      console.log('[Playlist] Saving active items for playlist', playlistId, ':', JSON.stringify(allItemIds), retryCount > 0 ? '(retry ' + retryCount + ')' : '');
+      _saveActiveItemsPending = true;
       
       try {
-        const res = await fetch(API_BASE + '/playlists/' + currentPlaylist.id + '/active-items', {
+        const res = await fetch(API_BASE + '/playlists/' + playlistId + '/active-items', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activeItemIds: allItemIds })
         });
 
         if (!res.ok) {
-          console.error('[Playlist] Failed to save active items:', await res.text());
+          const errText = await res.text();
+          console.error('[Playlist] Failed to save active items:', res.status, errText);
+          // 자동 재시도 (최대 2회)
+          if (retryCount < 2) {
+            console.log('[Playlist] Auto-retrying save... (' + (retryCount + 1) + '/2)');
+            await new Promise(r => setTimeout(r, 500 * (retryCount + 1)));
+            return saveActiveItems(retryCount + 1);
+          }
+          showToast('저장 실패 (서버 오류). 다시 시도해주세요.', 'error');
           return false;
         }
 
-        console.log('[Playlist] Active items saved:', allItemIds);
+        console.log('[Playlist] Active items saved successfully:', allItemIds);
+        
+        // 저장 후 DB 상태 검증
+        try {
+          const verifyRes = await fetch(API_BASE + '/playlists/' + playlistId + '?ts=' + Date.now());
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            const savedIds = verifyData.playlist?.activeItemIds || [];
+            const match = JSON.stringify(allItemIds.map(Number)) === JSON.stringify(savedIds.map(Number));
+            if (!match) {
+              console.warn('[Playlist] MISMATCH! sent:', allItemIds, 'saved:', savedIds);
+              // 불일치 시 한 번 더 저장 시도
+              if (retryCount < 2) {
+                console.log('[Playlist] Mismatch detected, re-saving...');
+                return saveActiveItems(retryCount + 1);
+              }
+              showToast('경고: 저장 데이터 불일치. 페이지를 새로고침해주세요.', 'error');
+            }
+          }
+        } catch(e) {
+          // 검증 실패는 무시 (저장 자체는 성공)
+        }
+        
         return true;
       } catch (e) {
-        console.error('[Playlist] Failed to save active items:', e);
+        console.error('[Playlist] Failed to save active items (network):', e);
+        // 네트워크 오류 시 재시도
+        if (retryCount < 2) {
+          console.log('[Playlist] Network error, auto-retrying... (' + (retryCount + 1) + '/2)');
+          await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+          return saveActiveItems(retryCount + 1);
+        }
+        showToast('저장 실패 (네트워크 오류). 인터넷 연결을 확인해주세요.', 'error');
         return false;
+      } finally {
+        _saveActiveItemsPending = false;
       }
     }
 
