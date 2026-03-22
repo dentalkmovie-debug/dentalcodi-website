@@ -1668,8 +1668,8 @@ function exportSelectedScripts() {
       '</div>' +
       '<button onclick="closeModal(\'script-type-modal\')" style="width:100%;margin-top:12px;color:#888;font-size:13px;background:none;border:none;cursor:pointer">취소</button>' +
     '</div>';
-  // 스크립트 전용 표시 (openModal 사용 안 함)
-  _showScriptModal(modal);
+  // 스크립트 전용 표시 (openModal 통합 사용)
+  openModal(modal.id);
 }
 
 // 선택된 체어 BAT 다운로드
@@ -4329,39 +4329,9 @@ function downloadAutoRunScript(btnEl) {
 }
 
 // 스크립트 전용 모달 표시 (openModal 사용 안 함 - iframe 위치 독립적)
-function _showScriptModal(el) {
-  if (!el) return;
-  if (el.parentElement !== document.body) document.body.appendChild(el);
-  // 스크롤 위치 저장 (첫 모달 오픈 시)
-  if (_openModalSet.size === 0) {
-    window._savedScrollY = window.scrollY || window.pageYOffset || 0;
-    document.body.style.top = '-' + window._savedScrollY + 'px';
-  }
-  // iframe 내부를 스크롤 최상단으로
-  window.scrollTo(0, 0);
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:10px; box-sizing:border-box; overflow-y:auto;';
-  document.body.classList.add('modal-open');
-  document.documentElement.classList.add('modal-open');
-  document.body.style.overflow = 'hidden';
-  document.documentElement.style.overflow = 'hidden';
-  modalHeightLocked = true;
-  if (el.id) _openModalSet.add(el.id);
-  // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
-  try {
-    if (window.parent && window.parent !== window) {
-      var h = Math.max(Math.round(window.screen.height * 0.92), 700);
-      window.parent.postMessage({ type: 'setHeight', height: h }, '*');
-      window.parent.postMessage({ type: 'scrollToTop' }, '*');
-      window.parent.postMessage({ type: 'lockScroll' }, '*');
-    }
-  } catch(e) {}
-}
-
-// 스크립트 다운로드 모달 표시 (설치 방법 안내용)
+// 스크립트 다운로드 모달 표시 (설치 방법 안내용) - openModal 통합 사용
 function showScriptDownloadModal() {
-  _showScriptModal(document.getElementById('script-download-modal'));
+  openModal('script-download-modal');
 }
 
 // 선택된 체어의 링크 복사
@@ -5018,7 +4988,8 @@ var _openModalSet = new Set();
 // ── 오버레이 모달 (fixed 위치, iframe 높이 변경 불필요) ──
 var OVERLAY_MODALS = new Set([
   'create-playlist-modal', 'delete-confirm-modal', 'clinic-name-modal',
-  'notice-modal', 'preview-modal', 'temp-video-modal', 'tv-export-modal'
+  'notice-modal', 'preview-modal', 'temp-video-modal', 'tv-export-modal',
+  'script-download-modal', 'script-type-modal'
 ]);
 
 function openModal(id) {
@@ -5051,7 +5022,7 @@ function openModal(id) {
   // 아임웹 헤더 높이 계산
   const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; overflow-y:auto;';
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:99999; overflow-y:auto; align-items:flex-start; justify-content:center;';
   
   // 배경 스크롤 완전 방지 (position:fixed + 스크롤 위치 보존)
   if (_openModalSet.size === 0) {
