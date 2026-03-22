@@ -7776,6 +7776,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     
     // TV 연결 설정 토글 상태 복원 (renderPlaylists 후 호출)
     function restoreSetupToggleState(wrOpen, chOpen) {
+      // 편집 패널 닫힐 때 설정 섹션도 자동 닫기
+      if (window._forceCloseSetupSections) {
+        window._forceCloseSetupSections = false;
+        return; // 복원하지 않고 닫힌 상태(기본값) 유지
+      }
       if (wrOpen) {
         const c = document.getElementById('wr-setup-content');
         const i = document.getElementById('wr-setup-toggle-icon');
@@ -11353,15 +11358,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         
-        // ── 대기실/체어 설정 섹션 자동 닫기 ──
-        var wrContent = document.getElementById('wr-setup-content');
-        var wrIcon = document.getElementById('wr-setup-toggle-icon');
-        if (wrContent) wrContent.style.display = 'none';
-        if (wrIcon) { wrIcon.classList.remove('fa-chevron-up'); wrIcon.classList.add('fa-chevron-down'); }
-        var chContent = document.getElementById('ch-setup-content');
-        var chIcon = document.getElementById('ch-setup-toggle-icon');
-        if (chContent) chContent.style.display = 'none';
-        if (chIcon) { chIcon.classList.remove('fa-chevron-up'); chIcon.classList.add('fa-chevron-down'); }
+        // ── 대기실/체어 설정 섹션 자동 닫기 플래그 ──
+        window._forceCloseSetupSections = true;
         
         // ── 인라인 편집 패널 닫기: 원래 탭 콘텐츠 복원 ──
         var mainContent = document.getElementById('dtv-pg');
