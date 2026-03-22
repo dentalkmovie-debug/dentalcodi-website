@@ -14408,21 +14408,21 @@ app.get('/tv/:shortCode', async (c) => {
         currentIndex = 0;
       }
       
-      // DocumentFragment 사용하여 DOM 조작 최소화 (전체화면 유지)
-      const fragment = document.createDocumentFragment();
-      
-      // 기존 자식들 숨기기만 (제거는 나중에)
+      // 기존 자식들 즉시 ID 제거 후 숨기기 (새 아이템과 ID 충돌 방지)
+      // → 이전에는 숨기고 500ms 후 제거했으나, 같은 ID의 새 div가 추가되면
+      //   getElementById가 이전(숨겨진) div를 반환하여 Vimeo player가 보이지 않는 곳에 생성됨
       const oldChildren = Array.from(container.children);
       oldChildren.forEach(child => {
+        if (child.id) child.id = '_old_' + child.id + '_' + Date.now();
         child.style.display = 'none';
       });
       
-      // 나중에 비동기로 제거
+      // 비동기로 제거 (DOM에서 완전히 분리)
       setTimeout(() => {
         oldChildren.forEach(child => {
           try { container.removeChild(child); } catch(e) {}
         });
-      }, 500);
+      }, 300);
       
       players = {};
       itemsReady = {};
