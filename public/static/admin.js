@@ -1593,6 +1593,14 @@ function toggleChairSetup() {
   icon.classList.toggle('fa-chevron-up', isHidden);
   if (typeof postParentHeight === 'function') { setTimeout(postParentHeight, 50); setTimeout(postParentHeight, 300); }
 }
+// 설정탭 강제 닫기
+function closeChairSetup() {
+  const content = document.getElementById('ch-setup-content');
+  const icon = document.getElementById('ch-setup-toggle-icon');
+  if (content) content.style.display = 'none';
+  if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); }
+  if (typeof postParentHeight === 'function') { setTimeout(postParentHeight, 50); setTimeout(postParentHeight, 300); }
+}
 
 // TV 연결 설정 토글 상태 복원 (renderPlaylists 후 호출)
 function restoreSetupToggleState(wrOpen, chOpen) {
@@ -4376,6 +4384,9 @@ function copyInstallLink() {
   showToast(selected.length + '개 체어 URL 복사됨');
   // 설치 마킹 (체어 설정 필요 배지 제거)
   markChairsSetup(selected);
+  // 모달 닫기 + 설정탭 접기
+  closeModal('script-download-modal');
+  closeChairSetup();
 }
 
 // 선택된 체어의 스크립트 다운로드
@@ -4396,6 +4407,9 @@ function downloadInstallScript() {
   showToast(selected.length + '개 스크립트 다운로드');
   // 설치 마킹 (체어 설정 필요 배지 제거)
   markChairsSetup(selected);
+  // 모달 닫기 + 설정탭 접기
+  closeModal('script-download-modal');
+  closeChairSetup();
 }
 // 단일 체어 설치 마킹 (URL 복사 등에서 사용)
 function markSingleChairSetup(playlistId) {
