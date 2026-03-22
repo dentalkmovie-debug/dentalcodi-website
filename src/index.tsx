@@ -5955,7 +5955,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <div id="notice-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('notice-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto my-auto">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto mt-8 mb-8">
         <div class="p-6 border-b flex items-center justify-between">
           <h3 id="notice-modal-title" class="text-lg font-bold">새 공지사항</h3>
           <label class="flex items-center gap-2 cursor-pointer select-none">
