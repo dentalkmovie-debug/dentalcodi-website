@@ -1244,9 +1244,13 @@ app.get('/api/:adminCode/playlists', async (c) => {
     return c.json({ error: '사용자를 찾을 수 없습니다.' }, 404)
   }
   
+  // playlists 쿼리에서 is_tv_active를 SQL로 직접 계산
   let playlists = await c.env.DB.prepare(`
     SELECT p.*, 
-      (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+      (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count,
+      CASE WHEN p.last_active_at IS NOT NULL 
+        AND (strftime('%s','now') - strftime('%s', p.last_active_at)) < 90
+        THEN 1 ELSE 0 END as is_tv_active_computed
     FROM playlists p
     WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
     ORDER BY COALESCE(p.sort_order, 999), p.created_at ASC
@@ -1264,7 +1268,10 @@ app.get('/api/:adminCode/playlists', async (c) => {
     // 다시 조회
     playlists = await c.env.DB.prepare(`
       SELECT p.*, 
-        (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+        (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count,
+        CASE WHEN p.last_active_at IS NOT NULL 
+          AND (strftime('%s','now') - strftime('%s', p.last_active_at)) < 90
+          THEN 1 ELSE 0 END as is_tv_active_computed
       FROM playlists p
       WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
       ORDER BY COALESCE(p.sort_order, 999), p.created_at ASC
@@ -1316,11 +1323,8 @@ app.get('/api/:adminCode/playlists', async (c) => {
     } catch (e) {
       activeItemIds = []
     }
-    // 서버에서 is_active 계산 (클라이언트 시간 오차 방지)
-    // last_active_at이 60초 이내면 사용중 (TV 3초 폴링 기준, 네트워크 지연/cold start 여유 포함)
-    const isActiveNow = p.last_active_at
-      ? (Date.now() - new Date(p.last_active_at + 'Z').getTime()) < 60000
-      : false
+    // SQL에서 이미 계산된 is_tv_active_computed 사용 (D1 서버 시간 기준, 시간차 문제 없음)
+    const isActiveNow = p.is_tv_active_computed === 1
     return { ...p, items, activeItemIds, is_tv_active: isActiveNow }
   })
 
@@ -1456,7 +1460,11 @@ app.delete('/api/:adminCode/playlists/:id', async (c) => {
   
   // 사용중(TV 활성) 플레이리스트 삭제 차단
   const playlist = await c.env.DB.prepare(
-    'SELECT id, is_tv_active FROM playlists WHERE id = ? AND user_id = ?'
+    `SELECT id, last_active_at,
+      CASE WHEN last_active_at IS NOT NULL 
+        AND (strftime('%s','now') - strftime('%s', last_active_at)) < 90
+        THEN 1 ELSE 0 END as is_tv_active
+    FROM playlists WHERE id = ? AND user_id = ?`
   ).bind(playlistId, user.id).first() as any
   
   if (playlist && playlist.is_tv_active === 1) {
