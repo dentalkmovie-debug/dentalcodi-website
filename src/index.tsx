@@ -1454,6 +1454,15 @@ app.delete('/api/:adminCode/playlists/:id', async (c) => {
   const playlistId = c.req.param('id')
   const user = await getOrCreateUser(c.env.DB, adminCode)
   
+  // 사용중(TV 활성) 플레이리스트 삭제 차단
+  const playlist = await c.env.DB.prepare(
+    'SELECT id, is_tv_active FROM playlists WHERE id = ? AND user_id = ?'
+  ).bind(playlistId, user.id).first() as any
+  
+  if (playlist && playlist.is_tv_active === 1) {
+    return c.json({ error: '사용중인 대기실/체어는 삭제할 수 없습니다. TV 연결을 해제한 후 삭제해주세요.' }, 400)
+  }
+  
   await c.env.DB.prepare(`
     DELETE FROM playlists WHERE id = ? AND user_id = ?
   `).bind(playlistId, user.id).run()
@@ -7154,11 +7163,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
                   </button>
+                  \${isActive ? \`
+                  <button disabled
+                    style="padding:5px 8px;border:none;background:none;color:#e5e7eb;cursor:not-allowed;font-size:12px" title="사용중인 대기실은 삭제할 수 없습니다">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  \` : \`
                   <button onclick="deletePlaylist(\${p.id})" 
                     style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px;transition:color .15s"
                     onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#d1d5db'" title="삭제">
                     <i class="fas fa-trash"></i>
                   </button>
+                  \`}
                 </div>
               </div>
             </div>
@@ -7305,11 +7321,18 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
                     URL 복사
                   </button>
+                  \${isActive ? \`
+                  <button disabled
+                    style="padding:5px 8px;border:none;background:none;color:#e5e7eb;cursor:not-allowed;font-size:12px" title="사용중인 체어는 삭제할 수 없습니다">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  \` : \`
                   <button onclick="deletePlaylist(\${p.id})" 
                     style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px;transition:color .15s"
                     onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#d1d5db'" title="삭제">
                     <i class="fas fa-trash"></i>
                   </button>
+                  \`}
                 </div>
               </div>
             </div>
@@ -8438,6 +8461,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // 마지막 플레이리스트인지 확인
       if (playlists.length <= 1) {
         showToast('최소 1개의 대기실/체어가 필요합니다.', 'error');
+        return;
+      }
+      
+      // 사용중(TV 활성) 플레이리스트 삭제 차단
+      const targetPlaylist = playlists.find(p => p.id === id || p.id === Number(id));
+      if (targetPlaylist && targetPlaylist.is_tv_active === true) {
+        showToast('사용중인 대기실/체어는 삭제할 수 없습니다. TV 연결을 해제한 후 삭제해주세요.', 'error');
         return;
       }
       
