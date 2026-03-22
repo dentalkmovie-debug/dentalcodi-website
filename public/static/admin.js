@@ -38,6 +38,7 @@ function showDeleteConfirm(message, callback, options) {
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    modalHeightLocked = true;
   }
 }
 function cancelDeleteConfirm() {
@@ -47,6 +48,8 @@ function cancelDeleteConfirm() {
   if (_openModalSet.size === 0) {
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
+    modalHeightLocked = false;
+    try { if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100); } catch(e) {}
   }
 }
 function executeDeleteConfirm() {
@@ -57,6 +60,8 @@ function executeDeleteConfirm() {
   if (_openModalSet.size === 0) {
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
+    modalHeightLocked = false;
+    try { if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100); } catch(e) {}
   }
   if (typeof cb === 'function') cb();
 }
@@ -4198,6 +4203,9 @@ function _showScriptModal(el) {
   var topVal = (iframePageTop > 0 && iframePageTop < 300) ? iframePageTop : 0;
   el.style.cssText = 'display:flex !important; position:fixed; top:' + topVal + 'px; left:0; right:0; bottom:0; width:100%; z-index:99999; align-items:flex-start; justify-content:center; padding-top:40px; box-sizing:border-box;';
   document.body.classList.add('modal-open');
+  document.body.style.overflow = 'hidden';
+  document.documentElement.style.overflow = 'hidden';
+  modalHeightLocked = true;
   if (el.id) _openModalSet.add(el.id);
   // 부모(아임웹)에 iframe 높이 확보 + 스크롤 최상단 요청
   try {
@@ -4648,10 +4656,7 @@ function renderNotices() {
       '<div class="notice-drag-handle" style="display:flex;align-items:center;padding:0 10px;cursor:grab;color:#d1d5db;font-size:12px;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div>' +
       '<div style="display:flex;align-items:center;padding:12px 4px 12px 0;flex-shrink:0"><span class="notice-number" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + ';font-size:11px;font-weight:700">' + (index + 1) + '</span></div>' +
       '<div style="flex:1;padding:12px 8px;min-width:0">' +
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-          (isUrgent ? '<span style="font-size:10px;padding:2px 6px;background:#fee2e2;color:#dc2626;border-radius:4px;font-weight:600"><i class="fas fa-exclamation-circle" style="margin-right:2px"></i>\uAE34\uAE09</span>' : '') +
-          '<span style="font-size:10px;padding:2px 6px;background:' + (isActive ? '#dcfce7' : '#f3f4f6') + ';color:' + (isActive ? '#16a34a' : '#9ca3af') + ';border-radius:4px;font-weight:600">' + (isActive ? 'TV \uD45C\uC2DC\uC911' : '\uC228\uAE40') + '</span>' +
-        '</div>' +
+        (isUrgent ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:10px;padding:2px 6px;background:#fee2e2;color:#dc2626;border-radius:4px;font-weight:600"><i class="fas fa-exclamation-circle" style="margin-right:2px"></i>\uAE34\uAE09</span></div>' : '') +
         '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
@@ -4869,13 +4874,16 @@ function openModal(id) {
   // 아임웹 헤더 높이 계산
   const headerH = (!isGuideModal && iframePageTop > 0) ? Math.min(iframePageTop, 160) : 0;
 
-  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999;';
+  el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:9999; overflow-y:auto;';
   
   // 배경 스크롤 완전 방지
   document.body.classList.add('modal-open');
   document.body.style.overflow = 'hidden';
   document.documentElement.style.overflow = 'hidden';
   _openModalSet.add(id);
+  
+  // iframe 높이 변경 차단 (MutationObserver가 postParentHeight를 호출하는 것 방지)
+  modalHeightLocked = true;
   
   // 부모 iframe에 스크롤 잠금 + 맨 위로 이동 요청
   try {
@@ -4927,6 +4935,8 @@ function closeModal(id) {
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
+    // iframe 높이 변경 차단 해제
+    modalHeightLocked = false;
     // 부모 iframe에 스크롤 잠금 해제 + 높이 복원
     try {
       if (window.parent && window.parent !== window) {
