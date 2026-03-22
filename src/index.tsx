@@ -13785,15 +13785,24 @@ app.get('/tv/:shortCode', async (c) => {
       initializeAllMedia();
       startPlaybackWatchdog();
       
-      // 전체화면 복원 (CSS 의사 전체화면으로 이미 커버되므로 1회만 시도)
-      if (wasFullscreen && userHasInteracted) {
+      // 전체화면 복원 (DOM 재구성 후 즉시 + 지연 복원)
+      if (wasFullscreen || (shouldBeFullscreen && userHasInteracted)) {
+        // 즉시 시도
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        // 300ms 후 재시도 (iframe 생성 후 브라우저가 풀 수 있음)
         setTimeout(() => {
-          if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {
-              // 실패해도 CSS 의사 전체화면이 유지됨
-            });
+          if (!document.fullscreenElement && shouldBeFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
           }
         }, 300);
+        // 1초 후 최종 확인
+        setTimeout(() => {
+          if (!document.fullscreenElement && shouldBeFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }, 1000);
       }
     }
     
@@ -14459,6 +14468,8 @@ app.get('/tv/:shortCode', async (c) => {
           console.log('Vimeo preload ready:', index);
           preloadedPlayers[index] = player;
           preloadingIndex = -1;
+          // 프리로드 iframe 생성 후 전체화면 복원
+          setTimeout(ensureFullscreen, 200);
           if (callback) callback();
         }).catch((err) => {
           console.log('Vimeo preload error:', index, err);
@@ -14612,6 +14623,8 @@ app.get('/tv/:shortCode', async (c) => {
             console.log('First Vimeo ready:', idx, 'session:', thisSession);
             // autoplay=true이므로 play() 호출 불필요 - PlayInterrupted 방지
             startVimeoPlayback(player, idx);
+            // Vimeo iframe 생성 후 전체화면 복원
+            setTimeout(ensureFullscreen, 200);
           }
         }).catch((e) => {
           console.log('Vimeo ready failed:', e);
@@ -14660,6 +14673,8 @@ app.get('/tv/:shortCode', async (c) => {
               try {
                 players[index].setOption('captions', 'track', {'languageCode': 'ko'});
               } catch(e) {}
+              // YouTube iframe 생성 후 전체화면 복원
+              setTimeout(ensureFullscreen, 200);
               if (currentIndex === index) {
                 try { players[index].playVideo(); } catch (e) {}
               }
@@ -15430,6 +15445,8 @@ app.get('/tv/:shortCode', async (c) => {
           transitionStarted = true;
           doTransition(prevIndex, nextIndex);
           startVimeoPlayback(player, nextIndex);
+          // Vimeo 재생 시작 후 전체화면 복원
+          setTimeout(ensureFullscreen, 200);
         };
         
         // 플레이어 준비되면 재생 시작
@@ -15544,8 +15561,7 @@ app.get('/tv/:shortCode', async (c) => {
     // 전체화면 상태 관리 - TV에서는 항상 전체화면 유지
     let userHasInteracted = false; // 사용자 상호작용 여부
     let fullscreenRestoreTimer = null; // 전체화면 복원 타이머
-    let fullscreenRestoreAttempts = 0; // 복원 시도 횟수
-    const MAX_RESTORE_ATTEMPTS = 3; // 최대 복원 시도 횟수
+    let _lastFullscreenRestoreTime = 0; // 마지막 복원 시도 시각 (디바운스용)
     
     function updateFullscreenState() {
       if (document.fullscreenElement) {
@@ -15553,7 +15569,6 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.remove('not-fullscreen');
         shouldBeFullscreen = true;
         userHasInteracted = true;
-        fullscreenRestoreAttempts = 0; // 성공하면 카운터 리셋
         // 복원 타이머 취소
         if (fullscreenRestoreTimer) {
           clearTimeout(fullscreenRestoreTimer);
@@ -15564,20 +15579,22 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.add('not-fullscreen');
         document.body.classList.remove('mouse-active');
         
-        // 전체화면이 풀리면 제한된 횟수만 복원 시도 (무한루프 방지)
-        if (shouldBeFullscreen && userHasInteracted && fullscreenRestoreAttempts < MAX_RESTORE_ATTEMPTS) {
-          fullscreenRestoreAttempts++;
-          console.log('Fullscreen exited, restore attempt', fullscreenRestoreAttempts, '/', MAX_RESTORE_ATTEMPTS);
+        // 전체화면이 풀리면 항상 복원 시도 (제한 없음 - TV는 항상 전체화면이어야 함)
+        if (shouldBeFullscreen && userHasInteracted) {
+          const now = Date.now();
+          // 디바운스: 300ms 이내 중복 복원 방지
+          if (now - _lastFullscreenRestoreTime < 300) return;
+          _lastFullscreenRestoreTime = now;
+          
           if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
           fullscreenRestoreTimer = setTimeout(() => {
             if (!document.fullscreenElement && shouldBeFullscreen) {
               document.documentElement.requestFullscreen().catch((e) => {
-                console.log('Fullscreen restore failed:', e.message, '- CSS pseudo-fullscreen active');
+                console.log('Fullscreen restore failed:', e.message);
               });
             }
-          }, 500); // 500ms 지연 (기존 100ms → 안정성 향상)
+          }, 200);
         }
-        // 복원 실패해도 CSS로 전체화면처럼 보이므로 사용자 경험에 영향 없음
       }
     }
     
@@ -15586,6 +15603,14 @@ app.get('/tv/:shortCode', async (c) => {
     
     // 초기 상태 설정
     updateFullscreenState();
+    
+    // ★ 전체화면 주기적 감시 (Vimeo/YouTube iframe 생성 시 fullscreenchange 이벤트 누락 대비)
+    // 3초마다 전체화면 상태 확인하여 풀려있으면 복원
+    setInterval(() => {
+      if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    }, 3000);
     
     // 전체화면에서 마우스 움직이면 버튼 표시 (2초 후 자동 숨김)
     // CSS 의사 전체화면이므로 전체화면 여부와 관계없이 동작
@@ -15607,10 +15632,16 @@ app.get('/tv/:shortCode', async (c) => {
     }
     
     // 전체화면 진입
+    // ★ 전체화면 복원 헬퍼 (iframe 생성 후 호출용 - 플레이어 생성 시 자동 호출)
+    function ensureFullscreen() {
+      if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    }
+    
     function enterFullscreen() {
       shouldBeFullscreen = true;
       userHasInteracted = true;
-      fullscreenRestoreAttempts = 0; // 사용자 의도적 진입 시 카운터 리셋
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
       }
