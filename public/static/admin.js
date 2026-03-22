@@ -5021,10 +5021,26 @@ function openModal(id) {
   if (wrapperEl) { wrapperEl.style.paddingTop = ''; }
 
   // ── 4) 모달 표시 ──
-  // dashboard를 숨겼으므로 iframe은 모달 높이만큼만 됨
-  // position:relative로 내부 absolute 자식이 올바르게 배치되도록
-  const vh = window.innerHeight || document.documentElement.clientHeight || 700;
-  el.style.cssText = 'display:block !important; position:relative; width:100%; height:' + vh + 'px; z-index:99999; overflow:hidden;';
+  // dashboard를 숨겼으므로 모달만 보임
+  // position:relative + 충분한 높이로 내부 absolute 자식이 올바르게 배치
+  const vh = Math.max(window.innerHeight, document.documentElement.clientHeight, 600);
+  el.style.cssText = 'display:block !important; position:relative; width:100%; height:' + vh + 'px; z-index:99999; overflow:hidden; margin:0; padding:0;';
+  
+  // 내부 absolute inset-0 자식들의 overflow-y를 auto로 보장 + 아임웹 헤더 보정
+  const contentWrapper = el.querySelector('.absolute.inset-0.flex');
+  if (contentWrapper) {
+    contentWrapper.style.overflowY = 'auto';
+    // 아임웹 헤더에 가려지는 부분 보정 (scrollToTop 후 iframePageTop 활용)
+    // iframePageTop이 0이면 아임웹이 아닌 환경이므로 보정 불필요
+    if (iframePageTop > 0) {
+      contentWrapper.style.paddingTop = Math.min(iframePageTop, 120) + 'px';
+    }
+  }
+  // backdrop에도 동일 보정
+  const backdrop = el.querySelector('.modal-backdrop, .bg-black\/50, [onclick*="closeModal"]');
+  if (backdrop && backdrop.classList.contains('absolute')) {
+    // backdrop은 전체를 덮으므로 보정 불필요
+  }
   
   // ── 5) 배경 스크롤 방지 ──
   if (_openModalSet.size === 0) {
@@ -5060,7 +5076,7 @@ function closeModal(id) {
     // 모달 박스 zoom/transform/paddingTop 초기화
     const wrapper = el.querySelector('.absolute.inset-0.flex, .inset-0.flex');
     const box = wrapper ? wrapper.querySelector(':scope > div') : null;
-    if (wrapper) { wrapper.style.paddingTop = ''; }
+    if (wrapper) { wrapper.style.paddingTop = ''; wrapper.style.overflowY = ''; }
     if (box) { box.style.zoom = ''; box.style.transform = ''; box.style.transformOrigin = ''; }
   }
   
