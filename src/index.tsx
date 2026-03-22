@@ -11379,6 +11379,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         } catch(e) {}
       }
 
+      // 가이드/스크립트 모달 닫힐 때 설정 아코디언도 접기
+      if (GUIDE_MODALS.has(id) || id === 'script-download-modal' || id === 'script-type-modal') {
+        var wc = document.getElementById('wr-setup-content');
+        var wi = document.getElementById('wr-setup-toggle-icon');
+        if (wc) wc.style.display = 'none';
+        if (wi) { wi.classList.remove('fa-chevron-up'); wi.classList.add('fa-chevron-down'); }
+        var cc = document.getElementById('ch-setup-content');
+        var ci = document.getElementById('ch-setup-toggle-icon');
+        if (cc) cc.style.display = 'none';
+        if (ci) { ci.classList.remove('fa-chevron-up'); ci.classList.add('fa-chevron-down'); }
+        window._forceCloseSetupSections = true;
+      }
+
       if (id === 'preview-modal') {
         var previewIframe = document.getElementById('preview-iframe');
         if (previewIframe) previewIframe.src = '';
