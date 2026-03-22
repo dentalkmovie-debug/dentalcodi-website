@@ -11154,7 +11154,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
       // ── 2) 모달 표시: position:fixed로 뷰포트 전체 덮기 ──
       // 아임웹 헤더 보정: iframePageTop > 0이면 아임웹 환경
-      var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 16, 120) : 0;
+      var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 32, 140) : 0;
       el.style.cssText = 'display:flex !important; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column; padding-top:' + headerOffset + 'px;';
       
       // 내부 absolute 자식들을 flex 자식으로 변환
