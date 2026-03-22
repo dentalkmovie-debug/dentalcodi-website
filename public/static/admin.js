@@ -1240,7 +1240,7 @@ function renderPlaylists() {
               <div style="width:36px;height:36px;border-radius:10px;background:${isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#6366f1,#818cf8)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
                 <i class="fas fa-tv" style="color:#fff;font-size:14px"></i>
                 ${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff" class="animate-pulse"></span>' : ''}
-                <span id="temp-indicator-${p.id}" style="display:${_tempVideoActiveCache[p.id]?.active ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="임시 영상 재생 중"></span>
+                <span id="temp-indicator-${p.id}" style="display:${(_tempVideoActiveCache[p.id]?.active && _tempVideoActiveCache[p.id]?.return_time === 'manual') ? 'block' : 'none'};position:absolute;top:-3px;left:-3px;width:10px;height:10px;background:#f97316;border-radius:50%;border:2px solid #fff" class="animate-pulse" title="수동 복귀 설정됨"></span>
               </div>
               <div style="min-width:0;flex:1">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1356,7 +1356,8 @@ function renderPlaylists() {
     const cached = _tempVideoActiveCache[pId];
     if (cached && cached.active) {
       const indicator = document.getElementById('temp-indicator-' + pId);
-      if (indicator) indicator.style.display = '';
+      // 인디케이터는 수동복귀일 때만 표시
+      if (indicator) indicator.style.display = cached.return_time === 'manual' ? '' : 'none';
       // return_time이 'manual'일 때만 복귀 버튼 활성화
       setStopButtonState(parseInt(pId), cached.return_time === 'manual');
     }
@@ -1393,14 +1394,15 @@ async function checkTempVideoStatus() {
       const indicator = document.getElementById('temp-indicator-' + p.id);
       
       if (data.active) {
-        _tempVideoActiveCache[p.id] = { active: true, return_time: data.return_time || 'end' };
-        // 임시 영상 재생 중 - 인디케이터 표시
-        if (indicator) indicator.style.display = '';
+        const rt = data.return_time || 'end';
+        _tempVideoActiveCache[p.id] = { active: true, return_time: rt };
+        // 인디케이터는 수동복귀일 때만 표시
+        if (indicator) indicator.style.display = (rt === 'manual') ? '' : 'none';
         // return_time이 'manual'일 때만 복귀 버튼 활성화
-        setStopButtonState(p.id, data.return_time === 'manual');
+        setStopButtonState(p.id, rt === 'manual');
       } else {
         _tempVideoActiveCache[p.id] = { active: false, return_time: null };
-        // 임시 영상 없음 (자동복귀 포함) - 인디케이터와 복귀 버튼 숨김
+        // 임시 영상 없음 - 인디케이터와 복귀 버튼 숨김
         if (indicator) indicator.style.display = 'none';
         setStopButtonState(p.id, false);
       }
@@ -2159,16 +2161,20 @@ async function sendTempVideo() {
       closeModal('temp-video-modal');
       // 캐시 업데이트
       _tempVideoActiveCache[playlistId] = { active: true, return_time: returnTime };
-      // 상태 업데이트 - 인디케이터와 기본으로 복귀 버튼 표시
+      // 상태 업데이트
       const indicator = document.getElementById('temp-indicator-' + playlistId);
-      if (indicator) indicator.style.display = '';
+      // 인디케이터는 수동복귀일 때만 표시
+      if (indicator) indicator.style.display = (returnTime === 'manual') ? '' : 'none';
       setStopButtonState(playlistId, returnTime === 'manual');
     } else {
-      showToast('전송 실패', 'error');
+      const errData = await res.json().catch(() => ({}));
+      const errMsg = errData.error || ('전송 실패 (HTTP ' + res.status + ')');
+      console.error('sendTempVideo error:', res.status, errData);
+      showToast(errMsg, 'error');
     }
   } catch (e) {
-    console.error(e);
-    showToast('전송 실패', 'error');
+    console.error('sendTempVideo exception:', e);
+    showToast('전송 실패: ' + (e.message || '네트워크 오류'), 'error');
   }
 }
 
