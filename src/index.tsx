@@ -2282,6 +2282,60 @@ app.get('/api/:adminCode/settings', async (c) => {
 })
 
 // ============================================
+// ============================================
+// 자막 관리 API (일반 관리자용)
+// ============================================
+
+// 자막 목록 조회
+app.get('/api/:adminCode/subtitles', async (c) => {
+  const adminCode = c.req.param('adminCode')
+  const user = await getOrCreateUser(c.env.DB, adminCode)
+  
+  const subtitles = await c.env.DB.prepare(`
+    SELECT s.*, pi.url as video_url, pi.title as video_title
+    FROM subtitles s
+    LEFT JOIN playlist_items pi ON s.playlist_item_id = pi.id
+    ORDER BY s.created_at DESC
+  `).all()
+  
+  return c.json({ subtitles: subtitles.results })
+})
+
+// 자막 추가/수정
+app.post('/api/:adminCode/subtitles', async (c) => {
+  const adminCode = c.req.param('adminCode')
+  const user = await getOrCreateUser(c.env.DB, adminCode)
+  const body = await c.req.json() as any
+  const { vimeo_id, content, language = 'ko', id: editId } = body
+  
+  if (!vimeo_id || !content) {
+    return c.json({ error: 'Vimeo ID와 자막 내용이 필요합니다.' }, 400)
+  }
+  
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM subtitles WHERE vimeo_id = ?'
+  ).bind(vimeo_id).first()
+  
+  if (existing) {
+    await c.env.DB.prepare(
+      'UPDATE subtitles SET content = ?, language = ?, updated_at = CURRENT_TIMESTAMP WHERE vimeo_id = ?'
+    ).bind(content, language, vimeo_id).run()
+    return c.json({ success: true, message: '자막이 수정되었습니다.' })
+  } else {
+    await c.env.DB.prepare(
+      'INSERT INTO subtitles (vimeo_id, content, language) VALUES (?, ?, ?)'
+    ).bind(vimeo_id, content, language).run()
+    return c.json({ success: true, message: '자막이 추가되었습니다.' })
+  }
+})
+
+// 자막 삭제
+app.delete('/api/:adminCode/subtitles/:id', async (c) => {
+  const id = c.req.param('id')
+  await c.env.DB.prepare('DELETE FROM subtitles WHERE id = ?').bind(id).run()
+  return c.json({ success: true })
+})
+
 // TV → 관리자 페이지 직접 이동용 토큰 발급 API
 // shortCode로 해당 플레이리스트 계정의 세션 토큰을 발급해 관리자 URL 반환
 // localStorage 우회 목적 (동시접속 차단 없이 TV 계정으로 바로 이동)
@@ -4693,6 +4747,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           onclick="showTab('admin')">
           관리
         </button>
+        <button id="tab-subtitles" class="dtv-nb" data-tab="subtitles"
+          style="display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap"
+          onclick="showTab('subtitles')">
+          자막
+        </button>
       </div>
       
       <!-- 콘텐츠 영역 (포인트관리 스타일) -->
@@ -5030,6 +5089,70 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
         </div>
         
+        <!-- 자막 관리 탭 -->
+        <div id="content-subtitles" style="display:none">
+          <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;font-size:12px"><i class="fas fa-closed-captioning"></i></span>
+            자막 관리
+          </div>
+          
+          <!-- 자막 추가 폼 -->
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 12px;display:flex;align-items:center;gap:8px" id="sub-form-title">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-plus-circle"></i></span>
+              자막 추가
+            </h3>
+            <div style="display:grid;gap:10px">
+              <div>
+                <label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">Vimeo URL 또는 ID</label>
+                <input type="text" id="sub-vimeo-id" placeholder="예: https://vimeo.com/123456789"
+                  style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box">
+              </div>
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                  <label style="font-size:12px;color:#6b7280">자막 내용 (SRT 형식)</label>
+                  <button type="button" onclick="document.getElementById('sub-srt-file').click()" 
+                    style="font-size:11px;background:#f5f3ff;color:#7c3aed;padding:4px 10px;border:1px solid #ddd6fe;border-radius:6px;cursor:pointer;font-family:inherit">
+                    <i class="fas fa-folder-open" style="margin-right:4px"></i>파일 불러오기
+                  </button>
+                </div>
+                <input type="file" id="sub-srt-file" accept=".srt,.txt" style="display:none" onchange="handleSubSrtFile(event)">
+                <textarea id="sub-content" rows="8" placeholder="1
+00:00:00,000 --> 00:00:03,000
+안녕하세요
+
+2
+00:00:03,500 --> 00:00:06,000
+치과에 오신 것을 환영합니다"
+                  style="width:100%;border:2px dashed #d1d5db;border-radius:8px;padding:8px 12px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button id="sub-save-btn" onclick="saveSubAdmin()"
+                  style="padding:8px 16px;border-radius:8px;border:none;background:#7c3aed;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+                  <i class="fas fa-save" style="margin-right:4px"></i><span id="sub-save-text">저장</span>
+                </button>
+                <button onclick="clearSubForm()"
+                  style="padding:8px 16px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;cursor:pointer;font-family:inherit">
+                  <i class="fas fa-times" style="margin-right:4px"></i>초기화
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 등록된 자막 목록 -->
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-list"></i></span>
+                등록된 자막
+              </h3>
+              <span id="sub-count" style="background:#f5f3ff;color:#7c3aed;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">0개</span>
+            </div>
+            <div id="sub-list">
+              <p style="text-align:center;color:#9ca3af;padding:24px 0;font-size:13px">등록된 자막이 없습니다</p>
+            </div>
+          </div>
+        </div>
         
       </main>
     </div>
@@ -6450,6 +6573,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     
     // 관리 탭 상태
     let _adminLoaded = false;
+    let _subtitlesLoaded = false;
+    let _editingSubId = null;
     let _adminSubTab = 'push';
     let _allClinics = INITIAL_DATA.allClinics || [];
     let _adminSearchQuery = '';
@@ -6868,7 +6993,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
       }
 
-      ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master'].forEach(t => {
+      ['waitingrooms', 'chairs', 'notices', 'settings', 'admin', 'master', 'subtitles'].forEach(t => {
         const content = document.getElementById('content-' + t);
         const tabBtn = document.getElementById('tab-' + t);
         if (content) content.style.display = (t === tab) ? '' : 'none';
@@ -6888,7 +7013,120 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         showAdminSubTab(_adminSubTab || 'push');
       }
       if (tab === 'settings') initSettingsTab();
+      if (tab === 'subtitles') { if (!_subtitlesLoaded) { _subtitlesLoaded = true; loadSubtitlesAdmin(); } }
       if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
+    }
+    
+    // ============================================
+    // 자막 관리 기능 (일반 관리자 페이지)
+    // ============================================
+    
+    function extractVimeoIdFromUrl(input) {
+      if (!input) return null;
+      input = input.trim();
+      if (/^\\d+$/.test(input)) return input;
+      const m = input.match(/vimeo\\.com\\/(?:video\\/)?(\\d+)/);
+      return m ? m[1] : null;
+    }
+    
+    async function loadSubtitlesAdmin() {
+      try {
+        const res = await fetch(API_BASE + '/subtitles');
+        const data = await res.json();
+        const subs = data.subtitles || [];
+        document.getElementById('sub-count').textContent = subs.length + '개';
+        const container = document.getElementById('sub-list');
+        if (subs.length === 0) {
+          container.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:24px 0;font-size:13px">등록된 자막이 없습니다</p>';
+          return;
+        }
+        container.innerHTML = subs.map(sub => {
+          const preview = sub.content.substring(0, 80).replace(/\\n/g, ' ');
+          return '<div style="background:#f9fafb;border-radius:8px;padding:12px;border:1px solid #e5e7eb;margin-bottom:8px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:start">'
+            + '<div style="flex:1">'
+            + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+            + '<span style="font-weight:700;color:#7c3aed;font-size:14px">Vimeo: ' + sub.vimeo_id + '</span>'
+            + '<span style="background:#dbeafe;color:#2563eb;padding:1px 8px;border-radius:10px;font-size:10px">' + (sub.language || 'ko') + '</span>'
+            + '</div>'
+            + '<div style="background:#fff;padding:6px 8px;border-radius:4px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-family:monospace;max-height:40px;overflow:hidden">' + preview + '</div>'
+            + '<p style="font-size:10px;color:#9ca3af;margin-top:4px">등록: ' + (sub.created_at || '') + '</p>'
+            + '</div>'
+            + '<div style="display:flex;flex-direction:column;gap:4px;margin-left:8px">'
+            + '<button onclick="editSubAdmin(' + sub.id + ',\\'' + sub.vimeo_id + '\\')" style="padding:6px 12px;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:11px;cursor:pointer;font-family:inherit"><i class="fas fa-edit" style="margin-right:2px"></i>수정</button>'
+            + '<button onclick="deleteSubAdmin(' + sub.id + ')" style="padding:6px 12px;border-radius:6px;border:1px solid #fecaca;background:#fef2f2;color:#dc2626;font-size:11px;cursor:pointer;font-family:inherit"><i class="fas fa-trash" style="margin-right:2px"></i>삭제</button>'
+            + '</div></div></div>';
+        }).join('');
+      } catch (e) {
+        console.error('자막 로드 에러:', e);
+      }
+    }
+    
+    async function saveSubAdmin() {
+      const vimeoInput = document.getElementById('sub-vimeo-id').value.trim();
+      const content = document.getElementById('sub-content').value.trim();
+      const vimeoId = extractVimeoIdFromUrl(vimeoInput);
+      if (!vimeoId) { alert('올바른 Vimeo URL 또는 ID를 입력해주세요.'); return; }
+      if (!content) { alert('자막 내용을 입력해주세요.'); return; }
+      try {
+        const res = await fetch(API_BASE + '/subtitles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vimeo_id: vimeoId, content, id: _editingSubId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(_editingSubId ? '자막이 수정되었습니다.' : '자막이 추가되었습니다.');
+          clearSubForm();
+          loadSubtitlesAdmin();
+        } else { alert(data.error || '저장 실패'); }
+      } catch (e) { alert('저장 실패'); }
+    }
+    
+    async function editSubAdmin(id, vimeoId) {
+      try {
+        const res = await fetch('/api/subtitles/' + vimeoId);
+        const data = await res.json();
+        if (data.subtitle) {
+          _editingSubId = id;
+          document.getElementById('sub-vimeo-id').value = vimeoId;
+          document.getElementById('sub-vimeo-id').readOnly = true;
+          document.getElementById('sub-vimeo-id').style.background = '#f3f4f6';
+          document.getElementById('sub-content').value = data.subtitle.content;
+          document.getElementById('sub-form-title').innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-edit"></i></span> 자막 수정 (Vimeo: ' + vimeoId + ')';
+          document.getElementById('sub-save-text').textContent = '수정';
+        }
+      } catch (e) { alert('자막 로드 실패'); }
+    }
+    
+    async function deleteSubAdmin(id) {
+      if (!confirm('이 자막을 삭제하시겠습니까?')) return;
+      try {
+        await fetch(API_BASE + '/subtitles/' + id, { method: 'DELETE' });
+        showToast('자막이 삭제되었습니다.');
+        loadSubtitlesAdmin();
+      } catch (e) { alert('삭제 실패'); }
+    }
+    
+    function clearSubForm() {
+      _editingSubId = null;
+      document.getElementById('sub-vimeo-id').value = '';
+      document.getElementById('sub-vimeo-id').readOnly = false;
+      document.getElementById('sub-vimeo-id').style.background = '';
+      document.getElementById('sub-content').value = '';
+      document.getElementById('sub-form-title').innerHTML = '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#f5f3ff;color:#7c3aed;font-size:10px"><i class="fas fa-plus-circle"></i></span> 자막 추가';
+      document.getElementById('sub-save-text').textContent = '저장';
+    }
+    
+    function handleSubSrtFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('sub-content').value = e.target.result;
+      };
+      reader.readAsText(file, 'UTF-8');
+      event.target.value = '';
     }
     
     // ============================================
@@ -14293,25 +14531,9 @@ app.get('/tv/:shortCode', async (c) => {
               player.disableTextTrack().catch(() => {});
               startSubtitleSync(player, vimeoId, idx);
             } else {
-              // 커스텀 자막이 없으면 Vimeo 내장 자막 활성화 시도
-              // 재생 안정 후 3초 지연하여 호출 (끊김 방지)
-              setTimeout(() => {
-                if (thisSession !== vimeoSessionId) return;
-                player.getTextTracks().then((tracks) => {
-                  if (thisSession !== vimeoSessionId) return;
-                  console.log('Vimeo text tracks available:', tracks.length, tracks.map(t => t.language + '/' + t.kind));
-                  if (tracks.length > 0) {
-                    // 한국어 포함 트랙 우선 (ko, ko-x-autogen 등), 없으면 첫 번째 트랙
-                    const koTrack = tracks.find(t => t.language && t.language.startsWith('ko'));
-                    const targetTrack = koTrack || tracks[0];
-                    player.enableTextTrack(targetTrack.language, targetTrack.kind).then(() => {
-                      console.log('Vimeo text track enabled:', targetTrack.language, targetTrack.kind);
-                    }).catch((e) => {
-                      console.log('Failed to enable text track:', e);
-                    });
-                  }
-                }).catch(() => {});
-              }, 3000);
+              // 커스텀 자막이 없으면 Vimeo 내장 자막 사용
+              // texttrack:'ko' 옵션으로 이미 자막이 활성화됨 (추가 API 호출 없음 - 끊김 방지)
+              console.log('No custom subtitle, using Vimeo built-in texttrack:ko');
             }
           });
         }
