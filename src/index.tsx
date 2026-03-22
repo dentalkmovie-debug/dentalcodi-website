@@ -13320,6 +13320,22 @@ app.get('/tv/:shortCode', async (c) => {
             // 아이템은 같지만 다른 설정이 변경될 수 있으므로 playlist 업데이트
             playlist = data.playlist;
           }
+          
+          // 안전장치: 현재 재생 중인 아이템이 서버 목록에 없으면 강제 재시작
+          // (itemsChanged 감지를 빠져나간 edge case 방어)
+          if (playlist.items && playlist.items.length > 0) {
+            const currentPlayingItem = playlist.items[currentIndex];
+            if (currentPlayingItem) {
+              const serverItems = data.playlist.items || [];
+              const currentUrlExists = serverItems.some(item => item.url === currentPlayingItem.url || item.id === currentPlayingItem.id);
+              if (!currentUrlExists && currentPlayingItem.id !== 'temp-video') {
+                console.log('[loadData] Safety: current playing item not in server list, forcing restart');
+                playlist = data.playlist;
+                currentIndex = 0;
+                safeRestartPlayback();
+              }
+            }
+          }
         }
         
         // 공지/설정 항상 업데이트
