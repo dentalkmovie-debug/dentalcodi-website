@@ -15,6 +15,7 @@
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed"
   },
   "dependencies": {
+    "better-sqlite3": "^12.8.0",
     "hono": "^4.11.6"
   },
   "devDependencies": {

@@ -11535,16 +11535,17 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       showDeleteConfirm(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + pushItems.length + '\uAC1C \uB9C1\uD06C\uB97C \uBC30\uD3EC\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?',
         async function() {
         var successCount = 0, failCount = 0, failDetails = [];
-        showToast('\uBC30\uD3EC \uC911... (0/' + selectedCodes.length + ')');
-        for (var i = 0; i < selectedCodes.length; i++) {
-          var code = selectedCodes[i];
+        showToast('\uBC30\uD3EC \uC911... (' + selectedCodes.length + '\uAC1C \uCE58\uACFC)');
+        
+        // 모든 치과에 동시 병렬 배포
+        var pushPromises = selectedCodes.map(async function(code) {
           try {
             var pRes = await fetch('/api/' + code + '/playlists');
-            if (!pRes.ok) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC870\uD68C \uC2E4\uD328'); continue; }
+            if (!pRes.ok) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC870\uD68C \uC2E4\uD328'); return; }
             var pData = await pRes.json();
             var targetPlaylists = (pData.playlists || []).filter(function(p) { return !p.is_master_playlist; });
             var firstPlaylist = targetPlaylists[0];
-            if (!firstPlaylist) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); continue; }
+            if (!firstPlaylist) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); return; }
             for (var j = 0; j < pushItems.length; j++) {
               var item = pushItems[j];
               var addRes = await fetch('/api/' + code + '/playlists/' + firstPlaylist.id + '/items', {
@@ -11561,17 +11562,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               }
             }
           } catch(e) { failCount++; failDetails.push(code + ': \uB124\uD2B8\uC6CC\uD06C \uC624\uB958'); }
-          // 진행률 업데이트
-          if (i % 3 === 0 || i === selectedCodes.length - 1) {
-            showToast('\uBC30\uD3EC \uC911... (' + (i+1) + '/' + selectedCodes.length + ')');
-          }
-        }
+        });
+        
+        await Promise.all(pushPromises);
         
         if (failCount > 0) {
           showToast('\uC131\uACF5 ' + successCount + '\uAC74 / \uC2E4\uD328 ' + failCount + '\uAC74', 'error');
           if (failDetails.length > 0) console.warn('\uBC30\uD3EC \uC2E4\uD328 \uC0C1\uC138:', failDetails);
         } else {
-          showToast(successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC');
+          showToast(selectedCodes.length + '\uAC1C \uCE58\uACFC\uC5D0 ' + successCount + '\uAC74 \uBC30\uD3EC \uC644\uB8CC!');
         }
         // 입력 초기화
         _pushTemplates = [];
