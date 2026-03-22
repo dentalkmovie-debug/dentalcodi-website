@@ -2265,18 +2265,36 @@ app.get('/api/tv/:shortCode', async (c) => {
   
   let combinedItems: any[] = []
   
-  if (activeItemIds.length === 0) {
-    // activeItemIds가 비어있으면 아무것도 재생 안 함 (대기 화면)
-    combinedItems = []
-  } else {
-    // active_item_ids가 설정됨: 해당 ID만 순서대로 재생
-    const allItemsMap = new Map<number, any>()
-    masterItems.forEach((item: any) => allItemsMap.set(item.id, { ...item, is_master: true }))
-    ;(userItems.results || []).forEach((item: any) => allItemsMap.set(item.id, { ...item, is_master: false }))
+  // use_master_playlist가 활성화되어 있으면 공용 영상을 항상 자동 포함
+  const useMasterPlaylist = (playlist as any).use_master_playlist ?? 1
+  const masterPlaylistMode = (playlist as any).master_playlist_mode || 'before'
+  const masterItemsWithFlag = masterItems.map((item: any) => ({ ...item, is_master: true }))
+  const userItemsWithFlag = (userItems.results || []).map((item: any) => ({ ...item, is_master: false }))
+  
+  // activeItemIds에서 사용자 아이템만 순서대로 가져오기
+  const allItemsMap = new Map<number, any>()
+  masterItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item))
+  userItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item))
+  
+  const activeUserItems = activeItemIds
+    .filter(id => allItemsMap.has(id))
+    .map(id => allItemsMap.get(id))
+  
+  if (useMasterPlaylist && masterItemsWithFlag.length > 0) {
+    // 공용 영상 자동 포함: activeItemIds에 없어도 항상 재생
+    // 이미 activeItemIds에 포함된 마스터 아이템은 중복 제거
+    const activeIdSet = new Set(activeItemIds)
+    const autoMasterItems = masterItemsWithFlag.filter((item: any) => !activeIdSet.has(item.id))
     
-    combinedItems = activeItemIds
-      .filter(id => allItemsMap.has(id))
-      .map(id => allItemsMap.get(id))
+    if (masterPlaylistMode === 'after') {
+      combinedItems = [...activeUserItems, ...autoMasterItems]
+    } else {
+      // 'before' (기본): 공용 영상 먼저, 그 다음 사용자 영상
+      combinedItems = [...autoMasterItems, ...activeUserItems]
+    }
+  } else {
+    // 공용 영상 비활성화: activeItemIds에 있는 것만 재생
+    combinedItems = activeUserItems
   }
   
   const items = { results: combinedItems }
@@ -9406,9 +9424,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       // 플레이리스트 순서대로 렌더링
       const allItems = [...masterItemsCache, ...items];
-      const playlistItems = activeItemIds
+      const activeUserItems = activeItemIds
         .map(id => allItems.find(item => String(item.id) === String(id)))
         .filter(item => item);
+      
+      // 공용 영상 자동 포함 (use_master_playlist 활성화 시)
+      const useMasterEl = document.getElementById('use-master-playlist');
+      const useMasterEnabled2 = useMasterEl ? useMasterEl.checked : true;
+      let playlistItems = activeUserItems;
+      
+      if (useMasterEnabled2 && masterItemsCache && masterItemsCache.length > 0) {
+        const activeIdSet = new Set(activeItemIds.map(id => String(id)));
+        const autoMasterItems = masterItemsCache
+          .filter(item => !activeIdSet.has(String(item.id)))
+          .map(item => ({ ...item, is_master: true, _auto: true }));
+        playlistItems = [...autoMasterItems, ...activeUserItems];
+      }
       
       // 플레이리스트 카운트 업데이트
       const countEl = document.getElementById('playlist-count');
@@ -9420,12 +9451,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
       
       playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-        <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
-          <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
-            <i class="fas fa-grip-vertical"></i>
-          </div>
-          <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+        <div class="flex items-center gap-2 p-2 \${item.is_master || item._auto ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master || item._auto ? 1 : 0}">
+          \${item._auto ? '' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+          <span class="text-sm font-bold \${item.is_master || item._auto ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
           <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
             \${item.item_type === 'image'
               ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
@@ -9436,11 +9465,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
+            \${item._auto ? '<p class="text-xs text-purple-400"><i class="fas fa-crown mr-1"></i>공용 자동</p>' : ''}
           </div>
-          <button onclick="removeFromPlaylist('\${item.id}')" 
-                  class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
-            <i class="fas fa-times"></i>
-          </button>
+          \${item._auto 
+            ? '<span class="text-xs text-purple-400 px-1"><i class="fas fa-lock text-xs"></i></span>' 
+            : \`<button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>\`
+          }
         </div>
       \`).join('');
       
@@ -9458,9 +9488,25 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const activeItemIds = Array.isArray(currentPlaylist.activeItemIds) ? currentPlaylist.activeItemIds : [];
       const items = currentPlaylist.items || [];
       const allItems = [...(masterItemsCache || []), ...items];
-      const playlistItems = activeItemIds
+      
+      // activeItemIds에서 매칭되는 아이템
+      const activeUserItems = activeItemIds
         .map(id => allItems.find(item => String(item.id) === String(id)))
         .filter(item => item);
+      
+      // 공용 영상 자동 포함 (use_master_playlist 활성화 시)
+      const useMaster = document.getElementById('use-master-playlist');
+      const useMasterEnabled = useMaster ? useMaster.checked : true;
+      let playlistItems = activeUserItems;
+      
+      if (useMasterEnabled && masterItemsCache && masterItemsCache.length > 0) {
+        const activeIdSet = new Set(activeItemIds.map(id => String(id)));
+        const autoMasterItems = (masterItemsCache || [])
+          .filter(item => !activeIdSet.has(String(item.id)))
+          .map(item => ({ ...item, is_master: true, _auto: true }));
+        playlistItems = [...autoMasterItems, ...activeUserItems];
+      }
+      
       const countEl = document.getElementById('playlist-count');
       if (countEl) countEl.textContent = playlistItems.length + '개';
       if (playlistItems.length === 0) {
@@ -9468,12 +9514,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         return;
       }
       playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-        <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
-          <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
-            <i class="fas fa-grip-vertical"></i>
-          </div>
-          <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+        <div class="flex items-center gap-2 p-2 \${item.is_master || item._auto ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master || item._auto ? 1 : 0}">
+          \${item._auto ? '' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+          <span class="text-sm font-bold \${item.is_master || item._auto ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
           <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
             \${item.item_type === 'image'
               ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
@@ -9484,11 +9528,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
+            \${item._auto ? '<p class="text-xs text-purple-400"><i class="fas fa-crown mr-1"></i>공용 자동</p>' : ''}
           </div>
-          <button onclick="removeFromPlaylist('\${item.id}')"
-                  class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100">
-            <i class="fas fa-times"></i>
-          </button>
+          \${item._auto 
+            ? '<span class="text-xs text-purple-400 px-1"><i class="fas fa-lock text-xs"></i></span>' 
+            : \`<button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>\`
+          }
         </div>
       \`).join('');
       initPlaylistItemsSortable();
@@ -11545,7 +11590,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             var pData = await pRes.json();
             var targetPlaylists = (pData.playlists || []).filter(function(p) { return !p.is_master_playlist; });
             if (targetPlaylists.length === 0) { failCount++; failDetails.push(code + ': \uD50C\uB808\uC774\uB9AC\uC2A4\uD2B8 \uC5C6\uC74C'); return; }
-            // 모든 플레이리스트에 라이브러리(내 영상)로 추가
+            // 모든 플레이리스트에 라이브러리 + 재생목록 모두 추가
             for (var pi = 0; pi < targetPlaylists.length; pi++) {
               var playlist = targetPlaylists[pi];
               for (var j = 0; j < pushItems.length; j++) {
@@ -11553,7 +11598,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                 var addRes = await fetch('/api/' + code + '/playlists/' + playlist.id + '/items', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url: item.url, title: item.title, add_to_playlist: false })
+                  body: JSON.stringify({ url: item.url, title: item.title, add_to_playlist: true })
                 });
                 if (addRes.ok) successCount++;
                 else {
