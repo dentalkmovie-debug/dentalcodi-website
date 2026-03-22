@@ -11279,42 +11279,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       const el = document.getElementById(id);
       if (!el) return;
 
-      // ── 1) 원래 부모/위치 저장 (closeModal에서 복원용) ──
-      if (!el._modalOriginalParent) {
-        el._modalOriginalParent = el.parentElement;
-        el._modalOriginalNextSibling = el.nextElementSibling;
-      }
-      
-      // ── 2) 숨긴 상태로 먼저 모든 스타일 설정 (깜빡임 방지) ──
-      var headerOffset = (typeof iframePageTop === 'number' && iframePageTop > 0) ? Math.min(iframePageTop + 32, 140) : 0;
-      el.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; overflow:hidden; flex-direction:column; padding-top:' + headerOffset + 'px;';
-      
-      // ── 3) 자식 요소 원래 스타일 백업 + 스타일 적용 ──
-      var children = el.children;
-      for (var i = 0; i < children.length; i++) {
-        var child = children[i];
-        if (child._origStyleCssText === undefined) {
-          child._origStyleCssText = child.style.cssText || '';
-        }
-        if (child.classList.contains('bg-black/50') || child.classList.contains('modal-backdrop') || (child.getAttribute('onclick') || '').includes('closeModal') && !child.querySelector('.bg-white')) {
-          child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
-        } else {
-          child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:16px; padding-top:8px;';
-          child.style.pointerEvents = 'none';
-          var box = child.querySelector('.bg-white');
-          if (box) box.style.pointerEvents = 'auto';
-        }
-      }
-      
-      // ── 4) body로 이동 (display:none 상태이므로 깜빡임 없음) ──
-      if (el.parentElement !== document.body) {
-        document.body.appendChild(el);
-      }
-      
-      // ── 5) 표시 (모든 준비 완료 후) ──
+      // ── 단순 표시: HTML의 fixed inset-0 z-50 클래스가 이미 올바른 위치를 잡음 ──
       el.style.display = 'flex';
       
-      // ── 6) 배경 스크롤 방지 ──
+      // ── 배경 스크롤 방지 ──
       if (_openModalSet.size === 0) {
         window._savedScrollY = window.scrollY || window.pageYOffset || 0;
       }
@@ -11332,36 +11300,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) {
-        // 자식 요소 스타일 복원 (openModal에서 백업한 원래 스타일로)
-        var children = el.children;
-        for (var i = 0; i < children.length; i++) {
-          if (children[i]._origStyleCssText !== undefined) {
-            children[i].style.cssText = children[i]._origStyleCssText;
-            delete children[i]._origStyleCssText;
-          } else {
-            children[i].style.cssText = '';
-          }
-          var box = children[i].querySelector('.bg-white');
-          if (box) box.style.pointerEvents = '';
-        }
-        
-        // 모달 숨김
-        el.style.cssText = 'display:none;';
-        
-        // ── 모달을 원래 DOM 위치로 복원 ──
-        if (el._modalOriginalParent && el._modalOriginalParent !== document.body) {
-          try {
-            if (el._modalOriginalNextSibling && el._modalOriginalNextSibling.parentElement === el._modalOriginalParent) {
-              el._modalOriginalParent.insertBefore(el, el._modalOriginalNextSibling);
-            } else {
-              el._modalOriginalParent.appendChild(el);
-            }
-          } catch(e) {
-            // 원래 부모가 더 이상 존재하지 않으면 body에 그대로 둠
-          }
-        }
-        delete el._modalOriginalParent;
-        delete el._modalOriginalNextSibling;
+        // ── 단순 숨김 ──
+        el.style.display = 'none';
       }
       
       // 추적 Set에서 제거
