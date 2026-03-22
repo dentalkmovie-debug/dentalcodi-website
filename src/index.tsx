@@ -13123,7 +13123,9 @@ app.get('/tv/:shortCode', async (c) => {
       }
     }
     
-    let _consecutive404Count = 0; // 연속 404 횟수 (3회 이상이면 삭제 확정)
+    let _consecutive404Count = 0; // 연속 404 횟수
+    let _initialLoadRetries = 0; // 초기 로드 재시도 횟수
+    const MAX_INITIAL_RETRIES = 10; // 초기 로드 최대 재시도 (30초)
     
     async function loadData(isInitial = false) {
       if (isLoadingData) {
@@ -13134,21 +13136,32 @@ app.get('/tv/:shortCode', async (c) => {
       try {
         const res = await fetch('/api/tv/' + SHORT_CODE + '?t=' + Date.now() + '&cid=' + CLIENT_ID);
         if (!res.ok) {
-          const err = new Error(res.status === 404 ? '404_NOT_FOUND' : 'SERVER_ERROR_' + res.status);
+          const err = new Error('HTTP_' + res.status);
           err.httpStatus = res.status;
           throw err;
         }
         
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          console.log('[loadData] JSON parse error, skipping this poll');
+          throw new Error('JSON_PARSE_ERROR');
+        }
         const serverTempVideo = data.tempVideo;
         
         // 이전에 에러 화면이 표시되었다면 숨기고 정상 복구
         const errorScreen = document.getElementById('error-screen');
         if (errorScreen && errorScreen.style.display !== 'none') {
           errorScreen.style.display = 'none';
-          console.log('[loadData] Recovered from error screen');
+          console.log('[loadData] Recovered from error screen, resuming playback');
+          // 에러 복구 시 재생 다시 시작
+          if (!isInitial) {
+            try { safeRestartPlayback(); } catch(_) {}
+          }
         }
-        _consecutive404Count = 0; // 성공하면 404 카운터 리셋
+        _consecutive404Count = 0;
+        _initialLoadRetries = 0; // 성공하면 초기 재시도 카운터도 리셋
         
         // 이 TV의 실제 admin_code/email을 저장 (관리자 페이지 이동 시 올바른 계정으로 연결)
         if (data.adminCode) {
@@ -13365,39 +13378,29 @@ app.get('/tv/:shortCode', async (c) => {
         }
         
       } catch (e) {
-        // 초기 로드 실패: 에러 화면 표시
+        // ===== 핵심 원칙: 이미 재생 중인 영상은 절대 중단하지 않음 =====
+        console.log('[loadData] Error:', e.message || e, 'httpStatus:', e.httpStatus || 'N/A');
+        
         if (isInitial) {
-          document.getElementById('loading-screen').classList.add('hidden');
-          document.getElementById('error-screen').style.display = 'flex';
-          document.getElementById('error-message').textContent = (e.httpStatus === 404)
-            ? '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.'
-            : '서버 연결에 실패했습니다. 잠시 후 다시 시도합니다.';
-        } else {
-          // 폴링 중 404 (플레이리스트 삭제됨) → 연속 3회 이상이면 재생 중단 + 안내 화면 표시
-          // httpStatus가 정확히 404일 때만 삭제 처리
-          const isDeleted = e.httpStatus === 404;
-          if (isDeleted) {
-            _consecutive404Count++;
-            console.log('[loadData] 404 count:', _consecutive404Count);
-            // 연속 3회 이상 404면 삭제 확정 (일시적 오류 방지)
-            if (_consecutive404Count >= 3) {
-              console.log('[loadData] Playlist deleted (404 x3), stopping playback');
-              // 재생 중단
-              try { if (typeof stopAllPlayback === 'function') stopAllPlayback(); } catch(_) {}
-              // 영상 숨기기
-              const videoEl = document.getElementById('main-video');
-              if (videoEl) videoEl.style.display = 'none';
-              const ytEl = document.getElementById('youtube-player');
-              if (ytEl) ytEl.style.display = 'none';
-              const vmEl = document.getElementById('vimeo-player');
-              if (vmEl) vmEl.style.display = 'none';
-              // 에러 화면 표시
-              document.getElementById('error-screen').style.display = 'flex';
-              document.getElementById('error-message').textContent = '이 채널은 삭제되었습니다. TV를 다른 채널로 전환해주세요.';
-            }
-            // 폴링 계속하되 빈번하지 않게 (혹시 복구될 경우 대비)
+          // 초기 로드 실패: 자동 재시도 (최대 MAX_INITIAL_RETRIES회)
+          _initialLoadRetries++;
+          console.log('[loadData] Initial load failed, retry', _initialLoadRetries, '/', MAX_INITIAL_RETRIES);
+          
+          if (_initialLoadRetries < MAX_INITIAL_RETRIES) {
+            // 3초 후 자동 재시도 (폴링과 동일 주기)
+            setTimeout(() => loadData(true), 3000);
+          } else {
+            // 재시도 횟수 초과: 에러 화면 표시 (초기 로드에서만)
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-message').textContent = (e.httpStatus === 404)
+              ? '채널을 찾을 수 없습니다. 주소를 확인해주세요.'
+              : '서버에 연결할 수 없습니다. 페이지를 새로고침해주세요.';
+            // 그래도 폴링은 계속 (복구 대비)
           }
         }
+        // 폴링 중 에러: 아무것도 하지 않음 - 현재 재생 유지, 다음 폴링에서 재시도
+        // 영상 중단, 에러 화면 표시 등 절대 금지
       } finally {
         isLoadingData = false;
         if (pendingLoad) {
