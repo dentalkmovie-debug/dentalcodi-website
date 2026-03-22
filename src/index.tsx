@@ -13303,38 +13303,28 @@ app.get('/tv/:shortCode', async (c) => {
               const newIndex = newItems.findIndex(item => item.url === currentUrl);
               if (newIndex >= 0) {
                 currentIndex = newIndex;
-                console.log('[loadData] Same item found at new index:', newIndex, '- restarting with rebuilt media');
+                // ★ 현재 재생 아이템이 그대로 있으면 재시작하지 않음 (끊김 방지)
+                console.log('[loadData] Same item found at new index:', newIndex, '- continuing playback (no restart)');
               } else {
+                // 현재 아이템이 삭제됨 - 재시작 필요
                 currentIndex = Math.min(currentIndex, newItemCount - 1);
                 if (currentIndex < 0) currentIndex = 0;
                 console.log('[loadData] Current item deleted, restarting at index:', currentIndex);
+                safeRestartPlayback();
               }
             } else if (newItemCount > 0) {
               console.log('[loadData] Playlist updated, restarting from start');
               currentIndex = 0;
+              safeRestartPlayback();
+            } else {
+              // 모든 아이템 삭제됨
+              console.log('[loadData] All items removed');
             }
-
-            // 아이템 목록 변경 시 항상 재초기화 (새로 추가된 아이템 DOM 반영)
-            safeRestartPlayback();
           } else {
-            // 아이템은 같지만 다른 설정이 변경될 수 있으므로 playlist 업데이트
+            // 아이템 목록은 같음 → 메타 설정만 업데이트 (items 참조 유지, 재생 중단 없음)
+            const currentItems = playlist.items;
             playlist = data.playlist;
-          }
-          
-          // 안전장치: 현재 재생 중인 아이템이 서버 목록에 없으면 강제 재시작
-          // (itemsChanged 감지를 빠져나간 edge case 방어)
-          if (playlist.items && playlist.items.length > 0) {
-            const currentPlayingItem = playlist.items[currentIndex];
-            if (currentPlayingItem) {
-              const serverItems = data.playlist.items || [];
-              const currentUrlExists = serverItems.some(item => item.url === currentPlayingItem.url || item.id === currentPlayingItem.id);
-              if (!currentUrlExists && currentPlayingItem.id !== 'temp-video') {
-                console.log('[loadData] Safety: current playing item not in server list, forcing restart');
-                playlist = data.playlist;
-                currentIndex = 0;
-                safeRestartPlayback();
-              }
-            }
+            playlist.items = currentItems; // items 참조 유지 (Vimeo 플레이어 안정성)
           }
         }
         
