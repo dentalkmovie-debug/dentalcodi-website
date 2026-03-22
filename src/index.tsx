@@ -6385,7 +6385,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     
     // 관리 탭 상태
     let _adminLoaded = false;
-    let _adminSubTab = 'clinics';
+    let _adminSubTab = 'push';
     let _allClinics = INITIAL_DATA.allClinics || [];
     let _adminSearchQuery = '';
 
@@ -6797,7 +6797,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           tabBtn.style.borderBottomColor = isActive ? '#2563eb' : 'transparent';
         }
       });
-      if (tab === 'admin' && !_adminLoaded) { _adminLoaded = true; loadMasterItemsForAdmin(); renderAdminPush(); }
+      if (tab === 'admin') {
+        if (!_adminLoaded) {
+          _adminLoaded = true;
+          _adminSubTab = 'push';
+          loadMasterItemsForAdmin();
+        }
+        showAdminSubTab(_adminSubTab || 'push');
+      }
       if (tab === 'settings') initSettingsTab();
       if (typeof postParentHeight === 'function') setTimeout(postParentHeight, 100);
     }
