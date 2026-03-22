@@ -5737,14 +5737,28 @@ function renderAdminOverview() {
     '</div>';
 }
 
+var _masterFilterType = 'all_filter'; // all_filter, waitingroom, chair
+
 function renderAdminMasterItems() {
   const body = document.getElementById('admin-body');
   if (!body) return;
-  const items = masterItems || [];
+  const allItems = masterItems || [];
+  
+  // 필터링
+  var items = allItems;
+  if (_masterFilterType === 'waitingroom') {
+    items = allItems.filter(function(i) { return (i.target_type || 'all') === 'waitingroom' || (i.target_type || 'all') === 'all'; });
+  } else if (_masterFilterType === 'chair') {
+    items = allItems.filter(function(i) { return (i.target_type || 'all') === 'chair' || (i.target_type || 'all') === 'all'; });
+  }
+  
+  // 카운트
+  var wrCount = allItems.filter(function(i) { var t = i.target_type || 'all'; return t === 'waitingroom' || t === 'all'; }).length;
+  var chCount = allItems.filter(function(i) { var t = i.target_type || 'all'; return t === 'chair' || t === 'all'; }).length;
   
   var itemsHtml = '';
   if (items.length === 0) {
-    itemsHtml = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-video" style="font-size:24px;margin-bottom:8px;display:block"></i><p style="margin:0;font-size:13px">\uB4F1\uB85D\uB41C \uACF5\uC6A9 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p><p style="margin:4px 0 0;font-size:11px;color:#d1d5db">Vimeo URL\uC744 \uC785\uB825\uD558\uC5EC \uCD94\uAC00\uD558\uC138\uC694.</p></div>';
+    itemsHtml = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-video" style="font-size:24px;margin-bottom:8px;display:block"></i><p style="margin:0;font-size:13px">\uD574\uB2F9 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p></div>';
   } else {
     itemsHtml = items.map(function(item, idx) {
       var thumb = item.thumbnail_url && !item.thumbnail_url.includes('vimeo.com/')
@@ -5779,13 +5793,27 @@ function renderAdminMasterItems() {
     }).join('');
   }
   
+  // 필터 탭 스타일
+  var fAll = _masterFilterType === 'all_filter';
+  var fWr = _masterFilterType === 'waitingroom';
+  var fCh = _masterFilterType === 'chair';
+  var filterTabBase = 'padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s;';
+  var filterTabOn = function(bg, color) { return filterTabBase + 'background:' + bg + ';color:' + color + ';'; };
+  var filterTabOff = filterTabBase + 'background:#f3f4f6;color:#6b7280;';
+
   body.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
       '<h3 style="font-size:14px;font-weight:700;color:#1f2937;margin:0;display:flex;align-items:center;gap:8px">' +
         '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:10px"><i class="fas fa-video"></i></span>' +
-        '\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC <span style="font-size:12px;font-weight:500;color:#6b7280">(' + items.length + '\uAC1C)</span>' +
+        '\uACF5\uC6A9 \uC601\uC0C1 \uAD00\uB9AC <span style="font-size:12px;font-weight:500;color:#6b7280">(' + allItems.length + '\uAC1C)</span>' +
       '</h3>' +
       '<button onclick="adminRefreshMasterList()" style="font-size:12px;color:#7c3aed;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:500"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button>' +
+    '</div>' +
+    // 필터 탭
+    '<div style="display:flex;gap:6px;margin-bottom:14px">' +
+      '<button onclick="_masterFilterType=\'all_filter\';renderAdminMasterItems()" style="' + (fAll ? filterTabOn('#7c3aed','#fff') : filterTabOff) + '">\uC804\uCCB4 ' + allItems.length + '</button>' +
+      '<button onclick="_masterFilterType=\'waitingroom\';renderAdminMasterItems()" style="' + (fWr ? filterTabOn('#2563eb','#fff') : filterTabOff) + '">\uB300\uAE30\uC2E4 ' + wrCount + '</button>' +
+      '<button onclick="_masterFilterType=\'chair\';renderAdminMasterItems()" style="' + (fCh ? filterTabOn('#7c3aed','#fff') : filterTabOff) + '">\uCCB4\uC5B4 ' + chCount + '</button>' +
     '</div>' +
     '<div style="background:#f5f3ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px">' +
       '<p style="font-size:11px;color:#6b7280;margin:0 0 8px"><i class="fas fa-info-circle" style="margin-right:4px;color:#7c3aed"></i>\uC5EC\uAE30\uC11C \uCD94\uAC00\uD55C \uC601\uC0C1\uC740 \uBAA8\uB4E0 \uCE58\uACFC\uC5D0 \uACF5\uC6A9\uB429\uB2C8\uB2E4.</p>' +
