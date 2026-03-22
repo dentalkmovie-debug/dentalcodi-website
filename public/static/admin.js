@@ -791,6 +791,8 @@ function showTab(tab) {
       masterItemsRefreshTimer = null;
     }
     _openModalSet.delete('edit-playlist-modal');
+    // 대기실/체어 설정 섹션 자동 닫기
+    window._forceCloseSetupSections = true;
     // _prevDisplay 정리
     var mainContent = document.getElementById('dtv-pg');
     if (mainContent) {
@@ -5107,7 +5109,7 @@ function openModal(id) {
       child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
     } else {
       // content wrapper: flex로 변환하여 전체 높이 차지
-      child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; padding-top:8px;';
+      child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow-y:auto; overflow-x:hidden; padding:16px; padding-top:8px;';
       // pointer-events 복원
       child.style.pointerEvents = 'none';
       var box = child.querySelector('.bg-white');

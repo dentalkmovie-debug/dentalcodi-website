@@ -5955,7 +5955,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <div id="notice-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('notice-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto mt-8 mb-8">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto">
         <div class="p-6 border-b flex items-center justify-between">
           <h3 id="notice-modal-title" class="text-lg font-bold">새 공지사항</h3>
           <label class="flex items-center gap-2 cursor-pointer select-none">
@@ -6963,6 +6963,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           masterItemsRefreshTimer = null;
         }
         _openModalSet.delete('edit-playlist-modal');
+        // 대기실/체어 설정 섹션 자동 닫기
+        window._forceCloseSetupSections = true;
         // _prevDisplay 정리
         var mainContent = document.getElementById('dtv-pg');
         if (mainContent) {
@@ -11279,7 +11281,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           child.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0;';
         } else {
           // content wrapper: flex로 변환하여 전체 높이 차지
-          child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px; padding-top:8px;';
+          child.style.cssText = 'position:relative; z-index:1; flex:1 1 0%; min-height:0; display:flex; align-items:center; justify-content:center; overflow-y:auto; overflow-x:hidden; padding:16px; padding-top:8px;';
           // pointer-events 복원
           child.style.pointerEvents = 'none';
           var box = child.querySelector('.bg-white');
