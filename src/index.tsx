@@ -4946,23 +4946,46 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             </div>
           </div>
           
-          <!-- ③ 공지사항 목록 -->
-          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-              <div style="display:flex;align-items:center;gap:10px">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:14px"><i class="fas fa-list"></i></span>
-                <div>
-                  <span style="font-size:14px;font-weight:700;color:#1f2937">공지사항 목록</span>
-                  <p style="font-size:11px;color:#9ca3af;margin:2px 0 0">드래그하여 순서를 변경할 수 있습니다</p>
-                </div>
-              </div>
-              <button onclick="showCreateNoticeModal()"
-                style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.2);transition:opacity .15s"
-                onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-                <i class="fas fa-plus" style="margin-right:4px"></i>새 공지
+          <!-- ③ 공지사항 목록 (일반/긴급 서브탭 분리) -->
+          <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden">
+            <!-- 서브탭 헤더 -->
+            <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;background:#fafbfc">
+              <button id="notice-subtab-normal" onclick="switchNoticeSubTab('normal')"
+                style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#2563eb;border-bottom:2px solid #2563eb;transition:all .15s">
+                <i class="fas fa-bullhorn" style="font-size:11px"></i>일반공지
+                <span id="notice-normal-count" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#2563eb;font-weight:700">0</span>
               </button>
+              <button id="notice-subtab-urgent" onclick="switchNoticeSubTab('urgent')"
+                style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-bottom:2px solid transparent;transition:all .15s">
+                <i class="fas fa-exclamation-triangle" style="font-size:11px"></i>긴급공지
+                <span id="notice-urgent-count" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#f3f4f6;color:#9ca3af;font-weight:700">0</span>
+              </button>
+              <div style="flex-shrink:0;padding:0 12px">
+                <button id="notice-add-btn" onclick="showCreateNoticeModal()"
+                  style="padding:6px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 6px rgba(37,99,235,.2);transition:opacity .15s;white-space:nowrap"
+                  onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+                  <i class="fas fa-plus" style="margin-right:3px"></i>새 공지
+                </button>
+              </div>
             </div>
-            <div id="notices-container" style="display:grid;gap:8px">
+            <!-- 일반공지 안내 -->
+            <div id="notice-info-normal" style="padding:10px 16px 0;display:block">
+              <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#eff6ff;border-radius:8px;border:1px solid #dbeafe">
+                <i class="fas fa-info-circle" style="color:#3b82f6;font-size:11px;flex-shrink:0"></i>
+                <span style="font-size:11px;color:#2563eb">일반 공지는 TV 화면 하단에 스크롤되며 표시됩니다. 긴급공지가 있으면 긴급공지가 우선 표시됩니다.</span>
+              </div>
+            </div>
+            <!-- 긴급공지 안내 -->
+            <div id="notice-info-urgent" style="padding:10px 16px 0;display:none">
+              <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca">
+                <i class="fas fa-exclamation-circle" style="color:#dc2626;font-size:11px;flex-shrink:0"></i>
+                <span style="font-size:11px;color:#dc2626">긴급공지가 1개라도 활성화되면, 일반 공지 대신 긴급공지만 TV에 표시됩니다.</span>
+              </div>
+            </div>
+            <!-- 공지 목록 컨테이너 -->
+            <div style="padding:12px 16px 16px">
+              <p style="font-size:10px;color:#b0b5be;margin:0 0 8px;display:flex;align-items:center;gap:4px"><i class="fas fa-grip-vertical" style="font-size:9px"></i>드래그하여 순서를 변경할 수 있습니다</p>
+              <div id="notices-container" style="display:grid;gap:8px"></div>
             </div>
           </div>
         </div>
@@ -5933,35 +5956,36 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('notice-modal')"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg pointer-events-auto my-auto">
-        <div class="p-6 border-b">
+        <div class="p-6 border-b flex items-center justify-between">
           <h3 id="notice-modal-title" class="text-lg font-bold">새 공지사항</h3>
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="notice-urgent" 
+              class="w-4 h-4 text-red-500 rounded focus:ring-red-500" onchange="updateNoticeModalStyle()">
+            <span id="notice-urgent-label" class="text-xs font-semibold text-gray-500">일반</span>
+          </label>
         </div>
         <form onsubmit="saveNotice(event)" class="p-6">
           <input type="hidden" id="notice-id">
+          <div id="notice-type-info" class="mb-4 p-3 rounded-lg border" style="background:#eff6ff;border-color:#dbeafe">
+            <div class="flex items-center gap-2">
+              <i id="notice-type-icon" class="fas fa-bullhorn text-blue-500 text-sm"></i>
+              <span id="notice-type-text" class="text-xs text-blue-600">일반 공지는 TV 하단에 스크롤되며 표시됩니다.</span>
+            </div>
+          </div>
           <div class="mb-4">
             <label class="block text-gray-700 text-sm font-medium mb-2">공지 내용</label>
             <textarea id="notice-content" required rows="4"
               class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-lg"
-              placeholder="TV 화면 하단에 표시될 공지 내용을 입력하세요"></textarea>
-          </div>
-          <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="notice-urgent" 
-                class="w-5 h-5 text-blue-500 rounded focus:ring-blue-500">
-              <div>
-                <span class="font-medium text-blue-700">긴급공지</span>
-                <p class="text-xs text-blue-500 mt-1">긴급공지는 일반 공지보다 우선 표시되고, 파란색 배경으로 강조됩니다.</p>
-              </div>
-            </label>
+              placeholder="TV 화면에 표시될 공지 내용을 입력하세요"></textarea>
           </div>
           <p class="text-xs text-gray-400 mb-4">
             <i class="fas fa-info-circle mr-1"></i>
-            스타일 설정(글자 크기, 색상 등)은 상단의 '공지 스타일 설정'에서 공통으로 적용됩니다.
+            스타일 설정(글자 크기, 색상 등)은 공지사항 탭의 '스타일 설정'에서 공통으로 적용됩니다.
           </p>
           <div class="flex gap-3">
             <button type="button" onclick="closeModal('notice-modal')"
               class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">취소</button>
-            <button type="submit"
+            <button type="submit" id="notice-save-btn"
               class="flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600">저장</button>
           </div>
         </form>
@@ -10925,9 +10949,43 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     // noticeSortableInstance는 JS 블록 상단에 선언됨
+    var currentNoticeSubTab = 'normal'; // 'normal' or 'urgent'
+    
+    function switchNoticeSubTab(tab) {
+      currentNoticeSubTab = tab;
+      // 서브탭 스타일 업데이트
+      var normalBtn = document.getElementById('notice-subtab-normal');
+      var urgentBtn = document.getElementById('notice-subtab-urgent');
+      var normalInfo = document.getElementById('notice-info-normal');
+      var urgentInfo = document.getElementById('notice-info-urgent');
+      var addBtn = document.getElementById('notice-add-btn');
+      if (tab === 'normal') {
+        normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#2563eb;border-bottom:2px solid #2563eb;transition:all .15s';
+        urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-bottom:2px solid transparent;transition:all .15s';
+        normalInfo.style.display = 'block';
+        urgentInfo.style.display = 'none';
+        addBtn.style.background = 'linear-gradient(135deg,#2563eb,#3b82f6)';
+        addBtn.style.boxShadow = '0 2px 6px rgba(37,99,235,.2)';
+      } else {
+        normalBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:#9ca3af;border-bottom:2px solid transparent;transition:all .15s';
+        urgentBtn.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#dc2626;border-bottom:2px solid #dc2626;transition:all .15s';
+        normalInfo.style.display = 'none';
+        urgentInfo.style.display = 'block';
+        addBtn.style.background = 'linear-gradient(135deg,#dc2626,#ef4444)';
+        addBtn.style.boxShadow = '0 2px 6px rgba(220,38,38,.2)';
+      }
+      // 카운트 뱃지 스타일
+      var normalCount = document.getElementById('notice-normal-count');
+      var urgentCount = document.getElementById('notice-urgent-count');
+      normalCount.style.background = tab === 'normal' ? '#dbeafe' : '#f3f4f6';
+      normalCount.style.color = tab === 'normal' ? '#2563eb' : '#9ca3af';
+      urgentCount.style.background = tab === 'urgent' ? '#fee2e2' : '#f3f4f6';
+      urgentCount.style.color = tab === 'urgent' ? '#dc2626' : '#9ca3af';
+      renderNotices();
+    }
     
     function renderNotices() {
-      const container = document.getElementById('notices-container');
+      var container = document.getElementById('notices-container');
       
       // 기존 sortable 인스턴스 제거
       if (noticeSortableInstance) {
@@ -10935,29 +10993,43 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         noticeSortableInstance = null;
       }
       
-      if (notices.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas fa-bullhorn" style="font-size:28px;margin-bottom:10px;display:block;color:#d1d5db"></i><p style="margin:0;font-size:13px;color:#6b7280">\uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.</p><p style="margin:4px 0 0;font-size:11px;color:#d1d5db">\uC0C8 \uACF5\uC9C0\uC0AC\uD56D\uC744 \uCD94\uAC00\uD574\uBCF4\uC138\uC694.</p></div>';
+      // 카운트 업데이트
+      var normalNotices = notices.filter(function(n) { return !n.is_urgent; });
+      var urgentNotices = notices.filter(function(n) { return n.is_urgent === 1; });
+      var normalCountEl = document.getElementById('notice-normal-count');
+      var urgentCountEl = document.getElementById('notice-urgent-count');
+      if (normalCountEl) normalCountEl.textContent = normalNotices.length;
+      if (urgentCountEl) urgentCountEl.textContent = urgentNotices.length;
+      
+      // 현재 서브탭에 맞는 공지만 필터링
+      var filtered = currentNoticeSubTab === 'urgent' ? urgentNotices : normalNotices;
+      
+      if (filtered.length === 0) {
+        var emptyIcon = currentNoticeSubTab === 'urgent' ? 'fa-exclamation-triangle' : 'fa-bullhorn';
+        var emptyColor = currentNoticeSubTab === 'urgent' ? '#dc2626' : '#6b7280';
+        var emptyMsg = currentNoticeSubTab === 'urgent' ? '\uAE34\uAE09\uACF5\uC9C0\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.' : '\uC77C\uBC18\uACF5\uC9C0\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.';
+        var emptyHint = currentNoticeSubTab === 'urgent' ? '\uAE34\uAE09 \uC0C1\uD669 \uC2DC \uAE34\uAE09\uACF5\uC9C0\uB97C \uCD94\uAC00\uD558\uC138\uC694.' : '\uC0C8 \uACF5\uC9C0\uC0AC\uD56D\uC744 \uCD94\uAC00\uD574\uBCF4\uC138\uC694.';
+        container.innerHTML = '<div style="text-align:center;padding:32px 0;color:#9ca3af"><i class="fas ' + emptyIcon + '" style="font-size:28px;margin-bottom:10px;display:block;color:#d1d5db"></i><p style="margin:0;font-size:13px;color:' + emptyColor + '">' + emptyMsg + '</p><p style="margin:4px 0 0;font-size:11px;color:#d1d5db">' + emptyHint + '</p></div>';
         return;
       }
       
+      var isUrgentTab = currentNoticeSubTab === 'urgent';
       var html = '';
-      notices.forEach(function(n, index) {
-        var isUrgent = n.is_urgent;
+      filtered.forEach(function(n, index) {
         var isActive = n.is_active;
-        var borderColor = isUrgent ? '#ef4444' : (isActive ? '#22c55e' : '#e5e7eb');
-        var bgColor = isUrgent ? '#fef2f2' : '#fff';
+        var borderColor = isUrgentTab ? (isActive ? '#ef4444' : '#fecaca') : (isActive ? '#22c55e' : '#e5e7eb');
+        var bgColor = isUrgentTab ? '#fef2f2' : '#fff';
+        var borderSide = isUrgentTab ? '#fecaca' : '#f3f4f6';
         
-        html += '<div class="notice-item" data-id="' + n.id + '" style="display:flex;align-items:stretch;gap:0;background:' + bgColor + ';border-radius:10px;border:1px solid ' + (isUrgent ? '#fecaca' : '#f3f4f6') + ';border-left:4px solid ' + borderColor + ';overflow:hidden;transition:all .15s" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.06)\'" onmouseout="this.style.boxShadow=\'none\'">' +
+        html += '<div class="notice-item" data-id="' + n.id + '" style="display:flex;align-items:stretch;gap:0;background:' + bgColor + ';border-radius:10px;border:1px solid ' + borderSide + ';border-left:4px solid ' + borderColor + ';overflow:hidden;transition:all .15s" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.06)\'" onmouseout="this.style.boxShadow=\'none\'">' +
           '<div class="notice-drag-handle" style="display:flex;align-items:center;padding:0 10px;cursor:grab;color:#d1d5db;font-size:12px;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div>' +
-          '<div style="display:flex;align-items:center;padding:12px 4px 12px 0;flex-shrink:0"><span class="notice-number" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:' + (isUrgent ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + ';font-size:11px;font-weight:700">' + (index + 1) + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:12px 4px 12px 0;flex-shrink:0"><span class="notice-number" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:' + (isUrgentTab ? '#fee2e2' : '#f3f4f6') + ';color:' + (isUrgentTab ? '#dc2626' : '#9ca3af') + ';font-size:11px;font-weight:700">' + (index + 1) + '</span></div>' +
           '<div style="flex:1;padding:12px 8px;min-width:0">' +
-            (isUrgent ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:10px;padding:2px 6px;background:#fee2e2;color:#dc2626;border-radius:4px;font-weight:600"><i class="fas fa-exclamation-circle" style="margin-right:2px"></i>\uAE34\uAE09</span></div>' : '') +
             '<p style="font-size:13px;color:#1f2937;margin:0;white-space:pre-wrap;word-break:break-all;line-height:1.5">' + (n.content || '') + '</p>' +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:4px;padding:12px 12px 12px 4px;flex-shrink:0">' +
             '<button onclick="toggleNotice(' + n.id + ',' + (isActive ? '0' : '1') + ')" title="' + (isActive ? '\uC228\uAE30\uAE30' : '\uD45C\uC2DC\uD558\uAE30') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isActive ? '#bbf7d0' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isActive ? '#dcfce7' : '#f9fafb') + ';color:' + (isActive ? '#15803d' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:80px">' + (isActive ? '<i class="fas fa-eye" style="font-size:10px"></i>TV \uD45C\uC2DC\uC911' : '<i class="fas fa-eye-slash" style="font-size:10px"></i>\uC228\uAE40') + '</button>' +
-            '<button onclick="toggleUrgent(' + n.id + ',' + (isUrgent ? '0' : '1') + ')" title="' + (isUrgent ? '\uAE34\uAE09 \uD574\uC81C' : '\uAE34\uAE09 \uC124\uC815') + '" style="padding:4px 10px;font-size:10px;border-radius:6px;border:1px solid ' + (isUrgent ? '#fecaca' : '#e5e7eb') + ';cursor:pointer;font-family:inherit;transition:all .15s;background:' + (isUrgent ? '#fee2e2' : '#f9fafb') + ';color:' + (isUrgent ? '#dc2626' : '#9ca3af') + ';font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:52px">' + (isUrgent ? '<i class="fas fa-bell" style="font-size:10px"></i>\uAE34\uAE09' : '<i class="far fa-bell" style="font-size:10px"></i>\uC77C\uBC18') + '</button>' +
-            '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:#eff6ff;color:#2563eb;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
+            '<button onclick="editNotice(' + n.id + ')" title="\uC218\uC815" style="padding:6px 8px;font-size:11px;background:' + (isUrgentTab ? '#fef2f2' : '#eff6ff') + ';color:' + (isUrgentTab ? '#dc2626' : '#2563eb') + ';border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-pen"></i></button>' +
             '<button onclick="deleteNotice(' + n.id + ')" title="\uC0AD\uC81C" style="padding:6px 8px;font-size:11px;background:#fef2f2;color:#dc2626;border-radius:6px;border:none;cursor:pointer;font-family:inherit;transition:background .15s"><i class="fas fa-trash"></i></button>' +
           '</div>' +
         '</div>';
@@ -11008,21 +11080,57 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     }
     
     function showCreateNoticeModal() {
-      document.getElementById('notice-modal-title').textContent = '새 공지사항';
+      var isUrgentTab = currentNoticeSubTab === 'urgent';
+      document.getElementById('notice-modal-title').textContent = isUrgentTab ? '\uC0C8 \uAE34\uAE09\uACF5\uC9C0' : '\uC0C8 \uC77C\uBC18\uACF5\uC9C0';
       document.getElementById('notice-id').value = '';
       document.getElementById('notice-content').value = '';
-      document.getElementById('notice-urgent').checked = false;
+      document.getElementById('notice-urgent').checked = isUrgentTab;
+      updateNoticeModalStyle();
       openModal('notice-modal');
+    }
+    
+    function updateNoticeModalStyle() {
+      var isUrgent = document.getElementById('notice-urgent').checked;
+      var label = document.getElementById('notice-urgent-label');
+      var infoDiv = document.getElementById('notice-type-info');
+      var icon = document.getElementById('notice-type-icon');
+      var text = document.getElementById('notice-type-text');
+      var saveBtn = document.getElementById('notice-save-btn');
+      if (isUrgent) {
+        label.textContent = '\uAE34\uAE09';
+        label.style.color = '#dc2626';
+        infoDiv.style.background = '#fef2f2';
+        infoDiv.style.borderColor = '#fecaca';
+        icon.className = 'fas fa-exclamation-triangle text-red-500 text-sm';
+        text.textContent = '\uAE34\uAE09\uACF5\uC9C0\uAC00 1\uAC1C\uB77C\uB3C4 \uD65C\uC131\uD654\uB418\uBA74, \uC77C\uBC18 \uACF5\uC9C0 \uB300\uC2E0 \uAE34\uAE09\uACF5\uC9C0\uB9CC TV\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4.';
+        text.style.color = '#dc2626';
+        saveBtn.className = 'flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600';
+      } else {
+        label.textContent = '\uC77C\uBC18';
+        label.style.color = '#6b7280';
+        infoDiv.style.background = '#eff6ff';
+        infoDiv.style.borderColor = '#dbeafe';
+        icon.className = 'fas fa-bullhorn text-blue-500 text-sm';
+        text.textContent = '\uC77C\uBC18 \uACF5\uC9C0\uB294 TV \uD558\uB2E8\uC5D0 \uC2A4\uD06C\uB864\uB418\uBA70 \uD45C\uC2DC\uB429\uB2C8\uB2E4.';
+        text.style.color = '#2563eb';
+        saveBtn.className = 'flex-1 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600';
+      }
+      // 모달 타이틀도 업데이트 (편집 모드가 아닐 때만)
+      if (!document.getElementById('notice-id').value) {
+        document.getElementById('notice-modal-title').textContent = isUrgent ? '\uC0C8 \uAE34\uAE09\uACF5\uC9C0' : '\uC0C8 \uC77C\uBC18\uACF5\uC9C0';
+      }
     }
     
     function editNotice(id) {
       const notice = notices.find(n => n.id === id);
       if (!notice) return;
       
-      document.getElementById('notice-modal-title').textContent = '공지사항 편집';
+      var isUrgent = notice.is_urgent === 1;
+      document.getElementById('notice-modal-title').textContent = isUrgent ? '\uAE34\uAE09\uACF5\uC9C0 \uD3B8\uC9D1' : '\uC77C\uBC18\uACF5\uC9C0 \uD3B8\uC9D1';
       document.getElementById('notice-id').value = notice.id;
       document.getElementById('notice-content').value = notice.content;
-      document.getElementById('notice-urgent').checked = notice.is_urgent === 1;
+      document.getElementById('notice-urgent').checked = isUrgent;
+      updateNoticeModalStyle();
       openModal('notice-modal');
     }
     
