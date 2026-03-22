@@ -15318,8 +15318,29 @@ app.get('/tv/:shortCode', async (c) => {
         // 'end' = 영상 끝나면 자동 복귀 (반복 안함)
         if (returnTime === 'end') {
           console.log('>>> RETURN TIME IS END - CLEARING TEMP VIDEO <<<');
-          // 서버에 임시 영상 해제 요청하고 다음 폴링에서 복귀됨
+          
+          // 즉시 재생 중단 + 타이머 정리 (검정화면/재재생 방지)
+          clearVimeoTimers();
+          if (currentTimer) { clearTimeout(currentTimer); currentTimer = null; }
+          vimeoSessionId++; // 기존 세션 무효화
+          Object.values(players).forEach(p => {
+            if (p) { try { if (p.pause) p.pause(); else if (p.pauseVideo) p.pauseVideo(); } catch(e) {} }
+          });
+          
+          // 임시 영상 상태 즉시 클리어 (다음 폴링 전에)
+          currentTempVideo = null;
+          
+          // 서버에 임시 영상 해제 요청
           clearTempVideoOnServer();
+          
+          // 원본 플레이리스트로 즉시 복귀 (10초 폴링 대기 없이)
+          if (originalPlaylist && originalPlaylist.items && originalPlaylist.items.length > 0) {
+            console.log('>>> Immediate restore to original playlist <<<');
+            playlist = JSON.parse(JSON.stringify(originalPlaylist));
+            currentIndex = 0;
+            showSyncIndicator();
+            safeRestartPlayback();
+          }
           return;
         }
         
