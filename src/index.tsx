@@ -13073,18 +13073,28 @@ app.get('/tv/:shortCode', async (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TV 미러링</title>
-  <!-- ★★ Vimeo/YouTube API 프리로드 (HTML 파싱과 동시에 다운로드 시작) -->
   <link rel="preload" href="https://player.vimeo.com/api/player.js" as="script">
   <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
+  <!-- ★★ 최소 CSS만 먼저: 검정 배경 + 로딩 스피너 (브라우저가 즉시 렌더링) -->
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { 
-      width: 100%; 
-      height: 100%; 
-      overflow: hidden; 
-      background: #000;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
+    .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #loading-screen p{color:#666;margin-top:20px}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+  <!-- ★★ 로딩 화면: CSS가 최소이므로 즉시 렌더링됨 -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <p>로딩 중...</p>
+  </div>
+  
+  <!-- ★★ 나머지 CSS를 여기서 로드 (로딩 화면 표시 후) -->
+  <style>
     
     /* 미디어 아이템 레이어 - 모든 아이템을 미리 로드 */
     #media-container {
@@ -13290,32 +13300,7 @@ app.get('/tv/:shortCode', async (c) => {
       100% { transform: translateX(-50%); }
     }
     
-    #loading-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 200;
-    }
-    
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 3px solid #333;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin { to { transform: rotate(360deg); } }
-    
-    #loading-screen p { color: #666; margin-top: 20px; }
+    /* loading-screen, spinner, spin keyframes → head 인라인 CSS로 이동 (중복 제거) */
     
     #error-screen {
       position: fixed;
@@ -13366,7 +13351,7 @@ app.get('/tv/:shortCode', async (c) => {
       50% { opacity: 1; transform: scale(1.05); }
     }
     
-    .hidden { display: none !important; }
+    /* .hidden → head 인라인 CSS로 이동 */
     
     /* 동기화 인디케이터 */
     #sync-indicator {
@@ -13473,13 +13458,6 @@ app.get('/tv/:shortCode', async (c) => {
       display: none;
     }
   </style>
-</head>
-<body>
-  <!-- 로딩 화면을 먼저 표시 (외부 리소스 없이) -->
-  <div id="loading-screen">
-    <div class="spinner"></div>
-    <p>로딩 중...</p>
-  </div>
   
   <div id="error-screen">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
@@ -13536,11 +13514,6 @@ app.get('/tv/:shortCode', async (c) => {
   </div>
   <div id="fullscreen-hint">전체화면 유지하려면 클릭</div>
 
-  <script>
-    // 즉시 로딩 화면 표시
-    document.getElementById('loading-screen').style.display = 'flex';
-  </script>
-  
   <!-- API는 나중에 비동기 로드 -->
   <script>
     // [독립 실행 보장] 클라이언트 고유 ID 생성
