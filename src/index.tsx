@@ -13811,6 +13811,7 @@ app.get('/tv/:shortCode', async (c) => {
       clearVimeoTimers();
       hideSubtitle(); // 자막 타이머 및 표시 정리
       vimeoSessionId++;
+      cachedVimeoDuration = 0; // ★★ duration 캐시 초기화 (새 영상에 이전 값 사용 방지)
       
       // ★★ 시나리오 6 수정: 플레이어를 destroy 한 후 참조 초기화
       // (이전: pause만 하고 참조 초기화 → destroy 누락으로 이전 이벤트가 계속 발생)
@@ -15164,21 +15165,28 @@ app.get('/tv/:shortCode', async (c) => {
         }, safetyFallback * 1000);
       });
       
-      // 자막 로드
+      // ★★ 자막 로드 (임시영상 포함)
       const item = playlist.items[idx];
       if (item) {
         const vimeoId = extractVimeoId(item.url);
         if (vimeoId) {
+          console.log('[subtitle] Loading for vimeoId:', vimeoId, 'idx:', idx, 'session:', thisSession);
           loadSubtitleForVimeo(vimeoId).then((subs) => {
-            if (thisSession !== vimeoSessionId) return;
+            if (thisSession !== vimeoSessionId) {
+              console.log('[subtitle] Session changed, skipping subtitle sync');
+              return;
+            }
             if (subs && subs.length > 0) {
               // 커스텀 자막이 있으면 Vimeo 내장 자막 비활성화 후 커스텀 자막 사용
+              console.log('[subtitle] Custom subtitle found:', subs.length, 'cues, starting sync');
               player.disableTextTrack().catch(() => {});
               startSubtitleSync(player, vimeoId, idx);
             } else {
-              // 커스텀 자막이 없으면 Vimeo 내장 자막 사용
-              // texttrack:'ko' 옵션으로 이미 자막이 활성화됨 (추가 API 호출 없음 - 끊김 방지)
-              console.log('No custom subtitle, using Vimeo built-in texttrack:ko');
+              // 커스텀 자막이 없으면 Vimeo 내장 자막 명시적 활성화
+              console.log('[subtitle] No custom subtitle, enabling Vimeo built-in texttrack:ko');
+              player.enableTextTrack('ko').catch(() => {
+                console.log('[subtitle] Built-in ko track not available');
+              });
             }
           });
         }
@@ -15505,9 +15513,12 @@ app.get('/tv/:shortCode', async (c) => {
       _transitionStartTime = Date.now(); // ★ 전환 시작 시각 기록
       // ★ 전환 락: transition duration + 500ms (최소 800ms, 최대 2초) - 더 빠른 전환
       const transitionLockDuration = Math.min(Math.max(transitionDuration || 500, 800), 2000);
-      setTimeout(() => { 
+      // ★★ 전환 락 타이머를 변수로 관리 (취소 가능하게)
+      if (window._transitionLockTimer) clearTimeout(window._transitionLockTimer);
+      window._transitionLockTimer = setTimeout(() => { 
         isTransitioning = false; 
         _watchdogNoProgressCount = 0;
+        window._transitionLockTimer = null;
       }, transitionLockDuration);
       
       // 워치독 시간 업데이트
@@ -15558,9 +15569,14 @@ app.get('/tv/:shortCode', async (c) => {
         if (returnTime === 'end') {
           console.log('>>> RETURN TIME IS END - CLEARING TEMP VIDEO <<<');
           
+          // ★★ 즉시 전환 락 해제 + 타이머 취소 (safeRestartPlayback이 새 전환을 시작할 수 있도록)
+          isTransitioning = false;
+          if (window._transitionLockTimer) { clearTimeout(window._transitionLockTimer); window._transitionLockTimer = null; }
+          
           // 즉시 재생 중단 + 타이머 정리 (검정화면/재재생 방지)
           clearVimeoTimers();
           if (currentTimer) { clearTimeout(currentTimer); currentTimer = null; }
+          hideSubtitle(); // ★ 자막 타이머도 정리
           vimeoSessionId++; // 기존 세션 무효화
           Object.values(players).forEach(p => {
             if (p) { try { if (p.pause) p.pause(); else if (p.pauseVideo) p.pauseVideo(); } catch(e) {} }
@@ -15568,6 +15584,8 @@ app.get('/tv/:shortCode', async (c) => {
           
           // 임시 영상 상태 즉시 클리어 (다음 폴링 전에)
           currentTempVideo = null;
+          tempVideoLoopCount = 0;
+          cachedVimeoDuration = 0; // ★★ 이전 영상의 duration 캐시 초기화 (잘못된 종료 감지 방지)
           
           // 서버에 임시 영상 해제 요청
           clearTempVideoOnServer();
@@ -15584,6 +15602,10 @@ app.get('/tv/:shortCode', async (c) => {
         }
         
         // 'manual' 또는 시간 설정 = 반복 재생
+        // ★★ 반복 재생 시 전환 락 즉시 해제 (같은 아이템이므로 전환이 아님)
+        isTransitioning = false;
+        if (window._transitionLockTimer) { clearTimeout(window._transitionLockTimer); window._transitionLockTimer = null; }
+        
         tempVideoLoopCount++;
         console.log('========================================');
         console.log('>>> LOOP RESTART #' + tempVideoLoopCount + ' <<<');
@@ -15594,13 +15616,14 @@ app.get('/tv/:shortCode', async (c) => {
         if (nextItem.item_type === 'vimeo') {
           // ★★ 시나리오 4 수정: 기존 폴링/타이머를 먼저 정리하여 세션 경쟁 방지
           clearVimeoTimers();
+          hideSubtitle(); // ★ 기존 자막 타이머 정리
           // 기존 플레이어가 있으면 seek(0)으로 처음부터 재생 (검정화면 없음)
           const existingPlayer = players[nextIndex];
           if (existingPlayer && typeof existingPlayer.setCurrentTime === 'function') {
             console.log('Vimeo single loop - seeking to start (no black screen)');
             existingPlayer.setCurrentTime(0).then(() => {
               existingPlayer.play().catch(() => {});
-              // 재생 시간 추적 다시 시작
+              // 재생 시간 추적 다시 시작 (자막도 재동기화됨)
               startVimeoPlayback(existingPlayer, nextIndex);
             }).catch(() => {
               // seek 실패 시 플레이어 재생성
@@ -15689,6 +15712,7 @@ app.get('/tv/:shortCode', async (c) => {
       // 새 세션 시작 (이 전환의 고유 ID)
       clearVimeoTimers();
       vimeoSessionId++;
+      cachedVimeoDuration = 0; // ★ 새 영상에 이전 duration 캐시 사용 방지
       const thisSession = vimeoSessionId;
       console.log('[prepareVimeo] new session:', thisSession, 'prev:', prevIndex, '-> next:', nextIndex);
       
@@ -16060,6 +16084,15 @@ app.get('/tv/:shortCode', async (c) => {
     // ★ 전체화면 복원 헬퍼 (iframe 생성 후 호출용 - 플레이어 생성 시 자동 호출)
     function ensureFullscreen() {
       if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
+        // ★★ iframe의 allow 속성 확인 (Vimeo/YouTube iframe이 fullscreen 허용하는지)
+        document.querySelectorAll('#media-container iframe').forEach(iframe => {
+          if (!iframe.getAttribute('allow') || !iframe.getAttribute('allow').includes('fullscreen')) {
+            iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+          }
+          if (!iframe.hasAttribute('allowfullscreen')) {
+            iframe.setAttribute('allowfullscreen', '');
+          }
+        });
         document.documentElement.requestFullscreen().catch(() => {});
       }
     }
