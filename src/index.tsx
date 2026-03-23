@@ -2295,6 +2295,7 @@ app.put('/api/:adminCode/settings', async (c) => {
       logo_url = COALESCE(?, logo_url),
       logo_size = COALESCE(?, logo_size),
       logo_opacity = COALESCE(?, logo_opacity),
+      logo_position = COALESCE(?, logo_position),
       schedule_enabled = COALESCE(?, schedule_enabled),
       schedule_start = COALESCE(?, schedule_start),
       schedule_end = COALESCE(?, schedule_end),
@@ -2320,6 +2321,7 @@ app.put('/api/:adminCode/settings', async (c) => {
     toNull(body.logo_url), 
     toNull(body.logo_size), 
     toNull(body.logo_opacity), 
+    toNull(body.logo_position),
     toNull(body.schedule_enabled),
     toNull(body.schedule_start), 
     toNull(body.schedule_end),
@@ -2354,6 +2356,7 @@ app.get('/api/:adminCode/settings', async (c) => {
     logo_url: user.logo_url || '',
     logo_size: user.logo_size || 150,
     logo_opacity: user.logo_opacity || 90,
+    logo_position: user.logo_position || 'right',
     schedule_enabled: user.schedule_enabled || 0,
     schedule_start: user.schedule_start || '',
     schedule_end: user.schedule_end || '',
@@ -2479,7 +2482,7 @@ app.get('/api/tv/:shortCode', async (c) => {
   const playlist = await c.env.DB.prepare(`
     SELECT p.*, u.clinic_name, u.id as user_id, u.admin_code, u.imweb_email,
       u.notice_font_size, u.notice_letter_spacing, u.notice_text_color, u.notice_bg_color, u.notice_bg_opacity, u.notice_scroll_speed, u.notice_enabled, u.notice_position,
-      u.logo_url, u.logo_size, u.logo_opacity, u.schedule_enabled, u.schedule_start, u.schedule_end,
+      u.logo_url, u.logo_size, u.logo_opacity, u.logo_position, u.schedule_enabled, u.schedule_start, u.schedule_end,
       u.use_master_playlist, u.master_playlist_mode, u.hidden_master_items
     FROM playlists p
     JOIN users u ON p.user_id = u.id
@@ -2639,7 +2642,8 @@ app.get('/api/tv/:shortCode', async (c) => {
     logoSettings: {
       url: playlist.logo_url || '',
       size: playlist.logo_size || 150,
-      opacity: playlist.logo_opacity || 90
+      opacity: playlist.logo_opacity || 90,
+      position: playlist.logo_position || 'right'
     },
     // 재생 시간 설정
     scheduleSettings: {
@@ -3040,16 +3044,23 @@ app.get('/embed-old/:memberCode', async (c) => {
             </div>
             <input type="text" id="logo-url" placeholder="로고 이미지 URL"
               class="w-full px-3 py-2 border rounded text-sm mb-2">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="text-xs text-gray-500">크기: <span id="logo-size-label">150px</span></label>
-                <input type="range" id="logo-size" value="150" min="50" max="500"
+                <input type="range" id="logo-size" value="150" min="50" max="800"
                   class="w-full" oninput="updateLogoSizeLabel()">
               </div>
               <div>
                 <label class="text-xs text-gray-500">투명도: <span id="logo-opacity-label">90%</span></label>
                 <input type="range" id="logo-opacity" value="90" min="10" max="100"
                   class="w-full" oninput="updateLogoOpacityLabel()">
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">위치</label>
+                <select id="logo-position" class="w-full px-2 py-1 border rounded text-sm mt-1">
+                  <option value="left">좌측</option>
+                  <option value="right" selected>우측</option>
+                </select>
               </div>
             </div>
           </div>
@@ -3528,6 +3539,8 @@ app.get('/embed-old/:memberCode', async (c) => {
         document.getElementById('logo-url').value = settings.logo_url || '';
         document.getElementById('logo-size').value = settings.logo_size || 150;
         document.getElementById('logo-opacity').value = settings.logo_opacity || 90;
+        const lpEl = document.getElementById('logo-position');
+        if (lpEl) lpEl.value = settings.logo_position || 'right';
         updateLogoSizeLabel();
         updateLogoOpacityLabel();
         
@@ -4197,6 +4210,7 @@ app.get('/embed-old/:memberCode', async (c) => {
             logo_url: document.getElementById('logo-url').value,
             logo_size: parseInt(document.getElementById('logo-size').value),
             logo_opacity: parseInt(document.getElementById('logo-opacity').value),
+            logo_position: (document.getElementById('logo-position') || {}).value || 'right',
             schedule_enabled: document.getElementById('schedule-enabled').checked ? 1 : 0,
             schedule_start: document.getElementById('schedule-start').value,
             schedule_end: document.getElementById('schedule-end').value,
@@ -5139,13 +5153,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               </div>
               <div style="display:flex;align-items:center;gap:12px">
                 <label style="font-size:12px;color:#6b7280">로고 크기</label>
-                <input type="range" id="settings-logo-size" min="50" max="300" value="150" style="flex:1;accent-color:#2563eb"
+                <input type="range" id="settings-logo-size" min="50" max="800" value="150" style="flex:1;accent-color:#2563eb"
                   oninput="document.getElementById('logo-size-label').textContent=this.value+'px'">
-                <span id="logo-size-label" style="font-size:12px;color:#9ca3af;width:40px">150px</span>
+                <span id="logo-size-label" style="font-size:12px;color:#9ca3af;width:45px">150px</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px">
+                <label style="font-size:12px;color:#6b7280">로고 위치</label>
+                <select id="settings-logo-position" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;background:#fff">
+                  <option value="left">좌측 상단</option>
+                  <option value="right" selected>우측 상단</option>
+                </select>
               </div>
               <div id="settings-logo-preview" style="display:none">
                 <p style="font-size:11px;color:#9ca3af;margin:0 0 4px">미리보기</p>
-                <img id="logo-preview-img" src="" style="max-height:60px;border-radius:6px;border:1px solid #e5e7eb">
+                <div style="background:#000;border-radius:6px;padding:8px;display:inline-block">
+                  <img id="logo-preview-img" src="" style="max-height:60px;border-radius:4px">
+                </div>
               </div>
             </div>
           </div>
@@ -5814,10 +5837,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                       <input type="text" id="logo-url" placeholder="로고 URL (PNG 권장)"
                         class="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-amber-500 mb-2"
                         onchange="saveLogoSettings()">
-                      <div class="flex gap-2">
+                      <div class="flex gap-2 mb-2">
                         <div class="flex-1">
                           <label class="text-xs text-gray-500">크기 <span id="logo-size-value">150px</span></label>
-                          <input type="range" id="logo-size" min="50" max="500" step="10" value="150"
+                          <input type="range" id="logo-size" min="50" max="800" step="10" value="150"
                             onchange="updateLogoSizeLabel(); saveLogoSettings()" class="w-full">
                         </div>
                         <div class="flex-1">
@@ -5825,6 +5848,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                           <input type="range" id="logo-opacity" min="10" max="100" step="5" value="90"
                             onchange="updateLogoOpacityLabel(); saveLogoSettings()" class="w-full">
                         </div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="text-xs text-gray-500">로고 위치</label>
+                        <select id="logo-position" onchange="saveLogoSettings()"
+                          class="w-full px-2 py-1 border rounded text-sm mt-1">
+                          <option value="left">좌측 상단</option>
+                          <option value="right" selected>우측 상단</option>
+                        </select>
                       </div>
                     </div>
                     
@@ -9237,9 +9268,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         const logoUrl = document.getElementById('logo-url');
         const logoSize = document.getElementById('logo-size');
         const logoOpacity = document.getElementById('logo-opacity');
+        const logoPos = document.getElementById('logo-position');
         if (logoUrl) logoUrl.value = settings.logo_url || '';
         if (logoSize) logoSize.value = settings.logo_size || 150;
         if (logoOpacity) logoOpacity.value = settings.logo_opacity || 90;
+        if (logoPos) logoPos.value = settings.logo_position || 'right';
         if (typeof updateLogoSizeLabel === 'function') updateLogoSizeLabel();
         if (typeof updateLogoOpacityLabel === 'function') updateLogoOpacityLabel();
         
@@ -9354,13 +9387,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     
     async function saveLogoSettings() {
       try {
+        const posEl = document.getElementById('logo-position');
         await fetch(API_BASE + '/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             logo_url: document.getElementById('logo-url').value,
             logo_size: parseInt(document.getElementById('logo-size').value),
-            logo_opacity: parseInt(document.getElementById('logo-opacity').value)
+            logo_opacity: parseInt(document.getElementById('logo-opacity').value),
+            logo_position: posEl ? posEl.value : 'right'
           })
         });
         showToast('로고 설정이 저장되었습니다.');
@@ -11829,6 +11864,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         if (logoUrl) logoUrl.value = data.logo_url || '';
         if (logoSize) logoSize.value = data.logo_size || 150;
         if (sizeLabel) sizeLabel.textContent = (data.logo_size || 150) + 'px';
+        // 로고 위치 설정
+        const logoPosition = document.getElementById('settings-logo-position');
+        if (logoPosition) logoPosition.value = data.logo_position || 'right';
         // 로고 미리보기
         var preview = document.getElementById('settings-logo-preview');
         var img = document.getElementById('logo-preview-img');
@@ -11853,11 +11891,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     async function saveSettingsTabLogo() {
       const logoUrl = (document.getElementById('settings-logo-url') || {}).value || '';
       const logoSize = parseInt((document.getElementById('settings-logo-size') || {}).value) || 150;
+      const logoPosition = (document.getElementById('settings-logo-position') || {}).value || 'right';
       try {
         const res = await fetch(API_BASE + '/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ logo_url: logoUrl, logo_size: logoSize })
+          body: JSON.stringify({ logo_url: logoUrl, logo_size: logoSize, logo_position: logoPosition })
         });
         if (res.ok) {
           showToast('\uB85C\uACE0 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
@@ -13605,7 +13644,7 @@ app.get('/tv/:shortCode', async (c) => {
     let noticeSettings = { font_size: 32, letter_spacing: 0, text_color: '#ffffff', bg_color: '#1a1a2e', bg_opacity: 100, scroll_speed: 50, position: 'bottom' };
     
     // 로고 설정
-    let logoSettings = { url: '', size: 150, opacity: 90 };
+    let logoSettings = { url: '', size: 150, opacity: 90, position: 'right' };
     
     // 자막 관련
     let subtitles = {};  // vimeoId -> parsed subtitles
@@ -13815,6 +13854,14 @@ app.get('/tv/:shortCode', async (c) => {
         img.src = logoSettings.url;
         img.style.width = logoSettings.size + 'px';
         img.style.opacity = (logoSettings.opacity / 100).toString();
+        // 위치 적용 (좌/우)
+        if (logoSettings.position === 'left') {
+          overlay.style.left = '20px';
+          overlay.style.right = 'auto';
+        } else {
+          overlay.style.right = '20px';
+          overlay.style.left = 'auto';
+        }
         overlay.style.display = 'block';
       } else {
         document.getElementById('logo-overlay').style.display = 'none';

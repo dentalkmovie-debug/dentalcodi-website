@@ -2996,9 +2996,11 @@ async function loadPlaylistSettings() {
     const logoUrl = document.getElementById('logo-url');
     const logoSize = document.getElementById('logo-size');
     const logoOpacity = document.getElementById('logo-opacity');
+    const logoPos = document.getElementById('logo-position');
     if (logoUrl) logoUrl.value = settings.logo_url || '';
     if (logoSize) logoSize.value = settings.logo_size || 150;
     if (logoOpacity) logoOpacity.value = settings.logo_opacity || 90;
+    if (logoPos) logoPos.value = settings.logo_position || 'right';
     if (typeof updateLogoSizeLabel === 'function') updateLogoSizeLabel();
     if (typeof updateLogoOpacityLabel === 'function') updateLogoOpacityLabel();
     
@@ -3113,13 +3115,15 @@ async function saveTransitionSettings() {
 
 async function saveLogoSettings() {
   try {
+    const posEl = document.getElementById('logo-position');
     await fetch(API_BASE + '/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         logo_url: document.getElementById('logo-url').value,
         logo_size: parseInt(document.getElementById('logo-size').value),
-        logo_opacity: parseInt(document.getElementById('logo-opacity').value)
+        logo_opacity: parseInt(document.getElementById('logo-opacity').value),
+        logo_position: posEl ? posEl.value : 'right'
       })
     });
     showToast('로고 설정이 저장되었습니다.');
@@ -5588,6 +5592,9 @@ async function loadSettingsData() {
     if (logoUrl) logoUrl.value = data.logo_url || '';
     if (logoSize) logoSize.value = data.logo_size || 150;
     if (sizeLabel) sizeLabel.textContent = (data.logo_size || 150) + 'px';
+    // 로고 위치 설정
+    const logoPosition = document.getElementById('settings-logo-position');
+    if (logoPosition) logoPosition.value = data.logo_position || 'right';
     // 로고 미리보기
     var preview = document.getElementById('settings-logo-preview');
     var img = document.getElementById('logo-preview-img');
@@ -5612,11 +5619,12 @@ async function loadSettingsData() {
 async function saveSettingsTabLogo() {
   const logoUrl = (document.getElementById('settings-logo-url') || {}).value || '';
   const logoSize = parseInt((document.getElementById('settings-logo-size') || {}).value) || 150;
+  const logoPosition = (document.getElementById('settings-logo-position') || {}).value || 'right';
   try {
     const res = await fetch(API_BASE + '/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ logo_url: logoUrl, logo_size: logoSize })
+      body: JSON.stringify({ logo_url: logoUrl, logo_size: logoSize, logo_position: logoPosition })
     });
     if (res.ok) {
       showToast('\uB85C\uACE0 \uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
