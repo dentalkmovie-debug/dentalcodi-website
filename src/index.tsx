@@ -13812,17 +13812,27 @@ app.get('/tv/:shortCode', async (c) => {
       hideSubtitle(); // 자막 타이머 및 표시 정리
       vimeoSessionId++;
       
-      // 기존 플레이어는 일시정지만 (destroy 하지 않음 - DOM 파괴로 인한 끊김 방지)
-      Object.values(players).forEach(p => {
-        if (p) {
-          try { if (p.pause) p.pause(); } catch(e) {}
-        }
-      });
+      // ★★ 시나리오 6 수정: 플레이어를 destroy 한 후 참조 초기화
+      // (이전: pause만 하고 참조 초기화 → destroy 누락으로 이전 이벤트가 계속 발생)
+      const oldPlayers = Object.assign({}, players);
+      const oldPreloaded = Object.assign({}, preloadedPlayers);
       
-      // 플레이어 참조 초기화 (initializeAllMedia에서 새로 생성됨)
+      // 참조 먼저 초기화 (이후 이벤트 콜백에서 players[idx]를 찾지 못하게)
       players = {};
       itemsReady = {};
       preloadedPlayers = {};
+      
+      // 이전 플레이어 파괴 (참조 끊긴 후이므로 이벤트가 발생해도 영향 없음)
+      Object.values(oldPlayers).forEach(p => {
+        if (p) {
+          try { if (p.destroy) p.destroy(); else if (p.pause) p.pause(); } catch(e) {}
+        }
+      });
+      Object.values(oldPreloaded).forEach(p => {
+        if (p) {
+          try { p.destroy(); } catch(e) {}
+        }
+      });
       
       // 인덱스 범위 체크
       if (currentIndex >= playlist.items.length) {
@@ -14409,12 +14419,19 @@ app.get('/tv/:shortCode', async (c) => {
       }
       
       // ★ 기존 플레이어 먼저 파괴 (메모리 누수 방지)
-      Object.values(players).forEach(p => {
+      // 참조를 별도로 저장한 후 즉시 초기화 (이벤트 콜백 차단)
+      const oldPlayers = Object.assign({}, players);
+      const oldPreloaded = Object.assign({}, preloadedPlayers);
+      players = {};
+      itemsReady = {};
+      preloadedPlayers = {};
+      
+      Object.values(oldPlayers).forEach(p => {
         if (p) {
           try { if (p.destroy) p.destroy(); else if (p.pause) p.pause(); } catch(e) {}
         }
       });
-      Object.values(preloadedPlayers).forEach(p => {
+      Object.values(oldPreloaded).forEach(p => {
         if (p) {
           try { p.destroy(); } catch(e) {}
         }
@@ -14434,9 +14451,7 @@ app.get('/tv/:shortCode', async (c) => {
         });
       }, 100);
       
-      players = {};
-      itemsReady = {};
-      preloadedPlayers = {};
+      // players, itemsReady, preloadedPlayers는 위에서 이미 초기화됨
       
       playlist.items.forEach((item, index) => {
         const div = document.createElement('div');
@@ -14486,12 +14501,20 @@ app.get('/tv/:shortCode', async (c) => {
         return;
       }
       
-      // 기존 플레이어/프리로드 정리 (매번 새로 생성)
+      // ★★ 시나리오 5 핵심 수정: 현재 재생 중인 인덱스는 절대 파괴하지 않음
+      if (index === currentIndex) {
+        console.log('[preload] Skipping preload for currently playing index:', index);
+        if (callback) callback();
+        return;
+      }
+      
+      // 기존 프리로드 정리 (매번 새로 생성)
       if (preloadedPlayers[index]) {
         try { preloadedPlayers[index].destroy(); } catch(e) {}
         delete preloadedPlayers[index];
       }
-      if (players[index]) {
+      // ★ players[index]는 현재 재생 중이 아닐 때만 파괴
+      if (players[index] && index !== currentIndex) {
         try { players[index].destroy(); } catch(e) {}
         players[index] = null;
       }
@@ -14992,11 +15015,15 @@ app.get('/tv/:shortCode', async (c) => {
         
         console.log('Vimeo duration:', effectiveDuration, 'session:', thisSession, '(cached:', cachedVimeoDuration, ')');
         
+        // ★★ 시나리오 3 수정: duration이 0이면 폴링 종료 감지를 건너뛰고
+        // 안전 타이머에만 의존 (즉시 ended 처리 방지)
+        const hasDuration = effectiveDuration > 2; // 2초 미만은 유효하지 않은 duration
+        
         // 멈춤 감지용 변수
         let lastTime = 0;
         let stuckCount = 0;
         let pollCount = 0;
-        let hasEverProgressed = false; // 한 번이라도 재생 진행됐는지
+        let hasEverProgressed = false;
         
         // 폴링: 영상 끝 감지 + 멈춤 감지 (2초마다)
         vimeoPollingInterval = setInterval(() => {
@@ -15018,13 +15045,13 @@ app.get('/tv/:shortCode', async (c) => {
             }
             
             // 멈춤 감지: 3번 연속(6초) 시간이 안 변하면 재시작
-            if (time > 0 && Math.abs(time - lastTime) < 0.5) {
+            if (hasEverProgressed && time > 0 && Math.abs(time - lastTime) < 0.5) {
               stuckCount++;
               if (stuckCount >= 3) {
                 console.log('[Vimeo] stuck detected at', Math.round(time), '/', effectiveDuration, '- restarting play...');
                 stuckCount = 0;
                 // 영상 끝 근처에서 멈췄으면 다음으로 전환
-                if (effectiveDuration > 0 && time >= effectiveDuration - 2) {
+                if (hasDuration && time >= effectiveDuration - 2) {
                   console.log('[Vimeo] stuck near end, treating as ended');
                   if (!endedHandled) {
                     endedHandled = true;
@@ -15041,7 +15068,8 @@ app.get('/tv/:shortCode', async (c) => {
             lastTime = time;
             
             // 영상 끝 감지 (폴링 백업 - ended 이벤트가 놓칠 경우 대비)
-            if (effectiveDuration > 0 && time >= effectiveDuration - 0.5) {
+            // ★ hasDuration 체크: duration이 유효할 때만 종료 감지
+            if (hasDuration && time >= effectiveDuration - 0.5) {
               if (!endedHandled) {
                 console.log('[Vimeo] polling detected end:', Math.round(time), '/', effectiveDuration);
                 endedHandled = true;
@@ -15053,16 +15081,16 @@ app.get('/tv/:shortCode', async (c) => {
         }, 2000);
         
         // 안전 타이머 (영상길이 + 5초 - 여유 확대)
-        if (effectiveDuration > 0) {
-          vimeoSafetyTimeout = setTimeout(() => {
+        // ★ hasDuration이 false여도 동작 - 이 경우 30초 후 강제 전환
+        const safetyDuration = hasDuration ? effectiveDuration + 5 : 30;
+        vimeoSafetyTimeout = setTimeout(() => {
             if (thisSession !== vimeoSessionId) return;
             if (endedHandled) return; // 이미 처리됨
-            console.log('[Vimeo] safety timeout, session:', thisSession);
+            console.log('[Vimeo] safety timeout after', safetyDuration, 's, session:', thisSession);
             endedHandled = true;
             clearVimeoTimers();
             goToNext();
-          }, (effectiveDuration + 5) * 1000);
-        }
+          }, safetyDuration * 1000);
       }).catch((err) => {
         console.log('Vimeo getDuration failed:', err, 'using cached:', cachedVimeoDuration);
         if (thisSession !== vimeoSessionId) return;
@@ -15143,7 +15171,7 @@ app.get('/tv/:shortCode', async (c) => {
       const newPlayerId = 'vimeo-player-' + idx + '-' + Date.now();
       const newDiv = document.createElement('div');
       newDiv.id = newPlayerId;
-      newDiv.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;z-index:10;opacity:0;transition:opacity 0.3s;';
+      newDiv.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;z-index:10;opacity:0;transition:opacity 0.5s ease;';
       container.style.position = 'relative';
       container.appendChild(newDiv);
       
@@ -15184,9 +15212,9 @@ app.get('/tv/:shortCode', async (c) => {
             newDiv.style.opacity = '1';
           });
           
-          // ★ 약간의 딜레이 후 기존 플레이어 정리 (새 영상이 보인 후)
+          // ★ 약간의 딜레이 후 기존 플레이어 정리 (새 영상이 보인 후 - 0.8초)
           setTimeout(() => {
-            if (oldPlayer) {
+            if (oldPlayer && oldPlayer !== player) {
               try { oldPlayer.destroy(); } catch(e) {}
             }
             const children = Array.from(container.children);
@@ -15197,7 +15225,7 @@ app.get('/tv/:shortCode', async (c) => {
             });
             newDiv.style.opacity = '';
             newDiv.style.transition = '';
-          }, 500);
+          }, 800);
           
           if (thisSession === vimeoSessionId) {
             startVimeoPlayback(player, idx);
@@ -15269,28 +15297,54 @@ app.get('/tv/:shortCode', async (c) => {
     
     // 강화된 워치독 - 멈춤/검정화면 감지 및 자동 복구
     let _watchdogCallCount = 0;
-    let _lastWatchdogPlayTime = 0; // 마지막으로 재생이 확인된 시간
     let _watchdogNoProgressCount = 0; // 재생 진행 없는 연속 횟수
+    let _transitionStartTime = 0; // isTransitioning이 true가 된 시각
     
     function ensurePlaybackAlive() {
       if (!playlist || !playlist.items || playlist.items.length === 0) return;
-      if (isTransitioning) return;
       if (currentIndex >= playlist.items.length) return;
+      
+      _watchdogCallCount++;
+      
+      // ★★ 시나리오 1+2 핵심 수정: isTransitioning 강제 해제
+      // setTimeout이 실행 안 될 수 있음 (브라우저 탭 비활성화 등)
+      // 5초 이상 전환 중이면 강제 해제
+      if (isTransitioning) {
+        const transitionElapsed = Date.now() - _transitionStartTime;
+        if (transitionElapsed > 5000) {
+          console.log('[watchdog] FORCE: isTransitioning stuck for', Math.round(transitionElapsed/1000), 's - releasing lock');
+          isTransitioning = false;
+          _watchdogNoProgressCount = 0;
+        } else {
+          return; // 아직 정상 범위 내 전환 중
+        }
+      }
 
       const item = playlist.items[currentIndex];
       if (!item) return;
-      
-      _watchdogCallCount++;
       
       // ★ 플레이어 존재 여부 체크 - 플레이어가 없으면 강제 재시작
       const hasPlayer = !!players[currentIndex];
       if (!hasPlayer && item.item_type !== 'image') {
         _watchdogNoProgressCount++;
         console.log('[watchdog] No player for index:', currentIndex, 'type:', item.item_type, 'count:', _watchdogNoProgressCount);
-        if (_watchdogNoProgressCount >= 3) { // 15초간 플레이어 없음
-          console.log('[watchdog] CRITICAL: No player for 15s, forcing restart');
+        if (_watchdogNoProgressCount >= 2) { // 10초간 플레이어 없음 (15→10초로 단축)
+          console.log('[watchdog] CRITICAL: No player for 10s, forcing restart');
           _watchdogNoProgressCount = 0;
           safeRestartPlayback();
+          return;
+        }
+      }
+      
+      // ★ Vimeo 폴링/안전타이머가 없는 경우 감지 (세션 불일치 등으로 누락 시)
+      if (item.item_type === 'vimeo' && hasPlayer && !vimeoPollingInterval && !vimeoSafetyTimeout) {
+        _watchdogNoProgressCount++;
+        console.log('[watchdog] Vimeo has player but no polling/safety timer, count:', _watchdogNoProgressCount);
+        if (_watchdogNoProgressCount >= 2) { // 10초간 감시 없음
+          console.log('[watchdog] CRITICAL: Vimeo unmonitored, restarting playback tracking');
+          _watchdogNoProgressCount = 0;
+          // 폴링만 다시 시작 (플레이어는 유지)
+          startVimeoPlayback(players[currentIndex], currentIndex);
           return;
         }
       }
@@ -15309,9 +15363,8 @@ app.get('/tv/:shortCode', async (c) => {
               ytPlayer.setVolume(0);
               ytPlayer.playVideo();
             } catch (e) {}
-            // 30초간 YouTube가 재생 안 되면 강제 다음으로
-            if (_watchdogNoProgressCount >= 6) {
-              console.log('[watchdog] YouTube stuck for 30s, skipping to next');
+            if (_watchdogNoProgressCount >= 4) { // 20초 (30→20으로 단축)
+              console.log('[watchdog] YouTube stuck for 20s, skipping to next');
               _watchdogNoProgressCount = 0;
               goToNext();
             }
@@ -15322,8 +15375,8 @@ app.get('/tv/:shortCode', async (c) => {
           }
         }
       } else if (item.item_type === 'vimeo') {
-        // Vimeo: 매 3번째 호출(15초)에만 상태 체크 - API 호출 최소화로 끊김 방지
-        if (_watchdogCallCount % 3 === 0) {
+        // Vimeo: 매 2번째 호출(10초)에 상태 체크 (15→10초로 단축)
+        if (_watchdogCallCount % 2 === 0) {
           const vimeoPlayer = players[currentIndex];
           if (vimeoPlayer && typeof vimeoPlayer.getPaused === 'function') {
             vimeoPlayer.getPaused().then((paused) => {
@@ -15331,20 +15384,27 @@ app.get('/tv/:shortCode', async (c) => {
                 _watchdogNoProgressCount++;
                 console.log('[watchdog] Vimeo paused, count:', _watchdogNoProgressCount, '- resuming...');
                 vimeoPlayer.play().catch(() => {});
-                // 45초간 Vimeo가 일시정지 상태면 강제 재시작
-                if (_watchdogNoProgressCount >= 3) {
-                  console.log('[watchdog] Vimeo stuck for 45s, forcing restart');
+                if (_watchdogNoProgressCount >= 3) { // 30초 (45→30초로 단축)
+                  console.log('[watchdog] Vimeo stuck for 30s, forcing restart');
                   _watchdogNoProgressCount = 0;
                   safeRestartPlayback();
                 }
               } else {
                 _watchdogNoProgressCount = 0;
               }
-            }).catch(() => {});
+            }).catch(() => {
+              // getPaused 자체가 실패하면 플레이어가 죽은 것
+              _watchdogNoProgressCount++;
+              console.log('[watchdog] Vimeo getPaused failed, count:', _watchdogNoProgressCount);
+              if (_watchdogNoProgressCount >= 2) {
+                console.log('[watchdog] Vimeo player dead, forcing restart');
+                _watchdogNoProgressCount = 0;
+                safeRestartPlayback();
+              }
+            });
           } else if (!vimeoPlayer) {
-            // 폴링이 있지만 플레이어가 없는 경우
             _watchdogNoProgressCount++;
-            if (_watchdogNoProgressCount >= 3) {
+            if (_watchdogNoProgressCount >= 2) {
               console.log('[watchdog] Vimeo player lost, restarting');
               _watchdogNoProgressCount = 0;
               safeRestartPlayback();
@@ -15373,15 +15433,22 @@ app.get('/tv/:shortCode', async (c) => {
     function goToNext() {
       // 중복 실행 방지 (transition 중 호출 무시)
       if (isTransitioning) {
-        console.log('Skipping goToNext: transition in progress');
-        return;
+        // ★ 시나리오 1 안전장치: 5초 초과 시 강제 해제 허용
+        const elapsed = Date.now() - _transitionStartTime;
+        if (elapsed > 5000) {
+          console.log('[goToNext] Force releasing stale transition lock after', Math.round(elapsed/1000), 's');
+          isTransitioning = false;
+        } else {
+          console.log('Skipping goToNext: transition in progress (' + Math.round(elapsed/1000) + 's)');
+          return;
+        }
       }
       isTransitioning = true;
-      // ★ 전환 락: transition duration + 500ms (최소 1초, 최대 3초)
-      const transitionLockDuration = Math.min(Math.max(transitionDuration || 500, 1000), 3000);
+      _transitionStartTime = Date.now(); // ★ 전환 시작 시각 기록
+      // ★ 전환 락: transition duration + 500ms (최소 800ms, 최대 2초) - 더 빠른 전환
+      const transitionLockDuration = Math.min(Math.max(transitionDuration || 500, 800), 2000);
       setTimeout(() => { 
         isTransitioning = false; 
-        // ★ 전환 완료 후 워치독 카운터 리셋
         _watchdogNoProgressCount = 0;
       }, transitionLockDuration);
       
@@ -15465,6 +15532,8 @@ app.get('/tv/:shortCode', async (c) => {
         console.log('========================================');
         
         if (nextItem.item_type === 'vimeo') {
+          // ★★ 시나리오 4 수정: 기존 폴링/타이머를 먼저 정리하여 세션 경쟁 방지
+          clearVimeoTimers();
           // 기존 플레이어가 있으면 seek(0)으로 처음부터 재생 (검정화면 없음)
           const existingPlayer = players[nextIndex];
           if (existingPlayer && typeof existingPlayer.setCurrentTime === 'function') {
@@ -15576,23 +15645,28 @@ app.get('/tv/:shortCode', async (c) => {
         const preloadedPlayer = preloadedPlayers[nextIndex];
         players[nextIndex] = preloadedPlayer;
         delete preloadedPlayers[nextIndex];
+        
+        // ★★ 프리로드된 플레이어: 이미 iframe이 준비되어 있으므로 거의 즉시 전환 가능
         preloadedPlayer.play().then(() => {
           if (thisSession !== vimeoSessionId) return;
           doTransition(prevIndex, nextIndex);
           startVimeoPlayback(preloadedPlayer, nextIndex);
           setTimeout(ensureFullscreen, 200);
+          scheduleNextPreload(nextIndex);
         }).catch(() => {
           if (thisSession !== vimeoSessionId) return;
           doTransition(prevIndex, nextIndex);
           startVimeoPlayback(preloadedPlayer, nextIndex);
+          scheduleNextPreload(nextIndex);
         });
-        // 3초 안전 타임아웃
+        // 1.5초 안전 타임아웃 (프리로드는 빨라야 하므로 줄임)
         setTimeout(() => {
           if (thisSession !== vimeoSessionId) return;
           if (!document.getElementById('media-item-' + nextIndex)?.classList.contains('active')) {
             doTransition(prevIndex, nextIndex);
+            startVimeoPlayback(preloadedPlayer, nextIndex);
           }
-        }, 3000);
+        }, 1500);
         return;
       }
       
@@ -15632,11 +15706,14 @@ app.get('/tv/:shortCode', async (c) => {
       const newPlayerId = 'vimeo-player-' + nextIndex + '-' + Date.now();
       const newDiv = document.createElement('div');
       newDiv.id = newPlayerId;
-      newDiv.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;z-index:10;opacity:0;transition:opacity 0.3s;';
+      newDiv.style.cssText = 'width:100%;height:100%;position:absolute;top:0;left:0;z-index:10;opacity:0;transition:opacity 0.5s ease;';
       container.style.position = 'relative';
       container.appendChild(newDiv);
       
       let transitionStarted = false;
+      // ★★ 시나리오 7: 재시도 카운터 (네트워크 오류 시 무한 루프 방지)
+      let _retryCount = 0;
+      const MAX_RETRIES = 3;
       
       try {
         const player = new Vimeo.Player(newPlayerId, {
@@ -15658,15 +15735,18 @@ app.get('/tv/:shortCode', async (c) => {
         const startTransitionIfNeeded = () => {
           if (transitionStarted) return;
           transitionStarted = true;
-          // ★ 새 영상이 시작되면 페이드인
+          // ★ 새 영상이 시작되면 부드러운 페이드인 (0.5초)
           newDiv.style.opacity = '1';
-          doTransition(prevIndex, nextIndex);
-          startVimeoPlayback(player, nextIndex);
-          // Vimeo 재생 시작 후 전체화면 복원
-          setTimeout(ensureFullscreen, 200);
-          // ★ 전환 완료 후 기존 플레이어/DOM 정리
+          // ★★ 핵심: doTransition보다 페이드인을 먼저 시작
+          // 새 영상이 완전히 보인 후에만 이전 영상을 제거
           setTimeout(() => {
-            if (oldPlayer) {
+            doTransition(prevIndex, nextIndex);
+          }, 100); // 페이드인이 시작된 후 100ms 뒤에 전환 처리
+          startVimeoPlayback(player, nextIndex);
+          setTimeout(ensureFullscreen, 200);
+          // ★ 전환 완료 후 기존 플레이어/DOM 정리 (충분한 여유 - 0.8초)
+          setTimeout(() => {
+            if (oldPlayer && oldPlayer !== player) {
               try { oldPlayer.destroy(); } catch(e) {}
             }
             const children = Array.from(container.children);
@@ -15675,10 +15755,9 @@ app.get('/tv/:shortCode', async (c) => {
                 try { container.removeChild(child); } catch(e) {}
               }
             });
-            // opacity 전환 스타일 제거
             newDiv.style.opacity = '';
             newDiv.style.transition = '';
-          }, 500);
+          }, 800);
           
           // ★ 다음 영상 프리로드 시작
           scheduleNextPreload(nextIndex);
@@ -15692,20 +15771,44 @@ app.get('/tv/:shortCode', async (c) => {
           }
           if (currentIndex !== nextIndex) return;
           
-          // 실제 재생이 시작될 때까지 이전 영상 유지
-          player.on('play', startTransitionIfNeeded);
-          player.on('playing', startTransitionIfNeeded);
+          // ★★ 핵심 개선: play() 호출하고 실제 재생이 시작될 때 전환
+          // 'playing' 이벤트가 가장 확실 (실제 프레임이 렌더링됨)
+          let playEventReceived = false;
+          const onPlaying = () => {
+            playEventReceived = true;
+            startTransitionIfNeeded();
+          };
+          player.on('playing', onPlaying);
+          player.on('play', () => {
+            // play 이벤트는 playing보다 먼저 올 수 있음 - 0.1초 대기 후 전환
+            setTimeout(() => {
+              if (!playEventReceived) startTransitionIfNeeded();
+            }, 150);
+          });
           player.play().catch(() => {});
           
-          // 2.5초 안에 재생 이벤트가 없으면 강제 전환
+          // 2초 안에 재생 이벤트가 없으면 강제 전환 (이전 영상은 아직 보이는 상태)
           setTimeout(() => {
             if (thisSession !== vimeoSessionId) return;
             startTransitionIfNeeded();
-          }, 2500);
+          }, 2000);
         }).catch(() => {
           if (thisSession !== vimeoSessionId) return;
-          startTransitionIfNeeded();
-          currentTimer = setTimeout(() => goToNext(), 5000);
+          // ★★ 시나리오 7: 재시도 로직
+          _retryCount++;
+          if (_retryCount <= MAX_RETRIES) {
+            console.log('[Vimeo] ready() failed, retry', _retryCount, '/', MAX_RETRIES);
+            try { player.destroy(); } catch(e) {}
+            try { container.removeChild(newDiv); } catch(e) {}
+            setTimeout(() => {
+              if (thisSession !== vimeoSessionId) return;
+              createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container);
+            }, 2000);
+          } else {
+            console.log('[Vimeo] ready() failed after', MAX_RETRIES, 'retries, skipping');
+            startTransitionIfNeeded();
+            currentTimer = setTimeout(() => goToNext(), 5000);
+          }
         });
         
       } catch (e) {
@@ -15716,23 +15819,26 @@ app.get('/tv/:shortCode', async (c) => {
       }
     }
     
-    // ★ 다음 영상 프리로드 스케줄링 (부드러운 전환을 위해)
+    // ★★ 다음 영상 프리로드 스케줄링 (부드러운 전환의 핵심)
+    // 현재 재생이 안정화된 후 2초 뒤에 프리로드 시작 (3→2초로 단축)
     function scheduleNextPreload(currentIdx) {
       if (!playlist || !playlist.items || playlist.items.length <= 1) return;
       const nextIdx = (currentIdx + 1) % playlist.items.length;
       const nextItem = playlist.items[nextIdx];
       if (!nextItem || nextItem.item_type !== 'vimeo') return;
-      // 현재 재생이 안정화된 후 (3초) 프리로드 시작
+      // ★ 현재 재생 중인 인덱스와 프리로드 대상이 같으면 건너뛰기
+      if (nextIdx === currentIndex && playlist.items.length > 1) return;
       setTimeout(() => {
         if (currentIndex !== currentIdx) return; // 이미 전환됨
         if (preloadedPlayers[nextIdx]) return; // 이미 프리로드됨
+        if (nextIdx === currentIndex) return; // ★ 재확인: 현재 재생 중이면 건너뛰기
         console.log('[preload] Scheduling preload for next item:', nextIdx);
         preloadVimeo(nextIdx);
-      }, 3000);
+      }, 2000);
     }
     
     // 실제 전환 수행 (디졸브)
-    // ★ 실제 전환 수행 (디졸브) - 이전 영상을 충분히 유지하여 검정화면 방지
+    // ★★ 실제 전환 수행 (디졸브) - 이전 영상을 충분히 유지하여 검정화면 방지
     function doTransition(prevIndex, nextIndex) {
       // 먼저 모든 아이템 숨기기 (현재 재생 중인 것 제외하고 정리)
       const allItems = document.querySelectorAll('.media-item');
@@ -15750,10 +15856,11 @@ app.get('/tv/:shortCode', async (c) => {
 
       const duration = transitionDuration || 500;
 
-      // ★ 이전 아이템 제거는 transition duration + 200ms 후에 (여유 확보)
-      // 새 영상이 완전히 보인 후에만 이전 영상을 숨김
+      // ★★ 핵심 개선: 이전 아이템 제거는 transition duration + 500ms 후
+      // 새 영상의 페이드인(0.5초)이 완료된 후에만 이전 영상을 숨김
+      // 이로써 검정 화면 갭이 절대 발생하지 않음
       setTimeout(() => {
-        if (prevIndex === nextIndex) return; // 같은 아이템이면 제거하지 않음
+        if (prevIndex === nextIndex) return;
         
         const prevItem = playlist?.items?.[prevIndex];
         if (prevItem) {
@@ -15766,7 +15873,7 @@ app.get('/tv/:shortCode', async (c) => {
         
         const prevDiv = document.getElementById('media-item-' + prevIndex);
         if (prevDiv && prevIndex !== nextIndex) prevDiv.classList.remove('active');
-      }, duration + 200);
+      }, duration + 500);
     }
     
     // 재생 시작 (초기화)
