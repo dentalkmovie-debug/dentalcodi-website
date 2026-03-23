@@ -4824,10 +4824,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
   <div id="app" style="display:block;width:100%">
-    <!-- 로딩 (기본 숨김) -->
-    <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
+    <!-- 로딩 (즉시 표시 - CSS 의존 없는 순수 인라인 스피너) -->
+    <div id="loading" style="display:flex;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
-        <i class="fas fa-spinner fa-spin" style="font-size:28px;color:#2563eb;margin-bottom:12px;display:block"></i>
+        <div style="width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px"></div>
+        <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
         <p style="font-size:13px;color:#6b7280">로딩 중...</p>
       </div>
     </div>
