@@ -4753,12 +4753,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
-  <!-- Noto Sans KR 폰트 -->
+  <!-- Admin CSS (같은 서버 - 빠름) -->
+  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
+  <!-- Noto Sans KR 폰트: 비동기 (외부서버 느림 → 렌더 차단 안함) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Admin CSS -->
-  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap"></noscript>
   <!-- SortableJS: defer로 렌더링 비차단 -->
   <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <!-- FontAwesome: 비동기 로드 (렌더링 비차단) -->
