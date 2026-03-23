@@ -13185,6 +13185,15 @@ let transitionDuration = 500;
 let tvAdminCode = null;
 let tvAdminEmail = null;
 
+// 로딩 화면 관리
+let _loadingScreenHidden = false;
+function hideLoadingScreen() {
+  if (_loadingScreenHidden) return;
+  _loadingScreenHidden = true;
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.classList.add('hidden');
+}
+
 // 안정성 강화 변수
 let isTransitioning = false; // 중복 전환 방지
 let wakeLock = null; // 화면 꺼짐 방지
@@ -13853,7 +13862,7 @@ async function loadData(isInitial = false) {
       
       // 초기 로드 시 로딩 화면 숨기기
       if (isInitial) {
-        document.getElementById('loading-screen').classList.add('hidden');
+        hideLoadingScreen();
       }
       
       // 공지와 로고는 계속 표시
@@ -13882,8 +13891,9 @@ async function loadData(isInitial = false) {
     }
     
     if (isInitial) {
-      // ★★ 로딩 화면 즉시 숨기기 (API 로드 완료 전에) - 빈 페이지 체감 시간 최소화
-      document.getElementById('loading-screen').classList.add('hidden');
+      // ★★ 로딩 화면은 첫 미디어 재생 시작 시 숨김 (빈 검은 화면 방지)
+      // 안전장치: 10초 후 강제 숨김 (미디어 로드 실패 대비)
+      setTimeout(hideLoadingScreen, 10000);
       
       // ★★ API는 이미 페이지 시작 시 프리로드됨 (loadVimeoAPI/loadYouTubeAPI 미리 호출)
       const hasYouTube = playlist.items.some(i => i.item_type === 'youtube');
@@ -13925,7 +13935,7 @@ async function loadData(isInitial = false) {
         setTimeout(() => loadData(true), 3000);
       } else {
         // 재시도 횟수 초과: 에러 화면 표시 (초기 로드에서만)
-        document.getElementById('loading-screen').classList.add('hidden');
+        hideLoadingScreen();
         document.getElementById('error-screen').style.display = 'flex';
         document.getElementById('error-message').textContent = (e.httpStatus === 404)
           ? '채널을 찾을 수 없습니다. 주소를 확인해주세요.'
@@ -14503,6 +14513,9 @@ function setupYouTube(item, index) {
           }
         },
         onStateChange: (e) => {
+          if (e.data === YT.PlayerState.PLAYING) {
+            hideLoadingScreen();
+          }
           if (e.data === YT.PlayerState.ENDED && currentIndex === index) {
             console.log('YouTube ended:', index);
             goToNext();
@@ -14536,6 +14549,7 @@ function setupImage(item, index) {
     container.appendChild(img);
     console.log('Image ready:', index);
     itemsReady[index] = true;
+    if (index === currentIndex) hideLoadingScreen();
   };
   
   img.onerror = () => {
@@ -14722,6 +14736,7 @@ function startVimeoPlayback(player, idx) {
     console.log('Vimeo play attempt:', attempt, 'session:', thisSession);
     player.play().then(() => {
       console.log('Vimeo play SUCCESS, attempt:', attempt);
+      hideLoadingScreen();
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
       if (attempt < 3 && thisSession === vimeoSessionId) {
