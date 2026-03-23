@@ -4697,6 +4697,41 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const ssrAdminTabDisplay = isSuperAdmin ? 'inline-block' : 'none'
 
   const baseUrl = new URL(c.req.url).origin
+
+  // ── SSR: 대기실/체어 카드를 서버에서 미리 렌더링 (admin.js 로드 전에도 즉시 표시) ──
+  const ssrPlaylists = playlistsWithItems || []
+  const ssrWaitingRooms = ssrPlaylists.filter((p: any) => !p.name.includes('체어')).sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+  const ssrChairs = ssrPlaylists.filter((p: any) => p.name.includes('체어')).sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+  
+  function ssrPlaylistCard(p: any, type: 'waitingroom' | 'chair') {
+    const isActive = !!(p.is_tv_active)
+    const neverConnected = !p.last_active_at && !p.external_short_url
+    const isOffline = !isActive && !neverConnected && (p.last_active_at || p.external_short_url)
+    const isChair = type === 'chair'
+    const gradActive = isChair ? 'linear-gradient(135deg,#22c55e,#16a34a)' : (isActive ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#3b82f6,#2563eb)')
+    const iconClass = isChair ? 'fa-tv' : 'fa-couch'
+    const borderColor = isActive ? '#bbf7d0' : '#e5e7eb'
+    const urlDisplay = p.external_short_url ? p.external_short_url.replace('https://', '') : baseUrl.replace('https://', '').replace('http://', '') + '/' + p.short_code
+    
+    let statusBadge = ''
+    if (isActive) statusBadge = '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">● 사용중</span>'
+    else if (isOffline) statusBadge = '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>'
+    else if (neverConnected) statusBadge = `<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">${isChair ? '체어 설정 필요' : 'TV 연결 필요'}</span>`
+    
+    return `<div class="playlist-sortable-item" id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" style="background:#fff;border-radius:12px;border:1px solid ${borderColor};overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div><div style="width:36px;height:36px;border-radius:10px;background:${gradActive};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative"><i class="fas ${iconClass}" style="color:#fff;font-size:14px"></i>${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></span>' : ''}</div><div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#1f2937">${p.name}</span>${statusBadge}</div><p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#2563eb;font-family:monospace;font-size:10px">${urlDisplay}</span><span style="margin:0 6px;color:#d1d5db">·</span>${p.item_count || 0}개 미디어</p></div></div><div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px"><button onclick="openPlaylistEditor(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">플레이리스트</button><button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">TV로 내보내기</button><button onclick="copyToClipboard('${p.external_short_url || baseUrl + '/' + p.short_code}'); markSingleChairSetup(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">URL 복사</button>${isActive ? '<button disabled style="padding:5px 8px;border:none;background:none;color:#e5e7eb;cursor:not-allowed;font-size:12px"><i class="fas fa-trash"></i></button>' : `<button onclick="deletePlaylist(${p.id})" style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px"><i class="fas fa-trash"></i></button>`}</div></div></div>`
+  }
+  
+  const ssrWaitingroomsHtml = ssrWaitingRooms.length === 0
+    ? '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center"><p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 대기실이 없습니다.</p><button onclick="showCreatePlaylistModal(\'waitingroom\')" style="padding:8px 20px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-plus" style="margin-right:6px"></i>대기실 추가</button></div>'
+    : `<div id="waitingroom-sortable-container" style="display:grid;gap:10px">${ssrWaitingRooms.map((p: any) => ssrPlaylistCard(p, 'waitingroom')).join('')}</div>`
+  
+  const ssrChairsHtml = ssrChairs.length === 0
+    ? '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center"><p style="font-size:14px;color:#6b7280;margin:0 0 12px">등록된 체어가 없습니다.</p><button onclick="showCreatePlaylistModal(\'chair\')" style="padding:8px 20px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit"><i class="fas fa-plus" style="margin-right:6px"></i>체어 추가</button></div>'
+    : `<div id="chair-sortable-container" style="display:grid;gap:10px">${ssrChairs.map((p: any) => ssrPlaylistCard(p, 'chair')).join('')}</div>`
+  
+  const ssrWrCount = ssrWaitingRooms.length + '개'
+  const ssrChCount = ssrChairs.length + '개'
+  // ── SSR 끝 ──
   
   // 강력한 캐시 방지 헤더 설정 (아임웹 iframe 캐시 문제 방지)
   c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -4713,6 +4748,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>치과 TV 관리자</title>
+  <link rel="preload" href="/static/admin.js?v=${Date.now()}" as="script">
   <script>
     // bfcache(뒤로/앞으로 캐시)에서 복원 시 강제 새로고침
     window.addEventListener('pageshow', function(e) {
@@ -4870,7 +4906,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             <div style="display:flex;align-items:center;gap:8px">
               <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px"><i class="fas fa-couch"></i></span>
               <span style="font-size:18px;font-weight:700;color:#1f2937">대기실 관리</span>
-              <span id="waitingroom-count-badge" style="font-size:11px;color:#2563eb;background:#dbeafe;padding:2px 10px;border-radius:20px;font-weight:600">0개</span>
+              <span id="waitingroom-count-badge" style="font-size:11px;color:#2563eb;background:#dbeafe;padding:2px 10px;border-radius:20px;font-weight:600">${ssrWrCount}</span>
             </div>
             <button onclick="showCreatePlaylistModal('waitingroom')" 
               style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,.3);transition:opacity .15s"
@@ -4878,7 +4914,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               <i class="fas fa-plus" style="margin-right:4px"></i>대기실 추가
             </button>
           </div>
-          <div id="waitingrooms-container" style="display:grid;gap:12px"></div>
+          <div id="waitingrooms-container" style="display:grid;gap:12px">${ssrWaitingroomsHtml}</div>
           
           <!-- 대기실 초기 설정 (TV 연결) -->
           <div id="waitingroom-setup-section" style="margin-top:16px"></div>
@@ -4890,7 +4926,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             <div style="display:flex;align-items:center;gap:8px">
               <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px"><i class="fas fa-tv"></i></span>
               <span style="font-size:18px;font-weight:700;color:#1f2937">체어 관리</span>
-              <span id="chair-count-badge" style="font-size:11px;color:#6366f1;background:#e0e7ff;padding:2px 10px;border-radius:20px;font-weight:600">0개</span>
+              <span id="chair-count-badge" style="font-size:11px;color:#6366f1;background:#e0e7ff;padding:2px 10px;border-radius:20px;font-weight:600">${ssrChCount}</span>
             </div>
             <button onclick="showCreatePlaylistModal('chair')" 
               style="padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#818cf8);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(99,102,241,.3);transition:opacity .15s"
@@ -4898,7 +4934,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               <i class="fas fa-plus" style="margin-right:4px"></i>체어 추가
             </button>
           </div>
-          <div id="chairs-container" style="display:grid;gap:12px"></div>
+          <div id="chairs-container" style="display:grid;gap:12px">${ssrChairsHtml}</div>
           
           <!-- 체어 초기 설정 (스크립트 다운로드) -->
           <div id="chair-setup-section" style="margin-top:16px"></div>
