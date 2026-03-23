@@ -4587,8 +4587,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   // 2. 마스터 관리자 페이지에서 설정한 관리자인 경우
   const isOwnerAdmin = isAdminQuery || finalUser?.is_site_admin === 1 || isAdminEmail(finalUser?.imweb_email) || isAdminEmail(emailParam)
   
-  // 서버에서 초기 데이터 미리 로드 (병렬)
-  const [playlistsData, noticesData, masterItemsData, playlistItemsData] = await Promise.all([
+  // 서버에서 초기 데이터 미리 로드 (병렬) — 최소 2쿼리만 (TTFB 최적화)
+  // masterItems, playlistItems, allClinics는 admin.js에서 API lazy 로드
+  const [playlistsData, noticesData] = await Promise.all([
     c.env.DB.prepare(`
       SELECT p.*, 
         (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
@@ -4597,43 +4598,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       ORDER BY p.id
     `).bind(finalUser?.id || 0).all(),
     c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? ORDER BY sort_order ASC, id DESC')
-      .bind(finalUser?.id || 0).all(),
-    // 3단계 직렬 쿼리 → 1개 JOIN 쿼리로 최적화 (DB 왕복 2→1회)
-    c.env.DB.prepare(`
-      SELECT pi.*
-      FROM playlist_items pi
-      JOIN playlists p ON pi.playlist_id = p.id
-      JOIN users u ON p.user_id = u.id
-      WHERE u.is_master = 1 AND p.is_master_playlist = 1
-      ORDER BY pi.sort_order
-    `).all(),
-    // 사용자 playlist의 items를 한 번에 로드 (편집창 즉시 렌더링용)
-    c.env.DB.prepare(`
-      SELECT pi.*
-      FROM playlist_items pi
-      JOIN playlists p ON pi.playlist_id = p.id
-      WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
-      ORDER BY pi.playlist_id, pi.sort_order ASC
-    `).bind(finalUser?.id || 0).all()
+      .bind(finalUser?.id || 0).all()
   ])
 
-  // playlist별로 items 그룹핑
-  const playlistItemsMap: Record<number, any[]> = {}
-  for (const item of (playlistItemsData.results || [])) {
-    const pid = (item as any).playlist_id
-    if (!playlistItemsMap[pid]) playlistItemsMap[pid] = []
-    playlistItemsMap[pid].push({ ...(item as any), is_master: false })
-  }
-
-  // playlists에 items와 activeItemIds 추가
-  const masterItemIds = (masterItemsData.results || []).map((i: any) => i.id)
+  // playlists에 activeItemIds 파싱 (items는 admin.js에서 API 로드)
   const playlistsWithItems = (playlistsData.results || []).map((p: any) => {
-    const items = playlistItemsMap[p.id] || []
     let activeItemIds: number[] = []
     try {
       const raw = p.active_item_ids
       if (raw === null || raw === undefined) {
-        // active_item_ids가 null이면 아직 아무것도 선택하지 않은 상태 → 빈 배열
         activeItemIds = []
       } else {
         activeItemIds = JSON.parse(raw || '[]')
@@ -4644,7 +4617,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     } catch (e) {
       activeItemIds = []
     }
-    return { ...p, items, activeItemIds }
+    return { ...p, items: [], activeItemIds }
   })
 
   // 최고관리자(super_admin) 판단:
