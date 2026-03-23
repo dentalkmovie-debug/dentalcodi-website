@@ -5154,12 +5154,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               <div style="display:flex;align-items:center;gap:12px">
                 <label style="font-size:12px;color:#6b7280">로고 크기</label>
                 <input type="range" id="settings-logo-size" min="50" max="800" value="150" style="flex:1;accent-color:#2563eb"
-                  oninput="document.getElementById('logo-size-label').textContent=this.value+'px'">
+                  oninput="document.getElementById('logo-size-label').textContent=this.value+'px'"
+                  onchange="saveSettingsTabLogo()">
                 <span id="logo-size-label" style="font-size:12px;color:#9ca3af;width:45px">150px</span>
               </div>
               <div style="display:flex;align-items:center;gap:12px">
                 <label style="font-size:12px;color:#6b7280">로고 위치</label>
-                <select id="settings-logo-position" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;background:#fff">
+                <select id="settings-logo-position" onchange="saveSettingsTabLogo()" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;background:#fff">
                   <option value="left">좌측 상단</option>
                   <option value="right" selected>우측 상단</option>
                 </select>
