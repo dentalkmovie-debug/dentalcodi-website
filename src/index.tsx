@@ -684,6 +684,7 @@ app.get('/api/master/users', async (c) => {
     FROM users u
     WHERE (u.is_master = 0 OR u.is_master IS NULL)
       AND u.admin_code NOT LIKE '%master_admin%'
+      AND NOT (u.clinic_name = '내 치과' AND (u.imweb_email IS NULL OR u.imweb_email = ''))
     ORDER BY u.created_at DESC
   `).all()
   
@@ -4674,6 +4675,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       FROM users u
       WHERE (u.is_master = 0 OR u.is_master IS NULL)
         AND u.admin_code NOT LIKE '%master_admin%'
+        AND NOT (u.clinic_name = '내 치과' AND (u.imweb_email IS NULL OR u.imweb_email = ''))
       ORDER BY u.created_at DESC
     `).all()
     allClinicsData = clinicsResult.results || []
@@ -14272,8 +14274,10 @@ app.get('/tv/:shortCode', async (c) => {
         }
         
         if (isInitial) {
+          // ★★ 로딩 화면 즉시 숨기기 (API 로드 완료 전에) - 빈 페이지 체감 시간 최소화
+          document.getElementById('loading-screen').classList.add('hidden');
+          
           // ★★ API는 이미 페이지 시작 시 프리로드됨 (loadVimeoAPI/loadYouTubeAPI 미리 호출)
-          // 여기서는 짧은 대기만 (이미 로드 중이므로 보통 즉시 resolve)
           const hasYouTube = playlist.items.some(i => i.item_type === 'youtube');
           const hasVimeo = playlist.items.some(i => i.item_type === 'vimeo');
           
@@ -14282,14 +14286,12 @@ app.get('/tv/:shortCode', async (c) => {
           if (hasVimeo) loadPromises.push(loadVimeoAPI());
           
           if (loadPromises.length > 0) {
-            // API가 이미 프리로드 중이므로 최대 2초만 대기 (이전 5초)
+            // API가 이미 프리로드 중이므로 최대 2초만 대기
             await Promise.race([
               Promise.all(loadPromises),
               new Promise(resolve => setTimeout(resolve, 2000))
             ]);
           }
-          
-          document.getElementById('loading-screen').classList.add('hidden');
           
           // 재생 시간 체크 시작
           if (scheduleCheckInterval) clearInterval(scheduleCheckInterval);
