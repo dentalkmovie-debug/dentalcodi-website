@@ -13626,7 +13626,7 @@ async function loadData(isInitial = false) {
         dbgDiv.style.cssText = 'position:fixed;top:10px;right:10px;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;padding:12px;border-radius:8px;font-size:11px;max-width:400px;max-height:50vh;overflow:auto;font-family:monospace';
         dbgDiv.innerHTML = '<b>TV Debug</b><pre style="margin:4px 0;white-space:pre-wrap">' + JSON.stringify(data._debug, null, 1) + '</pre>'
           + '<b>Items (' + (data.playlist?.items?.length||0) + ')</b><pre style="margin:4px 0">' 
-          + (data.playlist?.items || []).map(function(i){return i.id+': '+i.title}).join('\n') + '</pre>';
+          + (data.playlist?.items || []).map(function(i){return i.id+': '+i.title}).join('\\n') + '</pre>';
         document.body.appendChild(dbgDiv);
         setTimeout(function(){ dbgDiv.remove(); }, 30000);
       }
@@ -14069,7 +14069,7 @@ function showNotices() {
   bar.classList.add('position-' + position);
   
   // 각 공지 사이에 짧은 간격만 (별표 없음)
-  const spacer = '\u00A0\u00A0\u00A0\u00A0';
+  const spacer = '\\u00A0\\u00A0\\u00A0\\u00A0';
   const combinedContent = notices.map(n => n.content).join(spacer);
   
   // 두 개의 동일한 텍스트로 연속 스크롤 효과 (끝에도 간격 추가)
@@ -14568,18 +14568,18 @@ function applySubtitleSettings() {
 // SRT 자막 파싱
 function parseSRT(srtContent) {
   const subtitles = [];
-  const blocks = srtContent.trim().split(/\n\s*\n/);
+  const blocks = srtContent.trim().split(/\\n\\s*\\n/);
   
   for (const block of blocks) {
-    const lines = block.trim().split('\n');
+    const lines = block.trim().split('\\n');
     if (lines.length >= 3) {
       const timeLine = lines[1];
-      const timeMatch = timeLine.match(/(\d{2}):(\d{2}):(\d{2})[,\.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,\.](\d{3})/);
+      const timeMatch = timeLine.match(/(\\d{2}):(\\d{2}):(\\d{2})[,\\.](\\d{3})\\s*-->\\s*(\\d{2}):(\\d{2}):(\\d{2})[,\\.](\\d{3})/);
       
       if (timeMatch) {
         const startTime = parseInt(timeMatch[1]) * 3600 + parseInt(timeMatch[2]) * 60 + parseInt(timeMatch[3]) + parseInt(timeMatch[4]) / 1000;
         const endTime = parseInt(timeMatch[5]) * 3600 + parseInt(timeMatch[6]) * 60 + parseInt(timeMatch[7]) + parseInt(timeMatch[8]) / 1000;
-        const text = lines.slice(2).join('\n');
+        const text = lines.slice(2).join('\\n');
         
         subtitles.push({ startTime, endTime, text });
       }
@@ -14619,7 +14619,7 @@ function showSubtitle(text) {
   if (text) {
     // 기존 내용 완전히 제거 후 새로 설정
     textEl.textContent = '';
-    textEl.innerHTML = text.replace(/\n/g, '<br>');
+    textEl.innerHTML = text.replace(/\\n/g, '<br>');
     overlay.style.display = 'block';
   } else {
     textEl.textContent = '';
@@ -15702,12 +15702,12 @@ function startPlayback() {
 }
 
 function extractYouTubeId(url) {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\n?#]+)/);
+  const m = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/|youtube\\.com\\/embed\\/|youtube\\.com\\/shorts\\/)([^&\\n?#]+)/);
   return m ? m[1] : null;
 }
 
 function extractVimeoId(url) {
-  const m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  const m = url.match(/vimeo\\.com\\/(?:video\\/)?(\\d+)/);
   return m ? m[1] : null;
 }
 
