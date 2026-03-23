@@ -13063,496 +13063,119 @@ app.get('/tv/:shortCode', async (c) => {
     }
   }
   
-  // ★★ 스트리밍 응답: 로딩 화면을 즉시 전송하여 빈 페이지 제거
-  // 첫 번째 청크(~1KB): 로딩 스피너 → 브라우저 즉시 렌더링
-  // 두 번째 청크(~113KB): 나머지 CSS + HTML + JS → 이어서 전송
-  
-  const firstChunk = `<!DOCTYPE html>
+  // ★★ 단일 HTML 응답: 모든 CSS는 head에, JS는 외부 defer + preload
+  return c.html(`
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TV 미러링</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}#loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}.spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}#loading-screen p{color:#666;margin-top:20px}.hidden{display:none!important}</style>
-</head>
-<body>
-<div id="loading-screen"><div class="spinner"></div><p>로딩 중...</p></div>
-`;
-
-  const restChunk = `
-<link rel="preload" href="https://player.vimeo.com/api/player.js" as="script">
-<link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
-<style>
-    
-    /* 미디어 아이템 레이어 - 모든 아이템을 미리 로드 */
-    #media-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-    }
-    
-    .media-item {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      opacity: 0;
-      z-index: 1;
-      transition: opacity var(--transition-duration) ease-in-out;
-      pointer-events: none;
-    }
-    
-    .media-item.active {
-      opacity: 1;
-      z-index: 2;
-      pointer-events: auto;
-    }
-    
-    /* 전환 중 두 아이템이 동시에 active일 때 - 새 아이템이 아래에서 페이드인 */
-    .media-item.active ~ .media-item.active {
-      z-index: 1;
-    }
-    
-    .media-item iframe,
-    .media-item video,
-    .media-item img {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      min-width: 100%;
-      min-height: 100%;
-      width: auto;
-      height: auto;
-      border: none;
-      object-fit: cover;
-    }
-    
-    /* Vimeo/YouTube iframe - 화면보다 크게해서 여백 제거 */
-    .media-item iframe {
-      width: 177.78vh !important;
-      height: 100vh !important;
-      min-width: 100vw;
-      min-height: 56.25vw;
-    }
-    
-    /* 미리보기 모드 - iframe 크기에 맞게 조정 */
-    .preview-mode .media-item iframe,
-    .preview-mode .media-item video,
-    .preview-mode .media-item img {
-      width: 100% !important;
-      height: 100% !important;
-      min-width: 100% !important;
-      min-height: 100% !important;
-      object-fit: cover !important;
-      transform: translate(-50%, -50%) !important;
-    }
-    
-    .preview-mode #notice-bar {
-      padding: 3px 0 !important;
-      min-height: auto !important;
-    }
-    
-    .preview-mode .notice-text-content {
-      font-size: 12px !important;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.5) !important;
-    }
-    
-    .preview-mode #logo-overlay {
-      top: 10px !important;
-      right: 10px !important;
-    }
-    
-    .preview-mode #logo-overlay img {
-      max-width: 60px !important;
-      height: auto !important;
-    }
-    .transition-flip.exit { transform: rotateY(-90deg); }
-    
-    .transition-none { transition: none; }
-    .transition-none.active { opacity: 1; }
-    .transition-none.preload { opacity: 0; }
-    
-    /* 로고 */
-    #logo-overlay {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 90;
-      pointer-events: none;
-    }
-    
-    #logo-overlay img {
-      max-width: 100%;
-      height: auto;
-    }
-    
-    /* 재생시간 외 화면 */
-    #schedule-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      z-index: 180;
-    }
-    
-    #schedule-screen .clock {
-      font-size: 120px;
-      font-weight: 200;
-      margin-bottom: 20px;
-    }
-    
-    #schedule-screen .message {
-      font-size: 24px;
-      color: #666;
-    }
-    
-    #notice-bar {
-      position: fixed;
-      left: 0;
-      width: 100%;
-      padding: 10px 0;
-      z-index: 100;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-    }
-    
-    #notice-bar.position-bottom {
-      bottom: 0;
-      top: auto;
-    }
-    
-    #notice-bar.position-top {
-      top: 0;
-      bottom: auto;
-    }
-    
-    /* 자막 오버레이 스타일 */
-    #subtitle-overlay {
-      position: fixed;
-      bottom: 80px;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      pointer-events: none;
-      display: none;
-      text-align: center;
-    }
-    
-    #subtitle-text {
-      background: rgba(0, 0, 0, 0.8);
-      color: #ffffff;
-      padding: 12px 32px;
-      border-radius: 8px;
-      font-size: 28px;
-      font-weight: normal;
-      text-align: center;
-      line-height: 1.5;
-      /* 블록 요소로 변경 */
-      display: inline-block;
-      /* 단어 단위 줄바꿈 (한글 어절 유지) */
-      word-break: keep-all;
-      word-wrap: break-word;
-      /* 최대 너비 제한 */
-      max-width: 90vw;
-      margin: 0 auto;
-    }
-    
-    #notice-text-wrapper {
-      display: flex;
-      white-space: nowrap;
-      animation: scroll linear infinite;
-    }
-    
-    .notice-text-content {
-      display: inline-block;
-      white-space: nowrap;
-      padding-right: 0; /* 텍스트 자체에 간격이 포함됨 */
-    }
-    
-    @keyframes scroll {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-    
-    /* loading-screen, spinner, spin keyframes → head 인라인 CSS로 이동 (중복 제거) */
-    
-    #error-screen {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: #000;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      z-index: 200;
-    }
-    
-    /* 빈 플레이리스트 대기 화면 */
-    #empty-playlist-screen {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      z-index: 180;
-    }
-    
-    #empty-playlist-screen .icon {
-      font-size: 80px;
-      margin-bottom: 30px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    
-    #empty-playlist-screen .message {
-      font-size: 28px;
-      font-weight: 300;
-      margin-bottom: 15px;
-    }
-    
-    #empty-playlist-screen .sub-message {
-      font-size: 16px;
-      color: #888;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 0.5; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.05); }
-    }
-    
-    /* .hidden → head 인라인 CSS로 이동 */
-    
-    /* 동기화 인디케이터 */
-    #sync-indicator {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
-      color: #4ade80;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      z-index: 150;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    #sync-indicator.show { opacity: 1; }
-    
-    /* CSS 기반 의사 전체화면 - API 전체화면이 풀려도 항상 전체화면처럼 보임 */
-    html, body {
-      width: 100vw !important;
-      height: 100vh !important;
-      overflow: hidden !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    
-    /* 전체화면 컨트롤 버튼 */
-    #fullscreen-controls {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 9999;
-      display: flex;
-      gap: 10px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      pointer-events: none;
-    }
-    /* 상단 좌측 호버 영역 - iframe 위에서도 마우스 감지 */
-    #controls-hover-zone {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 200px;
-      height: 100px;
-      z-index: 9998;
-      pointer-events: auto;
-    }
-    #controls-hover-zone:hover ~ #fullscreen-controls,
-    #fullscreen-controls:hover {
-      opacity: 1 !important;
-      pointer-events: auto !important;
-    }
-
-    #fullscreen-hint {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      background: rgba(0, 0, 0, 0.65);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 200;
-      display: none;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    /* 전체화면 아닐 때도 힌트는 숨김 - CSS 의사 전체화면으로 보이므로 */
-    body.not-fullscreen #fullscreen-hint {
-      display: none;
-    }
-    
-    /* 마우스 활성시 컨트롤 표시 (전체화면 여부 무관) */
-    body.mouse-active #fullscreen-controls {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    
-    .control-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.5);
-      border: none;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-    }
-    
-    .control-btn:hover {
-      background: rgba(0, 0, 0, 0.8);
-      color: #fff;
-      transform: scale(1.1);
-    }
-    
-    /* 전체화면일 때 확대 버튼 숨김 */
-    body.is-fullscreen #btn-fullscreen {
-      display: none;
-    }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TV 미러링</title>
+  <link rel="preload" href="/static/tv-player.js?v=1" as="script">
+  <link rel="preload" href="https://player.vimeo.com/api/player.js" as="script">
+  <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
+    .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #loading-screen p{color:#666;margin-top:20px}
+    .hidden{display:none!important}
+    #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:#000}
+    .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
+    .media-item.active{opacity:1;z-index:2;pointer-events:auto}
+    .media-item.active ~ .media-item.active{z-index:1}
+    .media-item iframe,.media-item video,.media-item img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:100%;min-height:100%;width:auto;height:auto;border:none;object-fit:cover}
+    .media-item iframe{width:177.78vh!important;height:100vh!important;min-width:100vw;min-height:56.25vw}
+    .preview-mode .media-item iframe,.preview-mode .media-item video,.preview-mode .media-item img{width:100%!important;height:100%!important;min-width:100%!important;min-height:100%!important;object-fit:cover!important;transform:translate(-50%,-50%)!important}
+    .preview-mode #notice-bar{padding:3px 0!important;min-height:auto!important}
+    .preview-mode .notice-text-content{font-size:12px!important;text-shadow:1px 1px 2px rgba(0,0,0,0.5)!important}
+    .preview-mode #logo-overlay{top:10px!important;right:10px!important}
+    .preview-mode #logo-overlay img{max-width:60px!important;height:auto!important}
+    .transition-flip.exit{transform:rotateY(-90deg)}
+    .transition-none{transition:none}.transition-none.active{opacity:1}.transition-none.preload{opacity:0}
+    #logo-overlay{position:fixed;top:20px;right:20px;z-index:90;pointer-events:none}
+    #logo-overlay img{max-width:100%;height:auto}
+    #schedule-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:180}
+    #schedule-screen .clock{font-size:120px;font-weight:200;margin-bottom:20px}
+    #schedule-screen .message{font-size:24px;color:#666}
+    #notice-bar{position:fixed;left:0;width:100%;padding:10px 0;z-index:100;overflow:hidden;display:flex;align-items:center}
+    #notice-bar.position-bottom{bottom:0;top:auto}
+    #notice-bar.position-top{top:0;bottom:auto}
+    #subtitle-overlay{position:fixed;bottom:80px;left:0;right:0;z-index:100;pointer-events:none;display:none;text-align:center}
+    #subtitle-text{background:rgba(0,0,0,0.8);color:#fff;padding:12px 32px;border-radius:8px;font-size:28px;font-weight:normal;text-align:center;line-height:1.5;display:inline-block;word-break:keep-all;word-wrap:break-word;max-width:90vw;margin:0 auto}
+    #notice-text-wrapper{display:flex;white-space:nowrap;animation:scroll linear infinite}
+    .notice-text-content{display:inline-block;white-space:nowrap;padding-right:0}
+    @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+    #error-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:200}
+    #empty-playlist-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:180}
+    #empty-playlist-screen .icon{font-size:80px;margin-bottom:30px;animation:pulse 2s ease-in-out infinite}
+    #empty-playlist-screen .message{font-size:28px;font-weight:300;margin-bottom:15px}
+    #empty-playlist-screen .sub-message{font-size:16px;color:#888}
+    @keyframes pulse{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+    #sync-indicator{position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.7);color:#4ade80;padding:5px 10px;border-radius:20px;font-size:12px;z-index:150;opacity:0;transition:opacity 0.3s}
+    #sync-indicator.show{opacity:1}
+    #fullscreen-controls{position:fixed;top:20px;left:20px;z-index:9999;display:flex;gap:10px;opacity:0;transition:opacity 0.3s ease;pointer-events:none}
+    #controls-hover-zone{position:fixed;top:0;left:0;width:200px;height:100px;z-index:9998;pointer-events:auto}
+    #controls-hover-zone:hover ~ #fullscreen-controls,#fullscreen-controls:hover{opacity:1!important;pointer-events:auto!important}
+    #fullscreen-hint{position:fixed;right:20px;bottom:20px;background:rgba(0,0,0,0.65);color:#fff;padding:10px 14px;border-radius:8px;font-size:14px;z-index:200;display:none;cursor:pointer;user-select:none}
+    body.not-fullscreen #fullscreen-hint{display:none}
+    body.mouse-active #fullscreen-controls{opacity:1;pointer-events:auto}
+    .control-btn{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s ease}
+    .control-btn:hover{background:rgba(0,0,0,0.8);color:#fff;transform:scale(1.1)}
+    body.is-fullscreen #btn-fullscreen{display:none}
   </style>
 </head>
 <body>
-  <!-- ★★ 로딩 화면: head CSS에 정의됨 → 즉시 렌더링 -->
-  <div id="loading-screen">
-    <div class="spinner"></div>
-    <p>로딩 중...</p>
-  </div>
-  
+  <div id="loading-screen"><div class="spinner"></div><p>로딩 중...</p></div>
+
   <div id="error-screen" style="display:none">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
     <p id="error-message">플레이리스트를 찾을 수 없습니다.</p>
-    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 30px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
-      다시 시도
-    </button>
+    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 30px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; cursor: pointer;">다시 시도</button>
   </div>
-  
-  <!-- 빈 플레이리스트 대기 화면 -->
+
   <div id="empty-playlist-screen" style="display:none">
     <div class="icon">📺</div>
     <div class="message">재생할 영상을 준비 중입니다</div>
     <div class="sub-message">관리자 페이지에서 영상을 추가해 주세요</div>
   </div>
-  
-  <!-- 재생시간 외 화면 -->
+
   <div id="schedule-screen" style="display:none">
     <div class="clock" id="current-clock">00:00</div>
     <div class="message">재생 시간이 아닙니다</div>
-    <div style="margin-top: 30px; color: #444; font-size: 18px;">
-      <span id="schedule-info"></span>
-    </div>
+    <div style="margin-top: 30px; color: #444; font-size: 18px;"><span id="schedule-info"></span></div>
   </div>
-  
-  <!-- 미디어 컨테이너 - 모든 아이템을 미리 로드 -->
+
   <div id="media-container"></div>
-  
-  <!-- 로고 오버레이 -->
-  <div id="logo-overlay" style="display: none;">
-    <img id="logo-img" src="" alt="Logo">
-  </div>
-  
-  <div id="notice-bar" style="display: none;">
+  <div id="logo-overlay" style="display:none"><img id="logo-img" src="" alt="Logo"></div>
+  <div id="notice-bar" style="display:none">
     <div id="notice-text-wrapper">
       <span class="notice-text-content" id="notice-text-1"></span>
       <span class="notice-text-content" id="notice-text-2"></span>
     </div>
   </div>
-  
-  <!-- 자막 오버레이 -->
-  <div id="subtitle-overlay">
-    <div id="subtitle-text"></div>
-  </div>
-  
+  <div id="subtitle-overlay"><div id="subtitle-text"></div></div>
   <div id="sync-indicator">✓ 업데이트됨</div>
-  
-  <!-- 상단 좌측 호버 영역 (아이프레임 위에서도 마우스 감지) -->
   <div id="controls-hover-zone"></div>
-  <!-- 전체화면 컨트롤 버튼 (TV에서는 전체화면 진입만 가능) -->
   <div id="fullscreen-controls">
     <button id="btn-fullscreen" class="control-btn" title="전체화면으로 보기">⛶</button>
     <button id="btn-admin" class="control-btn" title="관리자 페이지" style="font-size:14px;">관리</button>
   </div>
   <div id="fullscreen-hint">전체화면 유지하려면 클릭</div>
 
-  <!-- ★★ 즉시 실행: 핵심 변수 + visibility override만 -->
   <script>
     const SHORT_CODE = '${shortCode}';
     const CLIENT_ID = 'client_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    function overrideVisibility() {
-      try {
-        const hd = Object.getOwnPropertyDescriptor(document, 'hidden');
-        if (!hd || hd.configurable) Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
-        const vd = Object.getOwnPropertyDescriptor(document, 'visibilityState');
-        if (!vd || vd.configurable) Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
-      } catch (e) { console.log('visibility override skipped:', e?.message || e); }
-    }
-    overrideVisibility();
-    window.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
+    (function(){try{var h=Object.getOwnPropertyDescriptor(document,'hidden');if(!h||h.configurable)Object.defineProperty(document,'hidden',{configurable:true,get:function(){return false}});var v=Object.getOwnPropertyDescriptor(document,'visibilityState');if(!v||v.configurable)Object.defineProperty(document,'visibilityState',{configurable:true,get:function(){return'visible'}})}catch(e){}})();
+    window.addEventListener('visibilitychange',function(e){e.stopImmediatePropagation()},true);
   </script>
-  <!-- ★★ 메인 JS: defer로 비동기 로드 → HTML 파싱 완료 후 실행, 로딩 화면 즉시 표시 -->
-  <script defer src="/static/tv-player.js?v=${Date.now()}"></script>
+  <script defer src="/static/tv-player.js?v=1"></script>
 </body>
 </html>
-`;
-
-  // ★★ 스트리밍: 로딩 화면(~1KB) 먼저 flush → 나머지 이어서 전송
-  const encoder = new TextEncoder();
-  const chunks = [firstChunk, restChunk];
-  let idx = 0;
-  const stream = new ReadableStream({
-    pull(controller) {
-      if (idx < chunks.length) {
-        controller.enqueue(encoder.encode(chunks[idx++]));
-      } else {
-        controller.close();
-      }
-    }
-  });
-  
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Content-Encoding': 'Identity',
-      'X-Content-Type-Options': 'nosniff',
-    }
-  });
+  `)
 })
-
 
 // 기본 페이지
 app.get('/', (c) => {
