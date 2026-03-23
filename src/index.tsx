@@ -4824,7 +4824,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </style>
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
-  <div id="app" style="display:block;width:100%;opacity:0">
+  <div id="app" style="display:block;width:100%">
     <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
     <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
@@ -5240,6 +5240,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     </div>
   </div>
   
+  <template id="modals-tpl">
   <!-- TV 연결 방법 가이드 모달 -->
   <div id="tv-guide-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('tv-guide-modal')"></div>
@@ -6248,7 +6249,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       <span id="admin-toast-message"></span>
     </div>
   </div>
+  </template>
 
+  <script>
+    // 모달 HTML을 DOM에 삽입
+    var _tpl = document.getElementById('modals-tpl');
+    if (_tpl) { document.getElementById('app').appendChild(_tpl.content); }
+  </script>
   <script>
     var ADMIN_CODE = '${adminCode}';
     var API_BASE = '/api/' + ADMIN_CODE;
@@ -12716,7 +12723,6 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
   <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
   <script defer src="/static/admin.js?v=${Date.now()}"></script>
-  <script>document.getElementById('app').style.opacity='1';</script>
 </body>
 </html>
   `)
