@@ -4753,14 +4753,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
-  <!-- Noto Sans KR 폰트: 비동기 로드 (렌더링 비차단) -->
+  <!-- Noto Sans KR 폰트 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap"></noscript>
-  <!-- Tailwind CSS: 빌드타임 purge - 비동기 로드 (렌더링 비차단) -->
-  <link rel="preload" href="/static/admin.css?v=${Date.now()}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="/static/admin.css?v=${Date.now()}"></noscript>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Admin CSS -->
+  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
   <!-- SortableJS: defer로 렌더링 비차단 -->
   <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <!-- FontAwesome: 비동기 로드 (렌더링 비차단) -->
@@ -4826,8 +4824,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
   <div id="app" style="display:block;width:100%">
-    <!-- 로딩 (즉시 표시 - CSS 의존 없는 순수 인라인 스피너) -->
-    <div id="loading" style="display:flex;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
+    <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
+    <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
         <div style="width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px"></div>
         <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
