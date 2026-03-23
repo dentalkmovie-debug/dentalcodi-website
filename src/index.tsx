@@ -4742,7 +4742,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     } catch (e) {}
   </script>
   <!-- Admin CSS (같은 서버 - 빠름) -->
-  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
+  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
   <!-- Noto Sans KR 폰트: 비동기 (외부서버 느림 → 렌더 차단 안함) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

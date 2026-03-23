@@ -6,6 +6,7 @@
     "dev:sandbox": "wrangler pages dev dist --d1=dental-tv-db --local --ip 0.0.0.0 --port 3000",
     "prebuild": "node build-admin-css.cjs",
     "build": "vite build",
+    "postbuild": "node postbuild-inline-css.cjs",
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy dist",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
