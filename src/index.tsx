@@ -15646,26 +15646,29 @@ app.get('/tv/:shortCode', async (c) => {
         players[nextIndex] = preloadedPlayer;
         delete preloadedPlayers[nextIndex];
         
-        // ★★ 프리로드된 플레이어: 이미 iframe이 준비되어 있으므로 거의 즉시 전환 가능
-        preloadedPlayer.play().then(() => {
-          if (thisSession !== vimeoSessionId) return;
+        // ★★ 문제 C 수정: startVimeoPlayback 중복 호출 방지 플래그
+        let playbackStarted = false;
+        const startOnce = () => {
+          if (playbackStarted) return;
+          playbackStarted = true;
           doTransition(prevIndex, nextIndex);
           startVimeoPlayback(preloadedPlayer, nextIndex);
           setTimeout(ensureFullscreen, 200);
           scheduleNextPreload(nextIndex);
+        };
+        
+        // ★★ 프리로드된 플레이어: 이미 iframe이 준비되어 있으므로 거의 즉시 전환 가능
+        preloadedPlayer.play().then(() => {
+          if (thisSession !== vimeoSessionId) return;
+          startOnce();
         }).catch(() => {
           if (thisSession !== vimeoSessionId) return;
-          doTransition(prevIndex, nextIndex);
-          startVimeoPlayback(preloadedPlayer, nextIndex);
-          scheduleNextPreload(nextIndex);
+          startOnce();
         });
         // 1.5초 안전 타임아웃 (프리로드는 빨라야 하므로 줄임)
         setTimeout(() => {
           if (thisSession !== vimeoSessionId) return;
-          if (!document.getElementById('media-item-' + nextIndex)?.classList.contains('active')) {
-            doTransition(prevIndex, nextIndex);
-            startVimeoPlayback(preloadedPlayer, nextIndex);
-          }
+          startOnce();
         }, 1500);
         return;
       }
@@ -15674,16 +15677,23 @@ app.get('/tv/:shortCode', async (c) => {
       const existingPlayer = players[nextIndex];
       if (existingPlayer && typeof existingPlayer.setCurrentTime === 'function') {
         console.log('[prepareVimeo] Reusing existing player at index:', nextIndex);
+        // ★★ 문제 C 수정: 중복 호출 방지
+        let playbackStarted = false;
+        const startOnce = () => {
+          if (playbackStarted) return;
+          playbackStarted = true;
+          doTransition(prevIndex, nextIndex);
+          startVimeoPlayback(existingPlayer, nextIndex);
+        };
+        
         existingPlayer.setCurrentTime(0).then(() => {
           if (thisSession !== vimeoSessionId) return;
           existingPlayer.play().then(() => {
             if (thisSession !== vimeoSessionId) return;
-            doTransition(prevIndex, nextIndex);
-            startVimeoPlayback(existingPlayer, nextIndex);
+            startOnce();
           }).catch(() => {
             if (thisSession !== vimeoSessionId) return;
-            doTransition(prevIndex, nextIndex);
-            startVimeoPlayback(existingPlayer, nextIndex);
+            startOnce();
           });
         }).catch(() => {
           // seek 실패 시 새 플레이어 생성
@@ -15698,7 +15708,11 @@ app.get('/tv/:shortCode', async (c) => {
     }
     
     // Vimeo 새 플레이어 생성 및 전환 (검정화면 방지: 이전 영상 유지하면서 새 영상 준비)
-    function createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container) {
+    // ★★ 문제 B 수정: retryCount를 파라미터로 전달 (재귀 호출 시에도 카운터 유지)
+    function createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container, retryCount) {
+      const _retryCount = retryCount || 0;
+      const MAX_RETRIES = 3;
+      
       // ★ 기존 플레이어는 즉시 제거하지 않음 - 새 플레이어가 준비될 때까지 유지
       const oldPlayer = players[nextIndex];
       
@@ -15711,9 +15725,6 @@ app.get('/tv/:shortCode', async (c) => {
       container.appendChild(newDiv);
       
       let transitionStarted = false;
-      // ★★ 시나리오 7: 재시도 카운터 (네트워크 오류 시 무한 루프 방지)
-      let _retryCount = 0;
-      const MAX_RETRIES = 3;
       
       try {
         const player = new Vimeo.Player(newPlayerId, {
@@ -15794,15 +15805,14 @@ app.get('/tv/:shortCode', async (c) => {
           }, 2000);
         }).catch(() => {
           if (thisSession !== vimeoSessionId) return;
-          // ★★ 시나리오 7: 재시도 로직
-          _retryCount++;
-          if (_retryCount <= MAX_RETRIES) {
-            console.log('[Vimeo] ready() failed, retry', _retryCount, '/', MAX_RETRIES);
+          // ★★ 문제 B 수정: _retryCount를 파라미터로 전달하여 재귀에서도 유지
+          if (_retryCount < MAX_RETRIES) {
+            console.log('[Vimeo] ready() failed, retry', _retryCount + 1, '/', MAX_RETRIES);
             try { player.destroy(); } catch(e) {}
             try { container.removeChild(newDiv); } catch(e) {}
             setTimeout(() => {
               if (thisSession !== vimeoSessionId) return;
-              createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container);
+              createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSession, container, _retryCount + 1);
             }, 2000);
           } else {
             console.log('[Vimeo] ready() failed after', MAX_RETRIES, 'retries, skipping');
