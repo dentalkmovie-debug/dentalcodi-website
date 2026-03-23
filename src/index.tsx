@@ -25,7 +25,7 @@ app.get('/favicon.ico', (c) => new Response(null, { status: 204 }))
 function getBlockedPageHtml(title: string, reason: string, message: string): string {
   return `
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#1f2937">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,7 +33,7 @@ function getBlockedPageHtml(title: string, reason: string, message: string): str
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen flex items-center justify-center p-4">
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen flex items-center justify-center p-4" style="background:#1f2937">
   <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
     <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
       <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
@@ -837,7 +837,7 @@ app.get('/master/links', async (c) => {
   const baseUrl = new URL(c.req.url).origin
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#f3f4f6">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -2788,7 +2788,7 @@ app.get('/embed-old/:memberCode', async (c) => {
   const adminCode = user.admin_code
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#f3f4f6">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4717,7 +4717,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#fff">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4753,12 +4753,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
-  <!-- Noto Sans KR 폰트 -->
+  <!-- Noto Sans KR 폰트: 비동기 로드 (렌더링 비차단) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Tailwind CSS: 빌드타임 purge (407KB CDN → 38KB 캐시 가능 파일) -->
-  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap"></noscript>
+  <!-- Tailwind CSS: 빌드타임 purge - 비동기 로드 (렌더링 비차단) -->
+  <link rel="preload" href="/static/admin.css?v=${Date.now()}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/static/admin.css?v=${Date.now()}"></noscript>
   <!-- SortableJS: defer로 렌더링 비차단 -->
   <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <!-- FontAwesome: 비동기 로드 (렌더링 비차단) -->
@@ -12743,7 +12745,7 @@ app.get('/admin/:adminCode', async (c) => {
 app.get('/go', (c) => {
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#fff">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12943,7 +12945,7 @@ app.get('/guide', (c) => {
   const baseUrl = new URL(c.req.url).origin
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#f9fafb">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -13185,9 +13187,8 @@ app.get('/', (c) => {
   const isSecureHost = rawUrl.host.includes('.pages.dev') || rawUrl.host.includes('.sandbox.') || rawUrl.host.includes('.e2b.')
   const proto = forwardedProto || (isSecureHost ? 'https' : rawUrl.protocol.replace(':', ''))
   const origin = proto + '://' + rawUrl.host
-  return c.html(`
-<!DOCTYPE html>
-<html lang="ko">
+  return c.html(`<!DOCTYPE html>
+<html lang="ko" style="background:#3b82f6">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13326,7 +13327,7 @@ app.get('/', (c) => {
 app.get('/not-logged-in', (c) => {
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#f9fafb">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13418,7 +13419,7 @@ app.get('/login', (c) => {
   
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#3b82f6">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14275,7 +14276,7 @@ app.get('/tv', (c) => {
   
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#fff">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14616,7 +14617,7 @@ app.get('/master', (c) => {
   
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#f3f4f6">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16658,7 +16659,7 @@ app.get('/admin-legacy/:adminCode', async (c) => {
 
   return c.html(`
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#fff">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16706,7 +16707,7 @@ app.get('/admin-inner/:adminCode', async (c) => {
 
     return c.html(`
       <!DOCTYPE html>
-      <html>
+      <html style="background:#fff">
       <head>
         <meta charset="UTF-8">
         <script src="https://cdn.tailwindcss.com"></script>
@@ -16747,7 +16748,7 @@ app.get('/admin-inner/:adminCode', async (c) => {
   } catch (err) {
     return c.html(`
       <!DOCTYPE html>
-      <html lang="ko">
+      <html lang="ko" style="background:#f9fafb">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16770,7 +16771,7 @@ app.get('/admin-inner/:adminCode', async (c) => {
 app.get('/', (c) => {
   return c.html(`
     <!DOCTYPE html>
-    <html lang="ko">
+    <html lang="ko" style="background:#f3f4f6">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
