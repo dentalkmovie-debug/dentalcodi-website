@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * build-admin-css.cjs
- * 1. src/index.tsx 전체를 스캔해서 실제 사용되는 Tailwind 클래스만 추출
+ * 1. src/index.tsx + src/modals.html 전체를 스캔해서 실제 사용되는 Tailwind 클래스만 추출
  *    → public/static/admin.css 에 저장
  * 2. src/index.tsx 에서 @@ADMIN_JS_BEGIN@@ ~ @@ADMIN_JS_END@@ 사이 JS 추출
  *    → public/static/admin.js 에 저장
- *    → src/index.tsx 에서 해당 구간을 defer src 참조로 교체
+ * 3. src/modals.html 을 읽어 admin.js 상단에 모달 lazy-inject 코드 추가
  */
 const { execSync } = require('child_process')
 const fs = require('fs')
@@ -13,13 +13,17 @@ const path = require('path')
 
 const root = __dirname
 const srcFile = path.join(root, 'src/index.tsx')
+const modalsFile = path.join(root, 'src/modals.html')
 const outCssStatic = path.join(root, 'public/static/admin.css')
 const outCssSrc = path.join(root, 'src/admin-styles.gen.css')
 const outJs = path.join(root, 'public/static/admin.js')
 
 // ── Step 1: CSS 빌드 ──────────────────────────────────────────
 const content = fs.readFileSync(srcFile, 'utf-8')
-fs.writeFileSync('/tmp/admin_scan.html', content)
+const modalsHtml = fs.existsSync(modalsFile) ? fs.readFileSync(modalsFile, 'utf-8') : ''
+
+// Tailwind에 src + modals 모두 스캔하도록 합침
+fs.writeFileSync('/tmp/admin_scan.html', content + '\n' + modalsHtml)
 
 const twConfig = `
 module.exports = {
@@ -75,8 +79,33 @@ if (beginIdx === -1 || endIdx === -1) {
     .replace(/\\`/g, '`')         // \\` → `
     .replace(/\\\${/g, '${')     // \\${ → ${
 
+  // ── Step 3: 모달 HTML을 admin.js 상단에 lazy-inject 코드로 추가 ──
+  let modalsInjectCode = ''
+  if (modalsHtml) {
+    // 모달 HTML을 JS 문자열로 안전하게 이스케이프
+    const escapedModals = modalsHtml
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '')
+    
+    modalsInjectCode = `
+// ── 모달 HTML 동적 삽입 (서버 HTML 크기 55KB 절감) ──
+(function() {
+  var _modalsHtml = '${escapedModals}';
+  var _app = document.getElementById('app');
+  if (_app) {
+    var _div = document.createElement('div');
+    _div.innerHTML = _modalsHtml;
+    while (_div.firstChild) { _app.appendChild(_div.firstChild); }
+  }
+})();
+`
+    console.log(`✅ Modals: ${(modalsHtml.length/1024).toFixed(1)}KB → injected into admin.js`)
+  }
+
   fs.mkdirSync(path.dirname(outJs), { recursive: true })
-  fs.writeFileSync(outJs, dedentedJs)
+  fs.writeFileSync(outJs, modalsInjectCode + dedentedJs)
   const jsSize = fs.statSync(outJs).size
   console.log(`✅ Admin JS:  ${(jsSize/1024).toFixed(1)}KB → public/static/admin.js`)
 }
