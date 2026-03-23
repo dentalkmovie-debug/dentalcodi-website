@@ -4824,7 +4824,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </style>
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
-  <div id="app" style="display:block;width:100%">
+  <div id="app" style="display:block;width:100%;opacity:0">
     <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
     <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
@@ -12716,6 +12716,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
   <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
   <script defer src="/static/admin.js?v=${Date.now()}"></script>
+  <script>document.getElementById('app').style.opacity='1';</script>
 </body>
 </html>
   `)
