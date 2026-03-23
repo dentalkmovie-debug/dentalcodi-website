@@ -4653,26 +4653,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   // 3. 아임웹 사이트 관리자로 접속 (is_admin=1 파라미터) - 사이트 주인
   const isSuperAdmin = isAdminEmail(finalUser?.imweb_email) || isAdminEmail(emailParam) || finalUser?.is_master === 1 || isAdminQuery
 
-  // 최고관리자일 때 전체 치과 목록 로드
-  let allClinicsData: any[] = []
-  if (isSuperAdmin) {
-    const clinicsResult = await c.env.DB.prepare(`
-      SELECT u.*, 
-        (SELECT COUNT(*) FROM playlists WHERE user_id = u.id AND (is_master_playlist = 0 OR is_master_playlist IS NULL)) as playlist_count,
-        (SELECT COUNT(*) FROM notices WHERE user_id = u.id) as notice_count
-      FROM users u
-      WHERE (u.is_master = 0 OR u.is_master IS NULL)
-        AND u.admin_code NOT LIKE '%master_admin%'
-        AND NOT (u.clinic_name = '내 치과' AND (u.imweb_email IS NULL OR u.imweb_email = ''))
-      ORDER BY u.created_at DESC
-    `).all()
-    allClinicsData = clinicsResult.results || []
-  }
+  // 최고관리자일 때 전체 치과 목록은 admin.js에서 API로 lazy 로드 (TTFB 절감)
 
   const initialData = {
     playlists: playlistsWithItems,
     notices: noticesData.results || [],
-    masterItems: masterItemsData.results || [],
+    masterItems: [],  // lazy load via API (saves ~12KB)
     clinicName: finalUser?.clinic_name || '',
     memberName: memberName || '',
     userEmail: finalUser?.imweb_email || emailParam || adminCode || '',
@@ -4680,7 +4666,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     isSuperAdmin: isSuperAdmin,
     adminCode: adminCode,
     userId: finalUser?.id || 0,
-    allClinics: isSuperAdmin ? allClinicsData : []
+    allClinics: []  // lazy load via API (saves ~17KB for superAdmin)
   }
   const initialDataJson = JSON.stringify(initialData).replace(/</g, '\\u003c')
 
@@ -4777,8 +4763,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
-  <!-- Admin CSS (Cloudflare edge cache - 빠름) -->
-  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}">
+  <!-- Admin CSS 인라인 (외부 요청 0개 → 즉시 스타일 적용) -->
+  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
   <!-- Noto Sans KR 폰트: 비동기 (외부서버 느림 → 렌더 차단 안함) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
