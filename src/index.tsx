@@ -2017,22 +2017,37 @@ app.post('/api/tv/:shortCode/clear-temp', async (c) => {
   return c.json({ success: true })
 })
 
-// ★★ TV 경량 임시영상 체크 엔드포인트 (빠른 폴링용 - DB 최소 접근)
+// ★★ TV 경량 빠른 체크 엔드포인트 (2초 폴링용 - 임시영상 + 공지 변경 감지)
 app.get('/api/tv/:shortCode/temp-check', async (c) => {
   const shortCode = c.req.param('shortCode')
   const result = await c.env.DB.prepare(
-    'SELECT temp_video_url, temp_video_type, temp_started_at FROM playlists WHERE short_code = ?'
+    'SELECT p.temp_video_url, p.temp_video_type, p.temp_started_at, p.user_id FROM playlists p WHERE p.short_code = ?'
   ).bind(shortCode).first() as any
   
   if (!result) {
-    return c.json({ has_temp: false })
+    return c.json({ has_temp: false, notice_hash: '' })
   }
+  
+  // 공지 변경 해시: 활성 공지 개수 + 최신 updated_at + notice_enabled + 설정 변경 시간
+  // 경량 쿼리 2개 - COUNT/MAX + 유저 설정 updated_at
+  const [noticeInfo, userInfo] = await Promise.all([
+    c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt, MAX(updated_at) as last_update FROM notices WHERE user_id = ? AND is_active = 1'
+    ).bind(result.user_id).first() as any,
+    c.env.DB.prepare(
+      'SELECT updated_at, notice_enabled, notice_font_size, notice_scroll_speed FROM users WHERE id = ?'
+    ).bind(result.user_id).first() as any
+  ])
+  
+  // 해시: notice_enabled + 공지 수 + 공지 최신 수정시간 + 유저설정 수정시간
+  const noticeHash = `${userInfo?.notice_enabled ?? 0}_${noticeInfo?.cnt || 0}_${noticeInfo?.last_update || ''}_${userInfo?.updated_at || ''}`
   
   return c.json({
     has_temp: !!result.temp_video_url,
     url: result.temp_video_url || null,
     type: result.temp_video_type || null,
-    started_at: result.temp_started_at || null
+    started_at: result.temp_started_at || null,
+    notice_hash: noticeHash
   })
 })
 
@@ -16239,10 +16254,11 @@ app.get('/tv/:shortCode', async (c) => {
     const POLL_INTERVAL = 10000;
     setInterval(() => loadData(false), POLL_INTERVAL);
     
-    // ★★ 빠른 임시영상 감지 폴링 (2초마다 - 경량 엔드포인트 사용)
-    // 임시영상 전송 시 즉시 반영되도록 별도 빠른 체크
+    // ★★ 빠른 변경 감지 폴링 (2초마다 - 경량 엔드포인트 사용)
+    // 임시영상 전송 + 공지사항 변경 시 즉시 반영
     let _lastKnownTempUrl = null; // 마지막으로 인지한 임시영상 URL
     let _lastKnownTempStarted = null; // 마지막 started_at 값
+    let _lastKnownNoticeHash = null; // 마지막 공지 해시 (공지 변경 감지용)
     const FAST_TEMP_POLL = 2000;
     setInterval(async () => {
       try {
@@ -16252,21 +16268,34 @@ app.get('/tv/:shortCode', async (c) => {
         
         const newUrl = data.url || null;
         const newStarted = data.started_at || null;
+        const newNoticeHash = data.notice_hash || '';
         
-        // 변경 감지: URL이 바뀌었거나, 같은 URL이지만 started_at이 바뀜 (재전송)
-        const changed = (newUrl !== _lastKnownTempUrl) || 
+        // 임시영상 변경 감지: URL이 바뀌었거나, 같은 URL이지만 started_at이 바뀜 (재전송)
+        const tempChanged = (newUrl !== _lastKnownTempUrl) || 
                         (newUrl && newStarted && newStarted !== _lastKnownTempStarted);
         
-        if (changed) {
-          console.log('[fastTempPoll] Temp video changed! url:', newUrl, 'started:', newStarted, 
+        // 공지사항 변경 감지: 해시가 바뀜 (공지 추가/삭제/수정/활성화/비활성화/설정변경)
+        const noticeChanged = (_lastKnownNoticeHash !== null) && (newNoticeHash !== _lastKnownNoticeHash);
+        
+        if (tempChanged) {
+          console.log('[fastPoll] Temp video changed! url:', newUrl, 'started:', newStarted, 
             '(was:', _lastKnownTempUrl, 'started:', _lastKnownTempStarted, ')');
           _lastKnownTempUrl = newUrl;
           _lastKnownTempStarted = newStarted;
+          _lastKnownNoticeHash = newNoticeHash;
           // 즉시 전체 데이터 로드 (임시영상 반영)
+          loadData(false);
+        } else if (noticeChanged) {
+          console.log('[fastPoll] Notice changed! hash:', newNoticeHash, '(was:', _lastKnownNoticeHash, ')');
+          _lastKnownTempUrl = newUrl;
+          _lastKnownTempStarted = newStarted;
+          _lastKnownNoticeHash = newNoticeHash;
+          // 즉시 전체 데이터 로드 (공지 반영)
           loadData(false);
         } else {
           _lastKnownTempUrl = newUrl;
           _lastKnownTempStarted = newStarted;
+          _lastKnownNoticeHash = newNoticeHash;
         }
       } catch (e) {
         // 네트워크 오류는 무시 (메인 폴링이 처리)
