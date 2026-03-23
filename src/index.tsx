@@ -13084,17 +13084,7 @@ app.get('/tv/:shortCode', async (c) => {
     @keyframes spin{to{transform:rotate(360deg)}}
     #loading-screen p{color:#666;margin-top:20px}
     .hidden{display:none!important}
-  </style>
-</head>
-<body>
-  <!-- ★★ 로딩 화면: CSS가 최소이므로 즉시 렌더링됨 -->
-  <div id="loading-screen">
-    <div class="spinner"></div>
-    <p>로딩 중...</p>
-  </div>
-  
-  <!-- ★★ 나머지 CSS를 여기서 로드 (로딩 화면 표시 후) -->
-  <style>
+    /* ── 나머지 CSS도 head에 통합 (body 내 style 제거로 렌더링 차단 방지) ── */
     
     /* 미디어 아이템 레이어 - 모든 아이템을 미리 로드 */
     #media-container {
@@ -13458,8 +13448,15 @@ app.get('/tv/:shortCode', async (c) => {
       display: none;
     }
   </style>
+</head>
+<body>
+  <!-- ★★ 로딩 화면: head CSS에 정의됨 → 즉시 렌더링 -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <p>로딩 중...</p>
+  </div>
   
-  <div id="error-screen">
+  <div id="error-screen" style="display:none">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
     <p id="error-message">플레이리스트를 찾을 수 없습니다.</p>
     <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 30px; background: #3b82f6; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
@@ -13468,14 +13465,14 @@ app.get('/tv/:shortCode', async (c) => {
   </div>
   
   <!-- 빈 플레이리스트 대기 화면 -->
-  <div id="empty-playlist-screen">
+  <div id="empty-playlist-screen" style="display:none">
     <div class="icon">📺</div>
     <div class="message">재생할 영상을 준비 중입니다</div>
     <div class="sub-message">관리자 페이지에서 영상을 추가해 주세요</div>
   </div>
   
   <!-- 재생시간 외 화면 -->
-  <div id="schedule-screen">
+  <div id="schedule-screen" style="display:none">
     <div class="clock" id="current-clock">00:00</div>
     <div class="message">재생 시간이 아닙니다</div>
     <div style="margin-top: 30px; color: #444; font-size: 18px;">
@@ -13514,29 +13511,24 @@ app.get('/tv/:shortCode', async (c) => {
   </div>
   <div id="fullscreen-hint">전체화면 유지하려면 클릭</div>
 
-  <!-- API는 나중에 비동기 로드 -->
+  <!-- ★★ 즉시 실행: 핵심 변수 + visibility override만 -->
   <script>
-    // [독립 실행 보장] 클라이언트 고유 ID 생성
     const SHORT_CODE = '${shortCode}';
     const CLIENT_ID = 'client_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    
-    // [중요] Page Visibility API 무력화 (백그라운드에서도 재생 유지)
     function overrideVisibility() {
       try {
-        const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
-        if (!hiddenDescriptor || hiddenDescriptor.configurable) {
-          Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
-        }
-        const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
-        if (!visibilityDescriptor || visibilityDescriptor.configurable) {
-          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
-        }
-      } catch (e) {
-        console.log('visibility override skipped:', e?.message || e);
-      }
+        const hd = Object.getOwnPropertyDescriptor(document, 'hidden');
+        if (!hd || hd.configurable) Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+        const vd = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+        if (!vd || vd.configurable) Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      } catch (e) { console.log('visibility override skipped:', e?.message || e); }
     }
     overrideVisibility();
     window.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
+  </script>
+  <!-- ★★ 메인 JS: requestAnimationFrame으로 지연 → 로딩 화면이 먼저 렌더링됨 -->
+  <script>
+  requestAnimationFrame(function() { setTimeout(function() {
 
     const IS_PREVIEW = new URLSearchParams(window.location.search).get('preview') === '1';
     let playlist = null;
@@ -16316,6 +16308,7 @@ app.get('/tv/:shortCode', async (c) => {
     
     // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
     // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
+  }, 0); }); // ★★ requestAnimationFrame + setTimeout 닫기
   </script>
 </body>
 </html>
