@@ -1980,7 +1980,8 @@ app.post('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   
   const result = await c.env.DB.prepare(`
     UPDATE playlists 
-    SET temp_video_url = ?, temp_video_title = ?, temp_video_type = ?, temp_return_time = ?
+    SET temp_video_url = ?, temp_video_title = ?, temp_video_type = ?, temp_return_time = ?,
+        temp_started_at = datetime('now')
     WHERE id = ?
   `).bind(url, title, type, return_time || 'end', playlistId).run()
   
@@ -1988,16 +1989,51 @@ app.post('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
 })
 
 // TV에서 임시 영상 해제 (영상 끝나면 자동 복귀용)
+// ★★ 경쟁 조건 방지: 특정 URL일 때만 클리어 (새로 전송된 다른 영상을 지우지 않도록)
 app.post('/api/tv/:shortCode/clear-temp', async (c) => {
   const shortCode = c.req.param('shortCode')
+  let clearUrl = null
+  try {
+    const body = await c.req.json()
+    clearUrl = body.url || null
+  } catch(e) {}
   
-  await c.env.DB.prepare(`
-    UPDATE playlists 
-    SET temp_video_url = NULL, temp_video_title = NULL, temp_video_type = NULL, temp_return_time = NULL, temp_started_at = NULL
-    WHERE short_code = ?
-  `).bind(shortCode).run()
+  if (clearUrl) {
+    // 특정 URL만 클리어 (다른 영상이 이미 설정되어 있으면 건드리지 않음)
+    await c.env.DB.prepare(`
+      UPDATE playlists 
+      SET temp_video_url = NULL, temp_video_title = NULL, temp_video_type = NULL, temp_return_time = NULL, temp_started_at = NULL
+      WHERE short_code = ? AND temp_video_url = ?
+    `).bind(shortCode, clearUrl).run()
+  } else {
+    // URL 미지정 시 무조건 클리어 (이전 호환)
+    await c.env.DB.prepare(`
+      UPDATE playlists 
+      SET temp_video_url = NULL, temp_video_title = NULL, temp_video_type = NULL, temp_return_time = NULL, temp_started_at = NULL
+      WHERE short_code = ?
+    `).bind(shortCode).run()
+  }
   
   return c.json({ success: true })
+})
+
+// ★★ TV 경량 임시영상 체크 엔드포인트 (빠른 폴링용 - DB 최소 접근)
+app.get('/api/tv/:shortCode/temp-check', async (c) => {
+  const shortCode = c.req.param('shortCode')
+  const result = await c.env.DB.prepare(
+    'SELECT temp_video_url, temp_video_type, temp_started_at FROM playlists WHERE short_code = ?'
+  ).bind(shortCode).first() as any
+  
+  if (!result) {
+    return c.json({ has_temp: false })
+  }
+  
+  return c.json({
+    has_temp: !!result.temp_video_url,
+    url: result.temp_video_url || null,
+    type: result.temp_video_type || null,
+    started_at: result.temp_started_at || null
+  })
 })
 
 // TV 비활성화 (탭 닫힘 시 last_active_at을 1시간 전으로 설정 → 사용중 해제, 설치필요 뱃지 유지)
@@ -13773,19 +13809,43 @@ app.get('/tv/:shortCode', async (c) => {
     let currentTempVideo = null; // 현재 클라이언트의 임시 영상 상태
     let tempVideoLoopCount = 0; // 임시 영상 반복 횟수 추적
     let originalPlaylist = null; // 원본 플레이리스트 저장
+    let _lastClearedTempUrl = null; // ★★ 마지막으로 클리어한 임시영상 URL (재등장 방지)
+    let _lastClearedTempTime = 0; // ★★ 클리어한 시각 (일정 시간 내 같은 URL 무시)
     
     // 서버에 임시 영상 해제 요청 (영상 끝나면 자동 복귀용)
-    async function clearTempVideoOnServer() {
-      console.log('=== clearTempVideoOnServer ===');
+    // ★★ 재시도 로직 추가: 실패 시 DB에 이전 영상이 남아 다시 재생되는 문제 방지
+    // ★★ 경쟁 조건 방지: 클리어할 URL을 명시해서 다른 영상이 새로 설정됐으면 건드리지 않음
+    let _clearTempRetryCount = 0;
+    let _clearTempTargetUrl = null; // 클리어 대상 URL
+    const MAX_CLEAR_RETRIES = 5;
+    async function clearTempVideoOnServer(targetUrl) {
+      _clearTempTargetUrl = targetUrl || _clearTempTargetUrl;
+      console.log('=== clearTempVideoOnServer (retry:', _clearTempRetryCount, ', url:', _clearTempTargetUrl, ') ===');
       
       try {
-        const res = await fetch('/api/tv/' + SHORT_CODE + '/clear-temp', { method: 'POST' });
+        const res = await fetch('/api/tv/' + SHORT_CODE + '/clear-temp', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: _clearTempTargetUrl })
+        });
         if (res.ok) {
-          console.log('Temp video cleared on server - waiting for next poll');
-          // 서버에만 요청, 실제 복귀는 loadData 폴링에서 처리
+          console.log('Temp video cleared on server successfully');
+          _clearTempRetryCount = 0;
+          _clearTempTargetUrl = null;
+        } else {
+          throw new Error('HTTP_' + res.status);
         }
       } catch (e) {
         console.log('Clear temp error:', e);
+        _clearTempRetryCount++;
+        if (_clearTempRetryCount <= MAX_CLEAR_RETRIES) {
+          console.log('[clearTemp] Retry', _clearTempRetryCount, '/', MAX_CLEAR_RETRIES, 'in 2s');
+          setTimeout(() => clearTempVideoOnServer(), 2000);
+        } else {
+          console.log('[clearTemp] All retries failed, will try on next poll');
+          _clearTempRetryCount = 0;
+          _clearTempTargetUrl = null;
+        }
       }
     }
     
@@ -13904,6 +13964,26 @@ app.get('/tv/:shortCode', async (c) => {
         }
         const serverTempVideo = data.tempVideo;
         
+        // ★★ 방금 클리어한 임시영상이 서버에 아직 남아있으면 무시 (clear 반영 전 폴링 방어)
+        // 30초 이내에 클리어한 같은 URL이면 서버 응답을 무시
+        let effectiveTempVideo = serverTempVideo;
+        if (serverTempVideo && _lastClearedTempUrl && serverTempVideo.url === _lastClearedTempUrl) {
+          const sinceClear = Date.now() - _lastClearedTempTime;
+          if (sinceClear < 30000) {
+            console.log('[loadData] Ignoring stale temp video (cleared', Math.round(sinceClear/1000), 's ago):', serverTempVideo.url);
+            effectiveTempVideo = null;
+          } else {
+            // 30초 지났으면 관리자가 의도적으로 같은 영상을 다시 전송한 것으로 간주
+            _lastClearedTempUrl = null;
+            _lastClearedTempTime = 0;
+          }
+        }
+        // 서버에서 temp가 null이면 클리어 기록도 리셋 (정상 clear 확인됨)
+        if (!serverTempVideo) {
+          _lastClearedTempUrl = null;
+          _lastClearedTempTime = 0;
+        }
+        
         // 디버그: TV API 응답 로깅
         if (data._debug) {
           console.log('[TV DEBUG]', JSON.stringify(data._debug));
@@ -13966,27 +14046,28 @@ app.get('/tv/:shortCode', async (c) => {
         // 원본 플레이리스트 항상 저장
         originalPlaylist = JSON.parse(JSON.stringify(data.playlist));
         
-        // 임시 영상 상태 변경 감지
+        // 임시 영상 상태 변경 감지 (effectiveTempVideo 사용 - 클리어 방어 적용됨)
         const hadTempVideo = currentTempVideo !== null;
-        const hasTempVideo = serverTempVideo !== null;
-        const tempUrlChanged = (currentTempVideo?.url || null) !== (serverTempVideo?.url || null);
+        const hasTempVideo = effectiveTempVideo !== null;
+        const tempUrlChanged = (currentTempVideo?.url || null) !== (effectiveTempVideo?.url || null);
         
-        console.log('[loadData] hadTemp:', hadTempVideo, 'hasTemp:', hasTempVideo, 'urlChanged:', tempUrlChanged);
+        console.log('[loadData] hadTemp:', hadTempVideo, 'hasTemp:', hasTempVideo, 'urlChanged:', tempUrlChanged,
+          'serverUrl:', serverTempVideo?.url || null, 'effectiveUrl:', effectiveTempVideo?.url || null);
         
         // 임시 영상 상태가 변경됨
         if (tempUrlChanged) {
           if (hasTempVideo && !hadTempVideo) {
             // 새 임시 영상 시작
-            console.log('>>> 임시 영상 시작:', serverTempVideo.title);
-            currentTempVideo = serverTempVideo;
+            console.log('>>> 임시 영상 시작:', effectiveTempVideo.title);
+            currentTempVideo = effectiveTempVideo;
             tempVideoLoopCount = 0;
             
             showSyncIndicator();
             playlist.items = [{
               id: 'temp-video',
-              item_type: serverTempVideo.type,
-              url: serverTempVideo.url,
-              title: serverTempVideo.title,
+              item_type: effectiveTempVideo.type,
+              url: effectiveTempVideo.url,
+              title: effectiveTempVideo.title,
               duration: 0,
               sort_order: 0
             }];
@@ -14007,16 +14088,16 @@ app.get('/tv/:shortCode', async (c) => {
             
           } else if (hasTempVideo && hadTempVideo) {
             // 임시 영상이 다른 영상으로 교체됨
-            console.log('>>> 임시 영상 교체:', serverTempVideo.title);
-            currentTempVideo = serverTempVideo;
+            console.log('>>> 임시 영상 교체:', effectiveTempVideo.title);
+            currentTempVideo = effectiveTempVideo;
             tempVideoLoopCount = 0;
             
             showSyncIndicator();
             playlist.items = [{
               id: 'temp-video',
-              item_type: serverTempVideo.type,
-              url: serverTempVideo.url,
-              title: serverTempVideo.title,
+              item_type: effectiveTempVideo.type,
+              url: effectiveTempVideo.url,
+              title: effectiveTempVideo.title,
               duration: 0,
               sort_order: 0
             }];
@@ -14028,16 +14109,16 @@ app.get('/tv/:shortCode', async (c) => {
         
         // 초기 로드 시 임시 영상 처리
         if (isInitial) {
-          currentTempVideo = serverTempVideo;
-          if (serverTempVideo) {
-            console.log('[Initial] 임시 영상 있음:', serverTempVideo.title);
+          currentTempVideo = effectiveTempVideo;
+          if (effectiveTempVideo) {
+            console.log('[Initial] 임시 영상 있음:', effectiveTempVideo.title);
             playlist = {
               ...data.playlist,
               items: [{
                 id: 'temp-video',
-                item_type: serverTempVideo.type,
-                url: serverTempVideo.url,
-                title: serverTempVideo.title,
+                item_type: effectiveTempVideo.type,
+                url: effectiveTempVideo.url,
+                title: effectiveTempVideo.title,
                 duration: 0,
                 sort_order: 0
               }]
@@ -15583,12 +15664,15 @@ app.get('/tv/:shortCode', async (c) => {
           });
           
           // 임시 영상 상태 즉시 클리어 (다음 폴링 전에)
+          // ★★ 클리어한 URL 기록 (서버 clear 실패 시 같은 영상이 다시 시작되는 것 방지)
+          _lastClearedTempUrl = currentTempVideo ? currentTempVideo.url : null;
+          _lastClearedTempTime = Date.now();
           currentTempVideo = null;
           tempVideoLoopCount = 0;
           cachedVimeoDuration = 0; // ★★ 이전 영상의 duration 캐시 초기화 (잘못된 종료 감지 방지)
           
-          // 서버에 임시 영상 해제 요청
-          clearTempVideoOnServer();
+          // 서버에 임시 영상 해제 요청 (★ 해당 URL만 클리어 - 새로 전송된 영상 보호)
+          clearTempVideoOnServer(_lastClearedTempUrl);
           
           // 원본 플레이리스트로 즉시 복귀 (10초 폴링 대기 없이)
           if (originalPlaylist && originalPlaylist.items && originalPlaylist.items.length > 0) {
@@ -16154,6 +16238,40 @@ app.get('/tv/:shortCode', async (c) => {
     // loadData가 이미 last_active_at을 업데이트하므로 별도 heartbeat 불필요
     const POLL_INTERVAL = 10000;
     setInterval(() => loadData(false), POLL_INTERVAL);
+    
+    // ★★ 빠른 임시영상 감지 폴링 (2초마다 - 경량 엔드포인트 사용)
+    // 임시영상 전송 시 즉시 반영되도록 별도 빠른 체크
+    let _lastKnownTempUrl = null; // 마지막으로 인지한 임시영상 URL
+    let _lastKnownTempStarted = null; // 마지막 started_at 값
+    const FAST_TEMP_POLL = 2000;
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/tv/' + SHORT_CODE + '/temp-check?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        const newUrl = data.url || null;
+        const newStarted = data.started_at || null;
+        
+        // 변경 감지: URL이 바뀌었거나, 같은 URL이지만 started_at이 바뀜 (재전송)
+        const changed = (newUrl !== _lastKnownTempUrl) || 
+                        (newUrl && newStarted && newStarted !== _lastKnownTempStarted);
+        
+        if (changed) {
+          console.log('[fastTempPoll] Temp video changed! url:', newUrl, 'started:', newStarted, 
+            '(was:', _lastKnownTempUrl, 'started:', _lastKnownTempStarted, ')');
+          _lastKnownTempUrl = newUrl;
+          _lastKnownTempStarted = newStarted;
+          // 즉시 전체 데이터 로드 (임시영상 반영)
+          loadData(false);
+        } else {
+          _lastKnownTempUrl = newUrl;
+          _lastKnownTempStarted = newStarted;
+        }
+      } catch (e) {
+        // 네트워크 오류는 무시 (메인 폴링이 처리)
+      }
+    }, FAST_TEMP_POLL);
     
     // 탭 닫힘/내비게이션 시에만 비활성화 (sendBeacon - 언로드 중에도 전송 보장)
     function deactivateTV() {
