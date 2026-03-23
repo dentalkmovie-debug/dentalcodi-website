@@ -30,28 +30,16 @@ function getBlockedPageHtml(title: string, reason: string, message: string): str
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title} - 치과 TV</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(135deg,#111827,#1f2937);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,sans-serif}.card{background:#fff;border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);padding:32px;max-width:28rem;width:100%;text-align:center}.icon-circle{width:80px;height:80px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:2rem;color:#ef4444}h1{font-size:1.5rem;font-weight:700;color:#1f2937;margin-bottom:8px}.reason{color:#4b5563;margin-bottom:16px;font-size:.95rem}.msg-box{background:#fffbeb;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:.875rem;color:#c2410c}.info-box{background:#f9fafb;border-radius:8px;padding:16px;font-size:.875rem;color:#4b5563}.back{display:inline-block;margin-top:16px;color:#3b82f6;font-size:.875rem;text-decoration:none}</style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen flex items-center justify-center p-4" style="background:#1f2937">
-  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-    <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-      <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
-    </div>
-    <h1 class="text-2xl font-bold text-gray-800 mb-2">${title}</h1>
-    <p class="text-gray-600 mb-4">${reason}</p>
-    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
-      <p class="text-sm text-orange-700">${message}</p>
-    </div>
-    <div class="bg-gray-50 rounded-lg p-4">
-      <p class="text-sm text-gray-600 mb-2">
-        <i class="fas fa-phone mr-2 text-blue-500"></i>
-        문의: 관리자에게 연락하세요
-      </p>
-    </div>
-    <a href="/login" onclick="clearLoginData()" class="inline-block mt-4 text-blue-500 hover:text-blue-600 text-sm">
-      <i class="fas fa-arrow-left mr-1"></i>로그인 페이지로 돌아가기
-    </a>
+<body>
+  <div class="card">
+    <div class="icon-circle">⚠</div>
+    <h1>${title}</h1>
+    <p class="reason">${reason}</p>
+    <div class="msg-box">${message}</div>
+    <div class="info-box">문의: 관리자에게 연락하세요</div>
+    <a href="/login" onclick="clearLoginData()" class="back">← 로그인 페이지로 돌아가기</a>
   </div>
   <script>
     function clearLoginData() {
@@ -13199,22 +13187,23 @@ app.get('/', (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>치과 TV 관리 시스템</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(135deg,#3b82f6,#7c3aed);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;font-family:-apple-system,BlinkMacSystemFont,sans-serif}.card{background:#fff;border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);padding:32px;max-width:32rem;width:100%;text-align:center}.icon{font-size:3.75rem;color:#3b82f6;margin-bottom:24px}h1{font-size:1.875rem;font-weight:700;color:#1f2937;margin-bottom:16px}p.sub{color:#4b5563;margin-bottom:32px}.section{border-radius:12px;padding:24px;text-align:left;margin-bottom:16px}.section.blue{background:#eff6ff}.section.purple{background:#faf5ff}h2{font-weight:700;color:#1f2937;margin-bottom:12px;font-size:.95rem}.btn{display:inline-block;padding:6px 12px;color:#fff;border-radius:8px;font-size:12px;font-weight:500;border:none;cursor:pointer}.btn-blue{background:#3b82f6}.btn-purple{background:#8b5cf6}.btn-lg{padding:12px 24px;border-radius:8px;font-size:14px;text-decoration:none}pre{background:#1f2937;color:#4ade80;padding:16px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:pre-wrap;margin-top:8px}.note{font-size:12px;color:#6b7280;margin-top:8px}.status{font-size:12px;color:#16a34a;display:none;margin-left:8px}.flex-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}</style>
 </head>
-<body class="bg-gradient-to-br from-blue-500 to-purple-600 min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full text-center">
-    <i class="fas fa-tv text-6xl text-blue-500 mb-6"></i>
-    <h1 class="text-3xl font-bold text-gray-800 mb-4">치과 대기실 TV</h1>
-    <p class="text-gray-600 mb-8">관리 시스템</p>
+<body>
+  <div class="card">
+    <i class="fas fa-tv icon"></i>
+    <h1>치과 대기실 TV</h1>
+    <p class="sub">관리 시스템</p>
     
-    <div class="bg-blue-50 rounded-xl p-6 text-left mb-4">
-      <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-code mr-2 text-blue-500"></i>아임웹 위젯 코드 (아임웹 로그인 자동 연동)</h2>
-      <div class="flex gap-2 mb-2">
-        <button onclick="copyWidget('imweb')" class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"><i class="fas fa-copy mr-1"></i>위젯 코드 복사</button>
-        <span id="copy-status-imweb" class="text-xs text-green-600 self-center hidden">복사됨!</span>
+    <div class="section blue">
+      <h2><i class="fas fa-code" style="margin-right:8px;color:#3b82f6"></i>아임웹 위젯 코드 (아임웹 로그인 자동 연동)</h2>
+      <div class="flex-row">
+        <button onclick="copyWidget('imweb')" class="btn btn-blue"><i class="fas fa-copy" style="margin-right:4px"></i>위젯 코드 복사</button>
+        <span id="copy-status-imweb" class="status">복사됨!</span>
       </div>
-      <pre id="widget-imweb-code" class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
+      <pre id="widget-imweb-code">&lt;iframe id="dental-tv-frame" src="" width="100%" height="800" frameborder="0" style="border:none; min-height:600px;"&gt;&lt;/iframe&gt;
 &lt;script&gt;
 (function() {
   var host = '${origin}';
@@ -13286,26 +13275,26 @@ app.get('/', (c) => {
   window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight'){ var newH=(e.data.height+30)+'px'; if(frame.style.height!==newH) frame.style.height=newH; } if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
 })();
 &lt;/script&gt;</pre>
-      <p class="text-xs text-gray-500 mt-2">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
+      <p class="note">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
     </div>
     
-    <div class="bg-purple-50 rounded-xl p-6 text-left mb-4">
-      <h2 class="font-bold text-gray-800 mb-3"><i class="fas fa-crown mr-2 text-purple-500"></i>마스터 관리자 위젯 코드</h2>
-      <div class="flex gap-2 mb-2">
-        <button onclick="copyWidget('master')" class="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-xs font-medium hover:bg-purple-600"><i class="fas fa-copy mr-1"></i>위젯 코드 복사</button>
-        <span id="copy-status-master" class="text-xs text-green-600 self-center hidden">복사됨!</span>
+    <div class="section purple">
+      <h2><i class="fas fa-crown" style="margin-right:8px;color:#8b5cf6"></i>마스터 관리자 위젯 코드</h2>
+      <div class="flex-row">
+        <button onclick="copyWidget('master')" class="btn btn-purple"><i class="fas fa-copy" style="margin-right:4px"></i>위젯 코드 복사</button>
+        <span id="copy-status-master" class="status">복사됨!</span>
       </div>
-      <pre id="widget-master-code" class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto">&lt;iframe 
+      <pre id="widget-master-code">&lt;iframe 
   src="${origin}/master"
   width="100%" 
   height="800"
   frameborder="0"
 &gt;&lt;/iframe&gt;</pre>
-      <p class="text-xs text-gray-500 mt-2">* 마스터 관리자 비밀번호: dental2024master</p>
+      <p class="note">* 마스터 관리자 비밀번호: dental2024master</p>
     </div>
     
-    <a href="${origin}/master" class="inline-block bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition">
-      <i class="fas fa-crown mr-2"></i>마스터 관리자 바로가기
+    <a href="${origin}/master" class="btn btn-purple btn-lg" style="margin-top:8px">
+      <i class="fas fa-crown" style="margin-right:8px"></i>마스터 관리자 바로가기
     </a>
   </div>
   
@@ -13317,7 +13306,7 @@ app.get('/', (c) => {
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       navigator.clipboard.writeText(text).then(function() {
         var status = document.getElementById('copy-status-' + type);
-        if (status) { status.classList.remove('hidden'); setTimeout(function(){ status.classList.add('hidden'); }, 2000); }
+        if (status) { status.style.display='inline'; setTimeout(function(){ status.style.display='none'; }, 2000); }
       });
     }
   </script>
