@@ -117,9 +117,9 @@ async function getOrCreateUser(db: D1Database, adminCode: string, clinicName?: s
       return null
     }
     const result = await db.prepare(`
-      INSERT INTO users (admin_code, clinic_name)
-      VALUES (?, ?)
-    `).bind(adminCode, clinicName || '내 치과').run()
+      INSERT INTO users (admin_code, clinic_name, is_master)
+      VALUES (?, ?, ?)
+    `).bind(adminCode, clinicName || '내 치과', adminCode.includes('master_admin') ? 1 : 0).run()
     
     user = await db.prepare(
       'SELECT * FROM users WHERE id = ?'
@@ -682,7 +682,8 @@ app.get('/api/master/users', async (c) => {
       (SELECT COUNT(*) FROM playlists WHERE user_id = u.id) as playlist_count,
       (SELECT short_code FROM playlists WHERE user_id = u.id LIMIT 1) as short_code
     FROM users u
-    WHERE u.is_master = 0 OR u.is_master IS NULL
+    WHERE (u.is_master = 0 OR u.is_master IS NULL)
+      AND u.admin_code NOT LIKE '%master_admin%'
     ORDER BY u.created_at DESC
   `).all()
   
@@ -4685,7 +4686,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         (SELECT COUNT(*) FROM playlists WHERE user_id = u.id AND (is_master_playlist = 0 OR is_master_playlist IS NULL)) as playlist_count,
         (SELECT COUNT(*) FROM notices WHERE user_id = u.id) as notice_count
       FROM users u
-      WHERE u.is_master = 0 OR u.is_master IS NULL
+      WHERE (u.is_master = 0 OR u.is_master IS NULL)
+        AND u.admin_code NOT LIKE '%master_admin%'
       ORDER BY u.created_at DESC
     `).all()
     allClinicsData = clinicsResult.results || []
