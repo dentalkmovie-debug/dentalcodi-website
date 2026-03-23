@@ -13843,24 +13843,36 @@ app.get('/tv/:shortCode', async (c) => {
       initializeAllMedia();
       startPlaybackWatchdog();
       
-      // 전체화면 복원 (DOM 재구성 후 즉시 + 지연 복원)
+      // ★★ 전체화면 복원 강화 (DOM 재구성 후 여러 시점에서 복원)
       if (wasFullscreen || (shouldBeFullscreen && userHasInteracted)) {
         // 즉시 시도
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(() => {});
         }
-        // 300ms 후 재시도 (iframe 생성 후 브라우저가 풀 수 있음)
+        // iframe 생성 직후 (200ms)
         setTimeout(() => {
           if (!document.fullscreenElement && shouldBeFullscreen) {
             document.documentElement.requestFullscreen().catch(() => {});
           }
-        }, 300);
-        // 1초 후 최종 확인
+        }, 200);
+        // iframe 로드 후 (500ms)
+        setTimeout(() => {
+          if (!document.fullscreenElement && shouldBeFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }, 500);
+        // Vimeo Player ready 이후 (1초)
         setTimeout(() => {
           if (!document.fullscreenElement && shouldBeFullscreen) {
             document.documentElement.requestFullscreen().catch(() => {});
           }
         }, 1000);
+        // 최종 확인 (2초)
+        setTimeout(() => {
+          if (!document.fullscreenElement && shouldBeFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }, 2000);
       }
     }
     
@@ -14975,7 +14987,10 @@ app.get('/tv/:shortCode', async (c) => {
       
       console.log('startVimeoPlayback session:', thisSession, 'idx:', idx);
       
-      // ★ Vimeo ended 이벤트 등록 (가장 확실한 종료 감지)
+      // ★★ 문제 D 수정: 기존 ended 리스너를 모두 제거한 후 새로 등록
+      // player.off('ended')로 이전 호출에서 등록된 리스너 정리 → 누적 방지
+      try { player.off('ended'); } catch(e) {}
+      
       let endedHandled = false;
       const handleEnded = () => {
         if (endedHandled || thisSession !== vimeoSessionId) return;
@@ -15095,15 +15110,58 @@ app.get('/tv/:shortCode', async (c) => {
         console.log('Vimeo getDuration failed:', err, 'using cached:', cachedVimeoDuration);
         if (thisSession !== vimeoSessionId) return;
         
-        // 캐시된 duration 사용, 없으면 15초 후 강제 전환
-        const fallbackDuration = cachedVimeoDuration > 0 ? cachedVimeoDuration : 15;
+        // ★★ 문제 E 수정: getDuration 실패해도 폴링 시작 (멈춤 감지 필수)
+        const fallbackDuration = cachedVimeoDuration > 0 ? cachedVimeoDuration : 0;
+        let lastTimeFb = 0;
+        let stuckCountFb = 0;
+        let pollCountFb = 0;
+        
+        vimeoPollingInterval = setInterval(() => {
+          if (thisSession !== vimeoSessionId) {
+            clearVimeoTimers();
+            return;
+          }
+          pollCountFb++;
+          player.getCurrentTime().then((time) => {
+            if (thisSession !== vimeoSessionId) return;
+            if (pollCountFb % 5 === 0) {
+              console.log('Vimeo progress (fb):', Math.round(time), 'session:', thisSession);
+            }
+            // 멈춤 감지
+            if (time > 0 && Math.abs(time - lastTimeFb) < 0.5) {
+              stuckCountFb++;
+              if (stuckCountFb >= 3) {
+                stuckCountFb = 0;
+                player.play().catch(() => {});
+              }
+            } else {
+              stuckCountFb = 0;
+            }
+            lastTimeFb = time;
+            // duration을 동적으로 가져오기 시도
+            if (fallbackDuration === 0) {
+              player.getDuration().then((d) => {
+                if (d > 2 && thisSession === vimeoSessionId) {
+                  console.log('[Vimeo] Got duration dynamically:', d);
+                  cachedVimeoDuration = d;
+                  // 폴링 재시작 (duration 확보했으므로 정상 모드로)
+                  clearVimeoTimers();
+                  startVimeoPlayback(player, idx);
+                }
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }, 2000);
+        
+        // 안전 타이머: 캐시된 duration 사용, 없으면 30초
+        const safetyFallback = fallbackDuration > 0 ? fallbackDuration + 5 : 30;
         vimeoSafetyTimeout = setTimeout(() => {
           if (thisSession !== vimeoSessionId) return;
           if (endedHandled) return;
           endedHandled = true;
           clearVimeoTimers();
           goToNext();
-        }, (fallbackDuration + 5) * 1000);
+        }, safetyFallback * 1000);
       });
       
       // 자막 로드
@@ -15458,6 +15516,7 @@ app.get('/tv/:shortCode', async (c) => {
       // 안전 체크: playlist가 없거나 비어있으면 대기 화면 표시
       if (!playlist || !playlist.items || playlist.items.length === 0) {
         console.log('[goToNext] Playlist is empty, showing waiting screen');
+        isTransitioning = false; // ★★ 문제 F 수정: 즉시 해제
         showEmptyPlaylistScreen();
         return;
       }
@@ -15477,6 +15536,7 @@ app.get('/tv/:shortCode', async (c) => {
       // 안전 체크: nextItem이 없으면 대기 화면 표시
       if (!nextItem) {
         console.log('[goToNext] nextItem is undefined, showing waiting screen');
+        isTransitioning = false; // ★★ 즉시 해제
         showEmptyPlaylistScreen();
         return;
       }
@@ -15914,6 +15974,7 @@ app.get('/tv/:shortCode', async (c) => {
     let userHasInteracted = false; // 사용자 상호작용 여부
     let fullscreenRestoreTimer = null; // 전체화면 복원 타이머
     let _lastFullscreenRestoreTime = 0; // 마지막 복원 시도 시각 (디바운스용)
+    let _fullscreenLostCount = 0; // 연속 전체화면 이탈 횟수 (빈도 추적용)
     
     function updateFullscreenState() {
       if (document.fullscreenElement) {
@@ -15921,6 +15982,7 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.remove('not-fullscreen');
         shouldBeFullscreen = true;
         userHasInteracted = true;
+        _fullscreenLostCount = 0; // 정상 복원됨
         // 복원 타이머 취소
         if (fullscreenRestoreTimer) {
           clearTimeout(fullscreenRestoreTimer);
@@ -15931,21 +15993,31 @@ app.get('/tv/:shortCode', async (c) => {
         document.body.classList.add('not-fullscreen');
         document.body.classList.remove('mouse-active');
         
-        // 전체화면이 풀리면 항상 복원 시도 (제한 없음 - TV는 항상 전체화면이어야 함)
+        // ★★ 문제 G~K 수정: 전체화면 복원 강화
         if (shouldBeFullscreen && userHasInteracted) {
+          _fullscreenLostCount++;
+          console.log('[fullscreen] Lost, restore attempt #' + _fullscreenLostCount);
+          
+          // ★ 디바운스 축소: 100ms (이전 300ms → iframe 생성 시 빠른 복원)
           const now = Date.now();
-          // 디바운스: 300ms 이내 중복 복원 방지
-          if (now - _lastFullscreenRestoreTime < 300) return;
+          if (now - _lastFullscreenRestoreTime < 100) return;
           _lastFullscreenRestoreTime = now;
           
           if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
+          // ★ 즉시 복원 시도 (이전 200ms 대기 제거)
           fullscreenRestoreTimer = setTimeout(() => {
             if (!document.fullscreenElement && shouldBeFullscreen) {
               document.documentElement.requestFullscreen().catch((e) => {
-                console.log('Fullscreen restore failed:', e.message);
+                console.log('[fullscreen] Restore failed:', e.message);
+                // ★ 실패 시 추가 시도: 500ms 후 재시도
+                setTimeout(() => {
+                  if (!document.fullscreenElement && shouldBeFullscreen && userHasInteracted) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                  }
+                }, 500);
               });
             }
-          }, 200);
+          }, 50); // 50ms 지연만 (브라우저 이벤트 루프 양보)
         }
       }
     }
@@ -15956,13 +16028,14 @@ app.get('/tv/:shortCode', async (c) => {
     // 초기 상태 설정
     updateFullscreenState();
     
-    // ★ 전체화면 주기적 감시 (Vimeo/YouTube iframe 생성 시 fullscreenchange 이벤트 누락 대비)
-    // 3초마다 전체화면 상태 확인하여 풀려있으면 복원
+    // ★★ 전체화면 주기적 감시 강화 (Vimeo/YouTube iframe 생성 시 fullscreenchange 이벤트 누락 대비)
+    // 1.5초마다 확인 (이전 3초 → 더 빠른 복원)
     setInterval(() => {
       if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
+        console.log('[fullscreen] Periodic check - restoring');
         document.documentElement.requestFullscreen().catch(() => {});
       }
-    }, 3000);
+    }, 1500);
     
     // 전체화면에서 마우스 움직이면 버튼 표시 (2초 후 자동 숨김)
     // CSS 의사 전체화면이므로 전체화면 여부와 관계없이 동작
