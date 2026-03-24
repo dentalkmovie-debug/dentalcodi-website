@@ -480,8 +480,10 @@ async function loadData(isInitial = false) {
       tvAdminEmail = data.adminEmail || null;
     }
     
-    // 원본 플레이리스트 항상 저장
-    originalPlaylist = JSON.parse(JSON.stringify(data.playlist));
+    // 원본 플레이리스트 항상 저장 (structuredClone 사용 - JSON.stringify보다 빠름)
+    originalPlaylist = typeof structuredClone === 'function' 
+      ? structuredClone(data.playlist) 
+      : JSON.parse(JSON.stringify(data.playlist));
     
     // 임시 영상 상태 변경 감지 (effectiveTempVideo 사용 - 클리어 방어 적용됨)
     const hadTempVideo = currentTempVideo !== null;
@@ -632,11 +634,27 @@ async function loadData(isInitial = false) {
     const newTransitionEffect = playlist.transition_effect || 'fade';
     const newTransitionDuration = playlist.transition_duration || 500;
     
-    // 변경 감지 후 업데이트 (불필요한 DOM 조작 방지)
-    const noticesChanged = JSON.stringify(newNotices) !== JSON.stringify(notices);
-    const noticeSettingsChanged = JSON.stringify(newNoticeSettings) !== JSON.stringify(noticeSettings);
-    const logoChanged = JSON.stringify(newLogoSettings) !== JSON.stringify(logoSettings);
-    const subtitleChanged = JSON.stringify(newSubtitleSettings) !== JSON.stringify(subtitleSettings);
+    // 변경 감지 후 업데이트 (JSON.stringify 대신 가벼운 키 비교 - 메인스레드 부하 감소)
+    const noticesChanged = newNotices.length !== notices.length || 
+      newNotices.some((n, i) => n.id !== notices[i]?.id || n.content !== notices[i]?.content || n.is_urgent !== notices[i]?.is_urgent);
+    const noticeSettingsChanged = newNoticeSettings.font_size !== noticeSettings.font_size ||
+      newNoticeSettings.enabled !== noticeSettings.enabled ||
+      newNoticeSettings.bg_color !== noticeSettings.bg_color ||
+      newNoticeSettings.text_color !== noticeSettings.text_color ||
+      newNoticeSettings.scroll_speed !== noticeSettings.scroll_speed ||
+      newNoticeSettings.position !== noticeSettings.position ||
+      newNoticeSettings.letter_spacing !== noticeSettings.letter_spacing ||
+      newNoticeSettings.bg_opacity !== noticeSettings.bg_opacity;
+    const logoChanged = newLogoSettings.url !== logoSettings.url || 
+      newLogoSettings.size !== logoSettings.size || 
+      newLogoSettings.opacity !== logoSettings.opacity ||
+      newLogoSettings.position !== logoSettings.position;
+    const subtitleChanged = newSubtitleSettings.font_size !== subtitleSettings.font_size ||
+      newSubtitleSettings.bg_opacity !== subtitleSettings.bg_opacity ||
+      newSubtitleSettings.text_color !== subtitleSettings.text_color ||
+      newSubtitleSettings.bg_color !== subtitleSettings.bg_color ||
+      newSubtitleSettings.position !== subtitleSettings.position ||
+      newSubtitleSettings.bottom_offset !== subtitleSettings.bottom_offset;
     
     notices = newNotices;
     noticeSettings = newNoticeSettings;
@@ -843,7 +861,8 @@ function showNotices() {
   }
   
   // 공지 내용이 변경되지 않았으면 스킵 (CSS 애니메이션 리셋 방지)
-  const sig = JSON.stringify(notices.map(n => n.id + ':' + n.content + ':' + n.is_urgent)) + '|' + JSON.stringify(noticeSettings);
+  const sig = notices.map(n => n.id + ':' + n.content + ':' + n.is_urgent).join('|') + 
+    '#' + noticeSettings.font_size + ',' + noticeSettings.enabled + ',' + noticeSettings.bg_color + ',' + noticeSettings.scroll_speed;
   if (sig === _lastNoticeSignature && bar.style.display === 'block') return;
   _lastNoticeSignature = sig;
   
@@ -1587,10 +1606,10 @@ function startVimeoPlayback(player, idx) {
           console.log('Vimeo progress:', Math.round(time), '/', effectiveDuration, 'session:', thisSession);
         }
         
-        // 멈춤 감지: 3번 연속(6초) 시간이 안 변하면 재시작
+        // 멈춤 감지: 5번 연속(10초) 시간이 안 변하면 재시작 (노트북 등 저사양 대응 - 기존 6초에서 완화)
         if (hasEverProgressed && time > 0 && Math.abs(time - lastTime) < 0.5) {
           stuckCount++;
-          if (stuckCount >= 3) {
+          if (stuckCount >= 5) {
             console.log('[Vimeo] stuck detected at', Math.round(time), '/', effectiveDuration, '- restarting play...');
             stuckCount = 0;
             // 영상 끝 근처에서 멈췄으면 다음으로 전환
@@ -1658,7 +1677,7 @@ function startVimeoPlayback(player, idx) {
         // 멈춤 감지
         if (time > 0 && Math.abs(time - lastTimeFb) < 0.5) {
           stuckCountFb++;
-          if (stuckCountFb >= 3) {
+          if (stuckCountFb >= 5) { // 10초 (노트북 대응 완화)
             stuckCountFb = 0;
             player.play().catch(() => {});
           }
@@ -1921,7 +1940,7 @@ function ensurePlaybackAlive() {
   if (!hasPlayer && item.item_type !== 'image') {
     _watchdogNoProgressCount++;
     console.log('[watchdog] No player for index:', currentIndex, 'type:', item.item_type, 'count:', _watchdogNoProgressCount);
-    if (_watchdogNoProgressCount >= 2) { // 10초간 플레이어 없음 (15→10초로 단축)
+    if (_watchdogNoProgressCount >= 4) { // 20초간 플레이어 없음 (노트북 대응 완화)
       console.log('[watchdog] CRITICAL: No player for 10s, forcing restart');
       _watchdogNoProgressCount = 0;
       safeRestartPlayback();
@@ -1933,7 +1952,7 @@ function ensurePlaybackAlive() {
   if (item.item_type === 'vimeo' && hasPlayer && !vimeoPollingInterval && !vimeoSafetyTimeout) {
     _watchdogNoProgressCount++;
     console.log('[watchdog] Vimeo has player but no polling/safety timer, count:', _watchdogNoProgressCount);
-    if (_watchdogNoProgressCount >= 2) { // 10초간 감시 없음
+    if (_watchdogNoProgressCount >= 4) { // 20초간 감시 없음 (완화)
       console.log('[watchdog] CRITICAL: Vimeo unmonitored, restarting playback tracking');
       _watchdogNoProgressCount = 0;
       // 폴링만 다시 시작 (플레이어는 유지)
@@ -1989,16 +2008,14 @@ function ensurePlaybackAlive() {
           // getPaused 자체가 실패하면 플레이어가 죽은 것
           _watchdogNoProgressCount++;
           console.log('[watchdog] Vimeo getPaused failed, count:', _watchdogNoProgressCount);
-          if (_watchdogNoProgressCount >= 2) {
-            console.log('[watchdog] Vimeo player dead, forcing restart');
+          if (_watchdogNoProgressCount >= 4) { // getPaused 실패 20초 (완화)
             _watchdogNoProgressCount = 0;
             safeRestartPlayback();
           }
         });
       } else if (!vimeoPlayer) {
         _watchdogNoProgressCount++;
-        if (_watchdogNoProgressCount >= 2) {
-          console.log('[watchdog] Vimeo player lost, restarting');
+        if (_watchdogNoProgressCount >= 4) { // 플레이어 없음 20초 (완화)
           _watchdogNoProgressCount = 0;
           safeRestartPlayback();
         }
@@ -2123,7 +2140,9 @@ function goToNext() {
       // 원본 플레이리스트로 즉시 복귀 (10초 폴링 대기 없이)
       if (originalPlaylist && originalPlaylist.items && originalPlaylist.items.length > 0) {
         console.log('>>> Immediate restore to original playlist <<<');
-        playlist = JSON.parse(JSON.stringify(originalPlaylist));
+        playlist = typeof structuredClone === 'function' 
+          ? structuredClone(originalPlaylist) 
+          : JSON.parse(JSON.stringify(originalPlaylist));
         currentIndex = 0;
         showSyncIndicator();
         safeRestartPlayback();
@@ -2792,6 +2811,8 @@ let _lastKnownTempStarted = null; // 마지막 started_at 값
 let _lastKnownNoticeHash = null; // 마지막 공지 해시 (공지 변경 감지용)
 const FAST_TEMP_POLL = 2000;
 setInterval(async () => {
+  // ★ loadData 실행 중이면 fast poll 스킵 (메인 스레드 과부하 방지 - 노트북 대응)
+  if (isLoadingData) return;
   try {
     const res = await fetch('/api/tv/' + SHORT_CODE + '/temp-check?t=' + Date.now());
     if (!res.ok) return;
