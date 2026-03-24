@@ -11808,7 +11808,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
   <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
   <!-- Admin CSS + 추가 스타일: body 끝에서 비차단 로드 -->
-  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
+  <!-- admin.css: lazy load (36KB 절감 → 초기 렌더링 가속) -->
+  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}" media="print" onload="this.media='all'">
   <style>
     body.modal-open{overflow:hidden!important;width:100%!important;touch-action:none!important}
     html.modal-open{overflow:hidden!important}
