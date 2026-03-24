@@ -1482,6 +1482,8 @@ function startSubtitleSync(player, vimeoId, idx) {
   
   console.log('Starting subtitle sync for:', vimeoId, 'idx:', idx);
   
+  // ★★ 노트북 대응: 자막 동기화 간격을 1초로 완화 (500ms → 1000ms)
+  // getCurrentTime() 호출이 메인 스레드를 차단하므로 빈도 감소
   currentSubtitleTimer = setInterval(() => {
     if (currentIndex !== idx) {
       hideSubtitle();
@@ -1503,7 +1505,7 @@ function startSubtitleSync(player, vimeoId, idx) {
         showSubtitle(null);
       }
     }).catch(() => {});
-  }, 500); // 500ms (성능 최적화)
+  }, 1000); // 1000ms (500→1000ms, 노트북 성능 최적화)
 }
 
 // Vimeo 세션별 상태 (각 재생 세션마다 고유 ID)
@@ -1587,7 +1589,7 @@ function startVimeoPlayback(player, idx) {
     let pollCount = 0;
     let hasEverProgressed = false;
     
-    // 폴링: 영상 끝 감지 + 멈춤 감지 (2초마다)
+    // 폴링: 영상 끝 감지 + 멈춤 감지 (3초마다 - 노트북 대응: 2→3초로 완화)
     vimeoPollingInterval = setInterval(() => {
       if (thisSession !== vimeoSessionId) {
         clearVimeoTimers();
@@ -1601,16 +1603,18 @@ function startVimeoPlayback(player, idx) {
         
         if (time > 1) hasEverProgressed = true;
         
-        // 10초마다 진행 상황 로그
+        // 15초마다 진행 상황 로그 (3초 × 5회)
         if (pollCount % 5 === 0) {
           console.log('Vimeo progress:', Math.round(time), '/', effectiveDuration, 'session:', thisSession);
         }
         
-        // 멈춤 감지: 5번 연속(10초) 시간이 안 변하면 재시작 (노트북 등 저사양 대응 - 기존 6초에서 완화)
+        // 멈춤 감지: 8번 연속(16초) 시간이 안 변하면 play() 재시도
+        // ★★ 노트북 대응: 버퍼링 중 성급한 play() 호출이 오히려 방해
+        // 16초로 충분히 여유를 줘서 노트북 버퍼링이 자연스럽게 해소되도록
         if (hasEverProgressed && time > 0 && Math.abs(time - lastTime) < 0.5) {
           stuckCount++;
-          if (stuckCount >= 5) {
-            console.log('[Vimeo] stuck detected at', Math.round(time), '/', effectiveDuration, '- restarting play...');
+          if (stuckCount >= 8) { // 16초 (10→16초로 완화)
+            console.log('[Vimeo] stuck detected at', Math.round(time), '/', effectiveDuration, '(', stuckCount * 2, 's)');
             stuckCount = 0;
             // 영상 끝 근처에서 멈췄으면 다음으로 전환
             if (hasDuration && time >= effectiveDuration - 2) {
@@ -1622,6 +1626,7 @@ function startVimeoPlayback(player, idx) {
               }
               return;
             }
+            // ★ play() 한 번만 시도 (반복 호출 방지)
             player.play().catch(() => {});
           }
         } else {
@@ -1640,11 +1645,11 @@ function startVimeoPlayback(player, idx) {
           }
         }
       }).catch(() => {});
-    }, 2000);
+    }, 3000); // 3초 간격 (노트북: getCurrentTime() 호출로 인한 메인 스레드 차단 최소화)
     
-    // 안전 타이머 (영상길이 + 5초 - 여유 확대)
+    // 안전 타이머 (영상길이 + 10초 - 노트북 버퍼링 여유 확대)
     // ★ hasDuration이 false여도 동작 - 이 경우 30초 후 강제 전환
-    const safetyDuration = hasDuration ? effectiveDuration + 5 : 30;
+    const safetyDuration = hasDuration ? effectiveDuration + 10 : 60; // +10초 (5→10), fallback 60초 (30→60)
     vimeoSafetyTimeout = setTimeout(() => {
         if (thisSession !== vimeoSessionId) return;
         if (endedHandled) return; // 이미 처리됨
@@ -1671,13 +1676,13 @@ function startVimeoPlayback(player, idx) {
       pollCountFb++;
       player.getCurrentTime().then((time) => {
         if (thisSession !== vimeoSessionId) return;
-        if (pollCountFb % 5 === 0) {
+        if (pollCountFb % 4 === 0) {
           console.log('Vimeo progress (fb):', Math.round(time), 'session:', thisSession);
         }
-        // 멈춤 감지
+        // 멈춤 감지 (fallback - 16초로 완화)
         if (time > 0 && Math.abs(time - lastTimeFb) < 0.5) {
           stuckCountFb++;
-          if (stuckCountFb >= 5) { // 10초 (노트북 대응 완화)
+          if (stuckCountFb >= 8) { // 16초 (10→16초 완화)
             stuckCountFb = 0;
             player.play().catch(() => {});
           }
@@ -1698,10 +1703,10 @@ function startVimeoPlayback(player, idx) {
           }).catch(() => {});
         }
       }).catch(() => {});
-    }, 2000);
+    }, 3000); // 3초 간격 (fallback 모드도 완화)
     
-    // 안전 타이머: 캐시된 duration 사용, 없으면 30초
-    const safetyFallback = fallbackDuration > 0 ? fallbackDuration + 5 : 30;
+    // 안전 타이머: 캐시된 duration 사용, 없으면 60초 (노트북 여유 확대)
+    const safetyFallback = fallbackDuration > 0 ? fallbackDuration + 10 : 60;
     vimeoSafetyTimeout = setTimeout(() => {
       if (thisSession !== vimeoSessionId) return;
       if (endedHandled) return;
@@ -1908,9 +1913,12 @@ function startCurrentItem() {
 }
 
 // 강화된 워치독 - 멈춤/검정화면 감지 및 자동 복구
+// ★★ 노트북 대응: safeRestartPlayback 절대 호출 안 함 (처음으로 돌아가는 원인)
+// 대신 play() 재시도만 하고, 정말 죽은 경우에만 최소한의 복구
 let _watchdogCallCount = 0;
 let _watchdogNoProgressCount = 0; // 재생 진행 없는 연속 횟수
 let _transitionStartTime = 0; // isTransitioning이 true가 된 시각
+let _watchdogRestartCount = 0; // safeRestartPlayback 호출 횟수 (과잉 방지)
 
 function ensurePlaybackAlive() {
   if (!playlist || !playlist.items || playlist.items.length === 0) return;
@@ -1918,12 +1926,10 @@ function ensurePlaybackAlive() {
   
   _watchdogCallCount++;
   
-  // ★★ 시나리오 1+2 핵심 수정: isTransitioning 강제 해제
-  // setTimeout이 실행 안 될 수 있음 (브라우저 탭 비활성화 등)
-  // 5초 이상 전환 중이면 강제 해제
+  // ★★ isTransitioning 강제 해제 (브라우저 탭 비활성화 등으로 setTimeout 안 될 때)
   if (isTransitioning) {
     const transitionElapsed = Date.now() - _transitionStartTime;
-    if (transitionElapsed > 5000) {
+    if (transitionElapsed > 8000) { // 5→8초로 완화
       console.log('[watchdog] FORCE: isTransitioning stuck for', Math.round(transitionElapsed/1000), 's - releasing lock');
       isTransitioning = false;
       _watchdogNoProgressCount = 0;
@@ -1935,27 +1941,30 @@ function ensurePlaybackAlive() {
   const item = playlist.items[currentIndex];
   if (!item) return;
   
-  // ★ 플레이어 존재 여부 체크 - 플레이어가 없으면 강제 재시작
+  // ★ 플레이어 존재 여부 체크
   const hasPlayer = !!players[currentIndex];
   if (!hasPlayer && item.item_type !== 'image') {
     _watchdogNoProgressCount++;
-    console.log('[watchdog] No player for index:', currentIndex, 'type:', item.item_type, 'count:', _watchdogNoProgressCount);
-    if (_watchdogNoProgressCount >= 4) { // 20초간 플레이어 없음 (노트북 대응 완화)
-      console.log('[watchdog] CRITICAL: No player for 10s, forcing restart');
+    if (_watchdogNoProgressCount >= 6) { // 30초간 플레이어 없음 (20→30초 완화)
+      console.log('[watchdog] No player for 30s, idx:', currentIndex, '- restarting');
       _watchdogNoProgressCount = 0;
-      safeRestartPlayback();
+      _watchdogRestartCount++;
+      if (_watchdogRestartCount <= 3) { // 최대 3회만 재시작
+        safeRestartPlayback();
+      } else {
+        console.log('[watchdog] Too many restarts, waiting for next poll');
+      }
       return;
     }
   }
   
-  // ★ Vimeo 폴링/안전타이머가 없는 경우 감지 (세션 불일치 등으로 누락 시)
+  // ★ Vimeo 폴링/안전타이머가 없는 경우 - 폴링만 다시 시작 (플레이어 유지)
   if (item.item_type === 'vimeo' && hasPlayer && !vimeoPollingInterval && !vimeoSafetyTimeout) {
     _watchdogNoProgressCount++;
-    console.log('[watchdog] Vimeo has player but no polling/safety timer, count:', _watchdogNoProgressCount);
-    if (_watchdogNoProgressCount >= 4) { // 20초간 감시 없음 (완화)
-      console.log('[watchdog] CRITICAL: Vimeo unmonitored, restarting playback tracking');
+    if (_watchdogNoProgressCount >= 6) { // 30초 (20→30초 완화)
+      console.log('[watchdog] Vimeo unmonitored for 30s, restarting tracking only');
       _watchdogNoProgressCount = 0;
-      // 폴링만 다시 시작 (플레이어는 유지)
+      // ★★ 핵심: 폴링만 다시 시작, safeRestartPlayback 절대 안 함
       startVimeoPlayback(players[currentIndex], currentIndex);
       return;
     }
@@ -1967,6 +1976,7 @@ function ensurePlaybackAlive() {
       const state = ytPlayer.getPlayerState();
       if (state === YT.PlayerState.PLAYING) {
         _watchdogNoProgressCount = 0;
+        _watchdogRestartCount = 0; // 정상 재생 → 재시작 카운터 리셋
       } else if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.UNSTARTED || state === YT.PlayerState.CUED) {
         _watchdogNoProgressCount++;
         console.log('[watchdog] YouTube not playing, state:', state, 'count:', _watchdogNoProgressCount);
@@ -1975,8 +1985,8 @@ function ensurePlaybackAlive() {
           ytPlayer.setVolume(0);
           ytPlayer.playVideo();
         } catch (e) {}
-        if (_watchdogNoProgressCount >= 4) { // 20초 (30→20으로 단축)
-          console.log('[watchdog] YouTube stuck for 20s, skipping to next');
+        if (_watchdogNoProgressCount >= 6) { // 30초 (20→30초 완화)
+          console.log('[watchdog] YouTube stuck for 30s, skipping to next');
           _watchdogNoProgressCount = 0;
           goToNext();
         }
@@ -1987,37 +1997,56 @@ function ensurePlaybackAlive() {
       }
     }
   } else if (item.item_type === 'vimeo') {
-    // Vimeo: 매 2번째 호출(10초)에 상태 체크 (15→10초로 단축)
-    if (_watchdogCallCount % 2 === 0) {
+    // ★★ 노트북 핵심 수정: Vimeo 워치독은 매 3번째 호출(15초)로 완화
+    // 버퍼링 중에 paused로 감지되어 play() 재호출 → Vimeo SDK 충돌 방지
+    if (_watchdogCallCount % 3 === 0) {
       const vimeoPlayer = players[currentIndex];
       if (vimeoPlayer && typeof vimeoPlayer.getPaused === 'function') {
         vimeoPlayer.getPaused().then((paused) => {
           if (paused && currentIndex < playlist.items.length) {
             _watchdogNoProgressCount++;
-            console.log('[watchdog] Vimeo paused, count:', _watchdogNoProgressCount, '- resuming...');
-            vimeoPlayer.play().catch(() => {});
-            if (_watchdogNoProgressCount >= 3) { // 30초 (45→30초로 단축)
-              console.log('[watchdog] Vimeo stuck for 30s, forcing restart');
+            console.log('[watchdog] Vimeo paused, count:', _watchdogNoProgressCount);
+            // ★★ 핵심 변경: 바로 play()를 호출하지 않음
+            // 노트북에서 버퍼링 중 play() 재호출이 오히려 재생을 방해
+            // 6회(90초) 연속 paused이면 그때만 play() 한 번 시도
+            if (_watchdogNoProgressCount >= 4 && _watchdogNoProgressCount % 2 === 0) {
+              console.log('[watchdog] Vimeo paused for', _watchdogNoProgressCount * 15, 's, gentle play retry');
+              vimeoPlayer.play().catch(() => {});
+            }
+            // ★★ safeRestartPlayback 호출 조건을 극단적으로 완화
+            // 8회(120초 = 2분) 연속 paused이면 그때만 재시작
+            if (_watchdogNoProgressCount >= 8) {
+              console.log('[watchdog] Vimeo stuck for 2min, forcing restart');
               _watchdogNoProgressCount = 0;
-              safeRestartPlayback();
+              _watchdogRestartCount++;
+              if (_watchdogRestartCount <= 2) {
+                safeRestartPlayback();
+              }
             }
           } else {
             _watchdogNoProgressCount = 0;
+            _watchdogRestartCount = 0; // 정상 재생 → 재시작 카운터 리셋
           }
         }).catch(() => {
-          // getPaused 자체가 실패하면 플레이어가 죽은 것
+          // getPaused 자체가 실패 = iframe이 죽은 것
           _watchdogNoProgressCount++;
           console.log('[watchdog] Vimeo getPaused failed, count:', _watchdogNoProgressCount);
-          if (_watchdogNoProgressCount >= 4) { // getPaused 실패 20초 (완화)
+          if (_watchdogNoProgressCount >= 6) { // 90초 (20→90초 대폭 완화)
             _watchdogNoProgressCount = 0;
-            safeRestartPlayback();
+            _watchdogRestartCount++;
+            if (_watchdogRestartCount <= 2) {
+              safeRestartPlayback();
+            }
           }
         });
       } else if (!vimeoPlayer) {
         _watchdogNoProgressCount++;
-        if (_watchdogNoProgressCount >= 4) { // 플레이어 없음 20초 (완화)
+        if (_watchdogNoProgressCount >= 6) { // 30초
           _watchdogNoProgressCount = 0;
-          safeRestartPlayback();
+          _watchdogRestartCount++;
+          if (_watchdogRestartCount <= 2) {
+            safeRestartPlayback();
+          }
         }
       }
     }
@@ -2028,6 +2057,7 @@ function ensurePlaybackAlive() {
       currentTimer = setTimeout(() => goToNext(), displayTime);
     }
     _watchdogNoProgressCount = 0;
+    _watchdogRestartCount = 0;
   }
 }
 
@@ -2566,31 +2596,34 @@ function updateFullscreenState() {
     document.body.classList.add('not-fullscreen');
     document.body.classList.remove('mouse-active');
     
-    // ★★ 문제 G~K 수정: 전체화면 복원 강화
+    // ★★ 노트북 안정성 수정: 전체화면 복원을 매우 보수적으로 변경
+    // Vimeo iframe 생성/파괴 시 fullscreenchange 이벤트가 발생하는데,
+    // 이때 즉시 requestFullscreen()을 호출하면 iframe 렌더링 방해 → 멈춤
     if (shouldBeFullscreen && userHasInteracted) {
       _fullscreenLostCount++;
-      console.log('[fullscreen] Lost, restore attempt #' + _fullscreenLostCount);
       
-      // ★ 디바운스 축소: 100ms (이전 300ms → iframe 생성 시 빠른 복원)
+      // ★★ 디바운스 2초: iframe 조작 중 연쇄 fullscreenchange 무시
       const now = Date.now();
-      if (now - _lastFullscreenRestoreTime < 100) return;
+      if (now - _lastFullscreenRestoreTime < 2000) return;
       _lastFullscreenRestoreTime = now;
       
+      // ★★ 3회 이상 연속 이탈이면 사용자가 의도적으로 나간 것으로 간주
+      if (_fullscreenLostCount > 3) {
+        console.log('[fullscreen] Lost', _fullscreenLostCount, 'times, user likely exited intentionally');
+        return;
+      }
+      
+      console.log('[fullscreen] Lost, restore attempt #' + _fullscreenLostCount);
+      
       if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
-      // ★ 즉시 복원 시도 (이전 200ms 대기 제거)
+      // ★★ 1초 대기 후 복원 (iframe 렌더링이 안정된 후)
       fullscreenRestoreTimer = setTimeout(() => {
         if (!document.fullscreenElement && shouldBeFullscreen) {
-          document.documentElement.requestFullscreen().catch((e) => {
-            console.log('[fullscreen] Restore failed:', e.message);
-            // ★ 실패 시 추가 시도: 500ms 후 재시도
-            setTimeout(() => {
-              if (!document.fullscreenElement && shouldBeFullscreen && userHasInteracted) {
-                document.documentElement.requestFullscreen().catch(() => {});
-              }
-            }, 500);
+          document.documentElement.requestFullscreen().catch(() => {
+            // 실패해도 재시도 안 함 - CSS 의사 전체화면이 이미 동작 중
           });
         }
-      }, 50); // 50ms 지연만 (브라우저 이벤트 루프 양보)
+      }, 1000);
     }
   }
 }
@@ -2799,9 +2832,9 @@ if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
   }, 500);
 }
 
-// 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
+// 실시간 동기화 (15초마다 - 노트북 대응: 네트워크/메인스레드 부하 최소화)
 // loadData가 이미 last_active_at을 업데이트하므로 별도 heartbeat 불필요
-const POLL_INTERVAL = 10000;
+const POLL_INTERVAL = 15000;
 setInterval(() => loadData(false), POLL_INTERVAL);
 
 // ★★ 빠른 변경 감지 폴링 (2초마다 - 경량 엔드포인트 사용)
@@ -2809,7 +2842,7 @@ setInterval(() => loadData(false), POLL_INTERVAL);
 let _lastKnownTempUrl = null; // 마지막으로 인지한 임시영상 URL
 let _lastKnownTempStarted = null; // 마지막 started_at 값
 let _lastKnownNoticeHash = null; // 마지막 공지 해시 (공지 변경 감지용)
-const FAST_TEMP_POLL = 2000;
+const FAST_TEMP_POLL = 3000; // 2→3초 (노트북 대응: 메인 스레드 호흡 확보)
 setInterval(async () => {
   // ★ loadData 실행 중이면 fast poll 스킵 (메인 스레드 과부하 방지 - 노트북 대응)
   if (isLoadingData) return;
@@ -2873,5 +2906,51 @@ window.addEventListener('beforeunload', deactivateTV, true);
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
+
+// ★★ 실시간 진단 오버레이 (?diag=1 파라미터로 활성화)
+const IS_DIAG = new URLSearchParams(window.location.search).get('diag') === '1';
+if (IS_DIAG) {
+  var _diagEl = document.createElement('div');
+  _diagEl.id = 'diag-overlay';
+  _diagEl.style.cssText = 'position:fixed;top:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;padding:10px 14px;border-radius:8px;font:12px/1.5 monospace;max-width:500px;pointer-events:none';
+  document.body.appendChild(_diagEl);
+  var _diagLog = [];
+  var _origLog = console.log;
+  console.log = function() {
+    _origLog.apply(console, arguments);
+    var msg = Array.prototype.slice.call(arguments).join(' ');
+    if (/watchdog|stuck|restart|goToNext|transition|paused|ended|error|FORCE|CRITICAL|progress|safeRestart|loadData.*had/.test(msg)) {
+      var t = new Date();
+      _diagLog.push(t.toTimeString().slice(0,8) + ' ' + msg.slice(0, 140));
+      if (_diagLog.length > 20) _diagLog.shift();
+    }
+  };
+  setInterval(function() {
+    var p = players[currentIndex];
+    var state = 'none';
+    if (p && typeof p.getPaused === 'function') {
+      p.getPaused().then(function(paused) {
+        state = paused ? 'PAUSED' : 'PLAYING';
+        _updateDiag(state);
+      }).catch(function() { _updateDiag('ERROR'); });
+    } else if (p && typeof p.getPlayerState === 'function') {
+      var s = p.getPlayerState();
+      state = s === 1 ? 'PLAYING' : s === 2 ? 'PAUSED' : 'state=' + s;
+      _updateDiag(state);
+    } else {
+      _updateDiag(p ? 'unknown' : 'NO_PLAYER');
+    }
+  }, 3000); // 3초 (노트북 대응: 진단 폴링도 완화)
+  function _updateDiag(state) {
+    var item = playlist && playlist.items && playlist.items[currentIndex];
+    _diagEl.innerHTML = '<b>DIAG</b> idx:' + currentIndex + ' sess:' + vimeoSessionId 
+      + ' <span style="color:' + (state === 'PLAYING' ? '#0f0' : '#f00') + '">' + state + '</span>'
+      + '<br>trans:' + isTransitioning + ' poll:' + !!vimeoPollingInterval + ' safety:' + !!vimeoSafetyTimeout
+      + '<br>wdg:' + _watchdogNoProgressCount + ' restart:' + _watchdogRestartCount + ' items:' + (playlist ? playlist.items.length : 0)
+      + ' type:' + (item ? item.item_type : '?')
+      + '<br><hr style="border-color:#333;margin:4px 0"><span style="color:#ff0;font-size:11px">' 
+      + _diagLog.slice(-10).join('<br>') + '</span>';
+  }
+}
 
 })();
