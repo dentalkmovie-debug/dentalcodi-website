@@ -2069,11 +2069,22 @@ app.get('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   const playlistId = c.req.param('playlistId')
   
   const result = await c.env.DB.prepare(`
-    SELECT temp_video_url, temp_video_title, temp_video_type, temp_return_time
+    SELECT temp_video_url, temp_video_title, temp_video_type, temp_return_time, last_active_at,
+      CASE WHEN last_active_at IS NOT NULL AND (strftime('%s','now') - strftime('%s', last_active_at)) < 90 THEN 1 ELSE 0 END as is_tv_active
     FROM playlists WHERE id = ?
   `).bind(playlistId).first<any>()
   
   if (!result || !result.temp_video_url) {
+    return c.json({ active: false })
+  }
+  
+  // TV가 오프라인이면 임시 영상이 재생 중일 수 없음 → 자동 정리
+  if (!result.is_tv_active) {
+    await c.env.DB.prepare(`
+      UPDATE playlists 
+      SET temp_video_url = NULL, temp_video_title = NULL, temp_video_type = NULL, temp_return_time = NULL, temp_started_at = NULL
+      WHERE id = ?
+    `).bind(playlistId).run()
     return c.json({ active: false })
   }
   
@@ -10753,18 +10764,27 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // ── 단순 표시 ──
       el.style.display = 'flex';
       
-      // ── 모달을 화면 중앙에 배치 (스크롤 없이) ──
+      // ── 모달을 화면 중앙에 배치 ──
       var innerWrap = el.querySelector('.absolute.inset-0.flex');
       if (innerWrap) {
-        innerWrap.classList.remove('items-start');
-        innerWrap.classList.add('items-center');
-        innerWrap.style.overflowY = '';
-        innerWrap.style.paddingTop = '0';
+        // 큰 모달(임시영상 등)은 items-start + 내부 스크롤로 전체 보이게
+        var TALL_MODALS = ['temp-video-modal', 'edit-playlist-modal', 'script-download-modal'];
+        if (TALL_MODALS.indexOf(id) !== -1) {
+          innerWrap.classList.remove('items-center');
+          innerWrap.classList.add('items-start');
+          innerWrap.style.overflowY = 'auto';
+          innerWrap.style.paddingTop = '8px';
+        } else {
+          innerWrap.classList.remove('items-start');
+          innerWrap.classList.add('items-center');
+          innerWrap.style.overflowY = '';
+          innerWrap.style.paddingTop = '0';
+        }
         var mc = innerWrap.querySelector('.bg-white');
         if (mc) {
           mc.style.maxHeight = '95vh';
           mc.style.overflowY = 'auto';
-          mc.style.marginBottom = '0';
+          mc.style.marginBottom = '16px';
         }
       }
       
