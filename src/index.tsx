@@ -4899,6 +4899,42 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 추가 CSS: body 끝에서 로드 (렌더 차단 방지) -->
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
+  <!-- ★ 스켈레톤 오버레이: HTML 파싱 중 즉시 표시 (흰 화면 방지) -->
+  <div id="skeleton-overlay" style="position:fixed;inset:0;z-index:9999;background:#fff">
+    <div style="background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px;border-radius:12px 12px 0 0">
+      <div style="height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px"></div>
+      <div style="height:12px;width:200px;background:rgba(255,255,255,.2);border-radius:3px"></div>
+    </div>
+    <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff">
+      <span style="padding:11px 14px;font-size:13px;color:#2563eb;border-bottom:2px solid #2563eb;font-weight:700;font-family:-apple-system,sans-serif">대기실</span>
+      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">체어</span>
+      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">공지사항</span>
+      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">설정</span>
+    </div>
+    <div style="padding:12px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="height:16px;width:100px;background:#e5e7eb;border-radius:4px;animation:skp 1.5s ease-in-out infinite"></div>
+        <div style="height:22px;width:36px;background:#e5e7eb;border-radius:10px;animation:skp 1.5s ease-in-out infinite"></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:10px;background:#e5e7eb;flex-shrink:0;animation:skp 1.5s ease-in-out infinite"></div><div style="flex:1"><div style="height:14px;width:90px;background:#e5e7eb;border-radius:3px;margin-bottom:6px;animation:skp 1.5s ease-in-out infinite"></div><div style="height:10px;width:160px;background:#f3f4f6;border-radius:3px;animation:skp 1.5s ease-in-out infinite"></div></div></div>
+        <div style="display:flex;gap:6px;margin-top:10px;padding-left:46px"><div style="height:28px;width:80px;background:#f3f4f6;border-radius:8px;animation:skp 1.5s ease-in-out infinite"></div><div style="height:28px;width:80px;background:#f3f4f6;border-radius:8px;animation:skp 1.5s ease-in-out infinite"></div></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:10px;background:#e5e7eb;flex-shrink:0;animation:skp 1.5s ease-in-out infinite"></div><div style="flex:1"><div style="height:14px;width:110px;background:#e5e7eb;border-radius:3px;margin-bottom:6px;animation:skp 1.5s ease-in-out infinite"></div><div style="height:10px;width:140px;background:#f3f4f6;border-radius:3px;animation:skp 1.5s ease-in-out infinite"></div></div></div>
+        <div style="display:flex;gap:6px;margin-top:10px;padding-left:46px"><div style="height:28px;width:80px;background:#f3f4f6;border-radius:8px;animation:skp 1.5s ease-in-out infinite"></div><div style="height:28px;width:80px;background:#f3f4f6;border-radius:8px;animation:skp 1.5s ease-in-out infinite"></div></div>
+      </div>
+    </div>
+    <style>@keyframes skp{0%,100%{opacity:1}50%{opacity:.4}}</style>
+  </div>
+  <script>
+    // 스켈레톤 제거: DOM 파싱 완료 시 (admin.js 로드 전이라도)
+    document.addEventListener('DOMContentLoaded',function(){
+      var sk=document.getElementById('skeleton-overlay');
+      if(sk){sk.style.transition='opacity .2s';sk.style.opacity='0';setTimeout(function(){sk.remove()},250)}
+    });
+  </script>
+
   <div id="app" style="display:block;width:100%">
     <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
     <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
