@@ -4913,16 +4913,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     <style>@keyframes skp{to{transform:rotate(360deg)}}</style>
   </div>
   <script>
-    // 스켈레톤 즉시 제거 (SSR 카드가 이미 HTML에 있으므로 기다릴 필요 없음)
+    // skeleton은 admin.js init 완료 시 제거 (여기서는 부모에게만 알림)
     (function(){
-      var sk=document.getElementById('skeleton-overlay');
-      if(sk){sk.style.transition='opacity .15s';sk.style.opacity='0';setTimeout(function(){try{sk.remove()}catch(e){}},200)}
-      // 부모 iframe(아임웹 위젯)에 콘텐츠 준비 완료 알림
       try{if(window.parent!==window)window.parent.postMessage({type:'contentReady'},'*');}catch(e){}
     })();
   </script>
 
-  <div id="app" style="display:block;width:100%">
+  <div id="app" style="display:none;width:100%">
     <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
     <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
@@ -5847,6 +5844,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       setupAutoHeight();
       
       console.log('[DentalTV] init done in', Math.round(performance.now() - t0), 'ms');
+      
+      // skeleton 제거 + app 표시 (UI가 완성된 상태로 한번에 전환)
+      var _sk = document.getElementById('skeleton-overlay');
+      var _ap = document.getElementById('app');
+      if (_ap) _ap.style.display = 'block';
+      if (_sk) { _sk.style.transition='opacity .15s'; _sk.style.opacity='0'; setTimeout(function(){ try{_sk.remove()}catch(e){} },200); }
       
       // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
       // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
@@ -11808,8 +11811,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
   <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
   <!-- Admin CSS + 추가 스타일: body 끝에서 비차단 로드 -->
-  <!-- admin.css: lazy load (36KB 절감 → 초기 렌더링 가속) -->
-  <link rel="stylesheet" href="/static/admin.css?v=${Date.now()}" media="print" onload="this.media='all'">
+  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
   <style>
     body.modal-open{overflow:hidden!important;width:100%!important;touch-action:none!important}
     html.modal-open{overflow:hidden!important}
