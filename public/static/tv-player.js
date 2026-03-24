@@ -2713,7 +2713,109 @@ initWatchdog(); // 워치독 시작
 loadVimeoAPI();
 loadYouTubeAPI();
 
-loadData(true);
+// ★★ SSR 데이터 사용: 서버에서 인라인된 데이터가 있으면 첫 API 호출 스킵
+// 검정화면 제거 - 즉시 재생 시작
+if (window.__INITIAL_TV_DATA__) {
+  console.log('[SSR] Using inline initial data - skipping first API call');
+  // SSR 데이터로 초기화 (loadData의 isInitial=true 로직 인라인)
+  (async function ssrInit() {
+    try {
+      const data = window.__INITIAL_TV_DATA__;
+      delete window.__INITIAL_TV_DATA__; // 메모리 해제
+      
+      // adminCode/email 설정
+      if (data.adminCode) tvAdminCode = data.adminCode;
+      if (data.adminEmail) tvAdminEmail = data.adminEmail;
+      
+      // 플레이리스트 설정
+      if (data.playlist) {
+        playlist = data.playlist;
+        transitionEffect = data.playlist.transition_effect || 'fade';
+        transitionDuration = data.playlist.transition_duration || 500;
+        document.documentElement.style.setProperty('--transition-duration', transitionDuration + 'ms');
+      }
+      
+      // 임시 영상 처리
+      if (data.tempVideo && data.tempVideo.url) {
+        playlist._tempVideo = data.tempVideo;
+      }
+      
+      // 공지 설정
+      if (data.noticeSettings) {
+        Object.assign(noticeSettings, data.noticeSettings);
+      }
+      if (data.notices && data.notices.length > 0 && noticeSettings.enabled) {
+        notices = data.notices;
+        showNotice();
+      }
+      
+      // 로고 설정
+      if (data.logoSettings) {
+        Object.assign(logoSettings, data.logoSettings);
+        showLogo();
+      }
+      
+      // 재생 시간 설정
+      if (data.scheduleSettings) {
+        Object.assign(scheduleSettings, data.scheduleSettings);
+      }
+      
+      // 자막 설정
+      if (data.subtitleSettings) {
+        Object.assign(subtitleSettings, data.subtitleSettings);
+      }
+      
+      // 빈 플레이리스트 처리
+      if (!playlist || !playlist.items || playlist.items.length === 0) {
+        showEmptyPlaylistScreen();
+        hideLoadingScreen();
+      } else {
+        // API 로드 (최대 2초 대기)
+        const loadPromises = [];
+        if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
+        if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
+        if (loadPromises.length > 0) {
+          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 2000))]);
+        }
+        
+        // 재생 시간 체크 시작
+        if (scheduleCheckInterval) clearInterval(scheduleCheckInterval);
+        scheduleCheckInterval = setInterval(checkSchedule, 30000);
+        
+        if (checkSchedule()) {
+          startPlayback();
+        }
+      }
+      
+      // 10초 안전장치
+      setTimeout(hideLoadingScreen, 10000);
+      
+    } catch(e) {
+      console.error('[SSR] Init failed, falling back to API:', e);
+      loadData(true);
+    }
+  })();
+} else {
+  loadData(true);
+}
+
+// ★★ autoplay=1: 자동 전체화면 진입 (사용자 상호작용 없이)
+// 관리자 페이지에서 '내보내기' 클릭 시 새 탭으로 열리므로 사용자 제스처가 있음
+if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
+  // 즉시 전체화면 시도 (새 탭 열기는 사용자 제스처로 간주됨)
+  userHasInteracted = true;
+  shouldBeFullscreen = true;
+  setTimeout(() => {
+    document.documentElement.requestFullscreen().catch(() => {
+      // 전체화면 실패 시 클릭 한번으로 진입하도록 힌트 표시
+      const hint = document.getElementById('fullscreen-hint');
+      if (hint) {
+        hint.style.display = 'block';
+        hint.textContent = '클릭하면 전체화면으로 재생됩니다';
+      }
+    });
+  }, 500);
+}
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
 // loadData가 이미 last_active_at을 업데이트하므로 별도 heartbeat 불필요

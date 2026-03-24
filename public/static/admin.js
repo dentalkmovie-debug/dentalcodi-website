@@ -1419,7 +1419,7 @@ function renderPlaylists() {
               <button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" 
                 style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
                 onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
-                TV로 내보내기
+                체어로 내보내기
               </button>
               <button onclick="showTempVideoModal(${p.id}, '${p.name}', '${p.short_code}')" 
                 style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
@@ -4975,7 +4975,7 @@ function openTVMirror(shortCode, itemCount) {
     return;
   }
   // 아이템 개수 검증은 서버에서 처리 (공용 영상 포함 시 0일 수 있음)
-  const url = '/tv/' + shortCode;
+  const url = '/tv/' + shortCode + '?autoplay=1';
   const opened = window.open(url, '_blank');
   if (!opened) {
     window.location.href = url;

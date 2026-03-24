@@ -4604,13 +4604,13 @@ app.get('/embed-old/:memberCode', async (c) => {
       openModal('preview-modal');
     }
     
-    // TV 미러링 열기 (팝업 차단 방지를 위해 동기적으로 창 열기)
+    // TV/체어 내보내기 (팝업 차단 방지를 위해 동기적으로 창 열기 + 자동 전체화면)
     function openTVMirror(shortCode, itemCount) {
       if (!shortCode) {
         alert('TV 코드가 없습니다. 관리자에게 문의하세요.');
         return;
       }
-      const url = '/tv/' + shortCode;
+      const url = '/tv/' + shortCode + '?autoplay=1';
       const opened = window.open(url, '_blank');
       if (!opened) {
         window.location.href = url;
@@ -4824,7 +4824,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     else if (isOffline) statusBadge = '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);color:#6b7280;font-size:10px;font-weight:700">● 오프라인</span>'
     else if (neverConnected) statusBadge = `<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-size:10px;font-weight:700">${isChair ? '체어 설정 필요' : 'TV 연결 필요'}</span>`
     
-    return `<div class="playlist-sortable-item" id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" style="background:#fff;border-radius:12px;border:1px solid ${borderColor};overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div><div style="width:36px;height:36px;border-radius:10px;background:${gradActive};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative"><i class="fas ${iconClass}" style="color:#fff;font-size:14px"></i>${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></span>' : ''}</div><div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#1f2937">${p.name}</span>${statusBadge}</div><p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#2563eb;font-family:monospace;font-size:10px">${urlDisplay}</span><span style="margin:0 6px;color:#d1d5db">·</span>${p.item_count || 0}개 미디어</p></div></div><div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px"><button onclick="openPlaylistEditor(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">플레이리스트</button><button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">TV로 내보내기</button><button onclick="copyToClipboard('${p.external_short_url || baseUrl + '/' + p.short_code}'); markSingleChairSetup(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">URL 복사</button>${isActive ? '<button disabled style="padding:5px 8px;border:none;background:none;color:#e5e7eb;cursor:not-allowed;font-size:12px"><i class="fas fa-trash"></i></button>' : `<button onclick="deletePlaylist(${p.id})" style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px"><i class="fas fa-trash"></i></button>`}</div></div></div>`
+    return `<div class="playlist-sortable-item" id="playlist-card-main-${p.id}" data-playlist-id="${p.id}" style="background:#fff;border-radius:12px;border:1px solid ${borderColor};overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="drag-handle" style="width:20px;display:flex;align-items:center;justify-content:center;color:#d1d5db;cursor:grab;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div><div style="width:36px;height:36px;border-radius:10px;background:${gradActive};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative"><i class="fas ${iconClass}" style="color:#fff;font-size:14px"></i>${isActive ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></span>' : ''}</div><div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#1f2937">${p.name}</span>${statusBadge}</div><p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#2563eb;font-family:monospace;font-size:10px">${urlDisplay}</span><span style="margin:0 6px;color:#d1d5db">·</span>${p.item_count || 0}개 미디어</p></div></div><div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:30px"><button onclick="openPlaylistEditor(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">플레이리스트</button><button onclick="openTVMirror('${p.short_code}', ${p.item_count || 0})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">${isChair ? '체어로 내보내기' : 'TV로 내보내기'}</button><button onclick="copyToClipboard('${p.external_short_url || baseUrl + '/' + p.short_code}'); markSingleChairSetup(${p.id})" style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">URL 복사</button>${isActive ? '<button disabled style="padding:5px 8px;border:none;background:none;color:#e5e7eb;cursor:not-allowed;font-size:12px"><i class="fas fa-trash"></i></button>' : `<button onclick="deletePlaylist(${p.id})" style="padding:5px 8px;border:none;background:none;color:#d1d5db;cursor:pointer;font-size:12px"><i class="fas fa-trash"></i></button>`}</div></div></div>`
   }
   
   const ssrWaitingroomsHtml = ssrWaitingRooms.length === 0
@@ -6772,7 +6772,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
                   <button onclick="openTVMirror('\${p.short_code}', \${p.item_count || 0})" 
                     style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
                     onmouseover="this.style.background='linear-gradient(to bottom,#dbeafe,#bfdbfe)';this.style.color='#1d4ed8';this.style.borderColor='#93c5fd'" onmouseout="this.style.background='linear-gradient(to bottom,#f9fafb,#f3f4f6)';this.style.color='#374151';this.style.borderColor='#d1d5db'">
-                    TV로 내보내기
+                    체어로 내보내기
                   </button>
                   <button onclick="showTempVideoModal(\${p.id}, '\${p.name}', '\${p.short_code}')" 
                     style="padding:5px 14px;border-radius:8px;border:1px solid #d1d5db;background:linear-gradient(to bottom,#f9fafb,#f3f4f6);color:#374151;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s"
@@ -10328,7 +10328,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         return;
       }
       // 아이템 개수 검증은 서버에서 처리 (공용 영상 포함 시 0일 수 있음)
-      const url = '/tv/' + shortCode;
+      const url = '/tv/' + shortCode + '?autoplay=1';
       const opened = window.open(url, '_blank');
       if (!opened) {
         window.location.href = url;
@@ -12158,10 +12158,19 @@ app.get('/:shortCode{[a-zA-Z0-9]{5,8}}', async (c, next) => {
 
 app.get('/tv/:shortCode', async (c) => {
   const shortCode = c.req.param('shortCode')
+  const isAutoplay = c.req.query('autoplay') === '1'
+  
+  // ★★ SSR: DB에서 플레이리스트 + 아이템을 서버에서 가져와 HTML에 인라인
+  // 이렇게 하면 클라이언트 첫 API 호출이 필요 없어 검정화면이 사라짐
   
   // 플레이리스트로 사용자 조회
   const playlist = await c.env.DB.prepare(
-    'SELECT p.*, u.is_active, u.is_master, u.subscription_end, u.subscription_plan, u.suspended_reason FROM playlists p JOIN users u ON p.user_id = u.id WHERE p.short_code = ?'
+    `SELECT p.*, u.is_active, u.is_master, u.subscription_end, u.subscription_plan, u.suspended_reason,
+      u.clinic_name, u.id as user_id, u.admin_code, u.imweb_email,
+      u.notice_font_size, u.notice_letter_spacing, u.notice_text_color, u.notice_bg_color, u.notice_bg_opacity, u.notice_scroll_speed, u.notice_enabled, u.notice_position,
+      u.logo_url, u.logo_size, u.logo_opacity, u.logo_position, u.schedule_enabled, u.schedule_start, u.schedule_end,
+      u.use_master_playlist, u.master_playlist_mode, u.hidden_master_items
+    FROM playlists p JOIN users u ON p.user_id = u.id WHERE p.short_code = ?`
   ).bind(shortCode).first() as any
   
   if (!playlist) {
@@ -12170,22 +12179,79 @@ app.get('/tv/:shortCode', async (c) => {
   
   // 계정 상태 확인
   if (playlist && !playlist.is_master) {
-    // 1. 계정 정지 확인
     if (playlist.is_active === 0) {
       return c.html(getBlockedPageHtml('서비스 이용 불가', playlist.suspended_reason || '계정이 정지되었습니다', '관리자에게 문의해주세요.'))
     }
-    
-    // 2. 구독 만료 확인 (무제한 플랜은 제외)
     if (playlist.subscription_plan !== 'unlimited' && playlist.subscription_end) {
       const endDate = new Date(playlist.subscription_end)
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      
       if (endDate < today) {
         return c.html(getBlockedPageHtml('서비스 이용 불가', '구독 기간이 만료되었습니다 (만료일: ' + playlist.subscription_end + ')', '서비스를 계속 이용하시려면 구독을 연장해주세요.'))
       }
     }
   }
+  
+  // ★★ SSR 데이터 로드 (기존 /api/tv/:shortCode 와 동일 로직)
+  let ssrData: any = null
+  try {
+    const [userItems, masterPlaylist, allNotices, masterUser, _heartbeat] = await Promise.all([
+      c.env.DB.prepare('SELECT * FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order ASC').bind(playlist.id).all(),
+      c.env.DB.prepare('SELECT p.id FROM playlists p JOIN users u ON p.user_id = u.id WHERE u.is_master = 1 AND p.is_master_playlist = 1 AND p.is_active = 1 LIMIT 1').first(),
+      c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? AND is_active = 1 ORDER BY is_urgent DESC, sort_order ASC, created_at DESC').bind(playlist.user_id).all(),
+      c.env.DB.prepare('SELECT subtitle_font_size, subtitle_bg_opacity, subtitle_text_color, subtitle_bg_color, subtitle_position, subtitle_bottom_offset FROM users WHERE is_master = 1 LIMIT 1').first() as Promise<any>,
+      c.env.DB.prepare('UPDATE playlists SET last_active_at = datetime(\'now\') WHERE id = ?').bind(playlist.id).run()
+    ])
+    
+    let masterItems: any[] = []
+    if (masterPlaylist) {
+      const masterItemsResult = await c.env.DB.prepare('SELECT * FROM playlist_items WHERE playlist_id = ? ORDER BY sort_order ASC').bind(masterPlaylist.id).all()
+      const hiddenIds: number[] = JSON.parse(playlist.hidden_master_items || '[]')
+      masterItems = (masterItemsResult.results || []).filter((item: any) => !hiddenIds.includes(item.id))
+    }
+    
+    const rawActiveItemIds = playlist.active_item_ids
+    let activeItemIds: number[] = []
+    if (rawActiveItemIds !== null && rawActiveItemIds !== undefined && rawActiveItemIds !== '') {
+      try { activeItemIds = JSON.parse(rawActiveItemIds || '[]'); activeItemIds = Array.isArray(activeItemIds) ? activeItemIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id)) : [] } catch(e) { activeItemIds = [] }
+    }
+    
+    const useMasterPlaylist = playlist.use_master_playlist ?? 1
+    const masterItemsWithFlag = masterItems.map((item: any) => ({ ...item, is_master: true }))
+    const userItemsWithFlag = (userItems.results || []).map((item: any) => ({ ...item, is_master: false }))
+    const allItemsMap = new Map<number, any>()
+    if (useMasterPlaylist) { masterItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item)) }
+    userItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item))
+    const combinedItems = activeItemIds.filter(id => allItemsMap.has(id)).map(id => allItemsMap.get(id))
+    
+    const urgentNotices = (allNotices.results || []).filter((n: any) => n.is_urgent === 1)
+    const normalNotices = (allNotices.results || []).filter((n: any) => n.is_urgent !== 1)
+    const notices = urgentNotices.length > 0 ? urgentNotices : normalNotices
+    
+    const isChair = playlist.name && playlist.name.includes('체어')
+    let tempVideo = null
+    if (isChair && playlist.temp_video_url) {
+      tempVideo = { url: playlist.temp_video_url, title: playlist.temp_video_title, type: playlist.temp_video_type, return_time: playlist.temp_return_time || 'end' }
+    }
+    
+    ssrData = {
+      playlist: { name: playlist.name, clinic_name: playlist.clinic_name, items: combinedItems, transition_effect: playlist.transition_effect || 'fade', transition_duration: playlist.transition_duration || 500 },
+      adminCode: playlist.admin_code || null,
+      adminEmail: playlist.imweb_email || null,
+      tempVideo,
+      notices,
+      notice: notices[0] || null,
+      noticeSettings: { font_size: playlist.notice_font_size || 32, letter_spacing: playlist.notice_letter_spacing ?? 0, text_color: playlist.notice_text_color || '#ffffff', bg_color: playlist.notice_bg_color || '#1a1a2e', bg_opacity: playlist.notice_bg_opacity ?? 100, scroll_speed: playlist.notice_scroll_speed || 50, enabled: playlist.notice_enabled ?? 0, position: playlist.notice_position || 'bottom' },
+      logoSettings: { url: playlist.logo_url || '', size: playlist.logo_size || 150, opacity: playlist.logo_opacity || 90, position: playlist.logo_position || 'right' },
+      scheduleSettings: { enabled: playlist.schedule_enabled || 0, start: playlist.schedule_start || '', end: playlist.schedule_end || '' },
+      subtitleSettings: { font_size: masterUser?.subtitle_font_size || 28, bg_opacity: masterUser?.subtitle_bg_opacity || 80, text_color: masterUser?.subtitle_text_color || '#ffffff', bg_color: masterUser?.subtitle_bg_color || '#000000', position: masterUser?.subtitle_position || 'bottom', bottom_offset: masterUser?.subtitle_bottom_offset || 80 }
+    }
+  } catch(e) {
+    // SSR 데이터 로드 실패 시 null - 클라이언트에서 API 호출로 폴백
+    ssrData = null
+  }
+  
+  const ssrDataScript = ssrData ? `<script>window.__INITIAL_TV_DATA__=${JSON.stringify(ssrData).replace(/</g, '\\u003c')};</script>` : ''
   
   // ★★ 단일 HTML 응답: 모든 CSS는 head에, JS는 외부 defer + preload
   return c.html(`<!DOCTYPE html>
@@ -12291,9 +12357,11 @@ app.get('/tv/:shortCode', async (c) => {
   <script>
     const SHORT_CODE = '${shortCode}';
     const CLIENT_ID = 'client_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    const IS_AUTOPLAY = ${isAutoplay ? 'true' : 'false'};
     (function(){try{var h=Object.getOwnPropertyDescriptor(document,'hidden');if(!h||h.configurable)Object.defineProperty(document,'hidden',{configurable:true,get:function(){return false}});var v=Object.getOwnPropertyDescriptor(document,'visibilityState');if(!v||v.configurable)Object.defineProperty(document,'visibilityState',{configurable:true,get:function(){return'visible'}})}catch(e){}})();
     window.addEventListener('visibilitychange',function(e){e.stopImmediatePropagation()},true);
   </script>
+  ${ssrDataScript}
   <script defer src="/static/tv-player.js"></script>
 </body>
 </html>
