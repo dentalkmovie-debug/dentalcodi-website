@@ -12409,7 +12409,9 @@ app.get('/tv/:shortCode', async (c) => {
   ${(() => {
     // SSR: 첫 번째 아이템 썸네일을 즉시 배경으로 표시 (검정화면 제거)
     const firstItem = ssrData?.playlist?.items?.[0]
-    const thumb = firstItem?.thumbnail_url || ''
+    let thumb = firstItem?.thumbnail_url || ''
+    // Vimeo 썸네일 고해상도로 변환
+    if (thumb) thumb = thumb.replace(/_\d+x\d+/, '_1920x1080')
     if (thumb && ssrData) {
       return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;background:#000"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover" alt=""></div>`
     }
