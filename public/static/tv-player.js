@@ -1549,7 +1549,7 @@ function startVimeoPlayback(player, idx) {
   };
   player.on('ended', handleEnded);
   
-  // 재생 시작 (실패 시 재시도 - 최대 3회, 간격 넓게)
+  // 재생 시작 (실패 시 재시도 - 최대 5회, 간격 점점 넓게)
   const tryPlay = (attempt) => {
     if (thisSession !== vimeoSessionId) return;
     console.log('Vimeo play attempt:', attempt, 'session:', thisSession);
@@ -1558,8 +1558,12 @@ function startVimeoPlayback(player, idx) {
       hideLoadingScreen();
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
-      if (attempt < 3 && thisSession === vimeoSessionId) {
-        setTimeout(() => tryPlay(attempt + 1), 2000);
+      if (attempt < 5 && thisSession === vimeoSessionId) {
+        // 재시도 간격: 1초, 2초, 3초, 4초 (점진적 증가)
+        setTimeout(() => tryPlay(attempt + 1), attempt * 1000);
+      } else if (thisSession === vimeoSessionId) {
+        console.log('[Vimeo] All play attempts failed, forcing next');
+        goToNext();
       }
     });
   };
@@ -1997,8 +2001,8 @@ function ensurePlaybackAlive() {
       }
     }
   } else if (item.item_type === 'vimeo') {
-    // ★★ 노트북 핵심 수정: Vimeo 워치독은 매 3번째 호출(15초)로 완화
-    // 버퍼링 중에 paused로 감지되어 play() 재호출 → Vimeo SDK 충돌 방지
+    // ★★ 노트북 균형 수정: Vimeo 워치독은 매 3번째 호출(15초)로 완화
+    // 하지만 진짜 멈춤일 때는 적절히 복구
     if (_watchdogCallCount % 3 === 0) {
       const vimeoPlayer = players[currentIndex];
       if (vimeoPlayer && typeof vimeoPlayer.getPaused === 'function') {
@@ -2006,21 +2010,22 @@ function ensurePlaybackAlive() {
           if (paused && currentIndex < playlist.items.length) {
             _watchdogNoProgressCount++;
             console.log('[watchdog] Vimeo paused, count:', _watchdogNoProgressCount);
-            // ★★ 핵심 변경: 바로 play()를 호출하지 않음
-            // 노트북에서 버퍼링 중 play() 재호출이 오히려 재생을 방해
-            // 6회(90초) 연속 paused이면 그때만 play() 한 번 시도
-            if (_watchdogNoProgressCount >= 4 && _watchdogNoProgressCount % 2 === 0) {
-              console.log('[watchdog] Vimeo paused for', _watchdogNoProgressCount * 15, 's, gentle play retry');
+            // 2회(30초) 연속 paused: play() 한 번 시도
+            if (_watchdogNoProgressCount === 2) {
+              console.log('[watchdog] Vimeo paused 30s, gentle play retry');
               vimeoPlayer.play().catch(() => {});
             }
-            // ★★ safeRestartPlayback 호출 조건을 극단적으로 완화
-            // 8회(120초 = 2분) 연속 paused이면 그때만 재시작
-            if (_watchdogNoProgressCount >= 8) {
-              console.log('[watchdog] Vimeo stuck for 2min, forcing restart');
+            // 4회(60초) 연속 paused: safeRestartPlayback (최대 2회)
+            if (_watchdogNoProgressCount >= 4) {
+              console.log('[watchdog] Vimeo stuck for 60s, forcing restart');
               _watchdogNoProgressCount = 0;
               _watchdogRestartCount++;
               if (_watchdogRestartCount <= 2) {
                 safeRestartPlayback();
+              } else {
+                // 재시작 3회 초과: 페이지 자체를 리로드
+                console.log('[watchdog] Too many restarts, reloading page');
+                window.location.reload();
               }
             }
           } else {
@@ -2031,11 +2036,13 @@ function ensurePlaybackAlive() {
           // getPaused 자체가 실패 = iframe이 죽은 것
           _watchdogNoProgressCount++;
           console.log('[watchdog] Vimeo getPaused failed, count:', _watchdogNoProgressCount);
-          if (_watchdogNoProgressCount >= 6) { // 90초 (20→90초 대폭 완화)
+          if (_watchdogNoProgressCount >= 4) { // 60초
             _watchdogNoProgressCount = 0;
             _watchdogRestartCount++;
             if (_watchdogRestartCount <= 2) {
               safeRestartPlayback();
+            } else {
+              window.location.reload();
             }
           }
         });

@@ -12363,7 +12363,7 @@ app.get('/tv/:shortCode', async (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TV 미러링</title>
-  <link rel="preload" href="/static/tv-player.js" as="script">
+  <link rel="preload" href="/static/tv-player.js?v=${Date.now()}" as="script">
   <link rel="preload" href="https://player.vimeo.com/api/player.js" as="script">
   <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
   <style>
@@ -12465,7 +12465,7 @@ app.get('/tv/:shortCode', async (c) => {
     window.addEventListener('visibilitychange',function(e){e.stopImmediatePropagation()},true);
   </script>
   ${ssrDataScript}
-  <script defer src="/static/tv-player.js"></script>
+  <script defer src="/static/tv-player.js?v=${Date.now()}"></script>
 </body>
 </html>
   `)
