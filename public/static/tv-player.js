@@ -765,10 +765,10 @@ async function loadData(isInitial = false) {
       if (hasVimeo) loadPromises.push(loadVimeoAPI());
       
       if (loadPromises.length > 0) {
-        // API가 이미 프리로드 중이므로 최대 800ms만 대기
+        // API가 이미 프리로드 중이므로 최대 2초만 대기
         await Promise.race([
           Promise.all(loadPromises),
-          new Promise(resolve => setTimeout(resolve, 800))
+          new Promise(resolve => setTimeout(resolve, 2000))
         ]);
       }
       
@@ -1603,7 +1603,7 @@ function startVimeoPlayback(player, idx) {
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
       if (attempt < 3 && thisSession === vimeoSessionId) {
-        setTimeout(() => tryPlay(attempt + 1), 1000);
+        setTimeout(() => tryPlay(attempt + 1), 2000);
       }
     });
   };
@@ -2813,7 +2813,7 @@ if (window.__INITIAL_TV_DATA__) {
         if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
         if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
         if (loadPromises.length > 0) {
-          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 500))]);
+          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 2000))]);
         }
         
         // 재생 시간 체크 시작
