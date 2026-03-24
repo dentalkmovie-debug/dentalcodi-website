@@ -4949,6 +4949,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const ssrChCount = ssrChairs.length + '개'
   // ── SSR 끝 ──
   
+  // widget 모드: 외부 위젯에서 iframe으로 호출 시 헤더/탭 숨김
+  const widgetMode = c.req.query('widget') === '1'
+  const widgetTab = c.req.query('tab') || 'waitingrooms'
+  // widget 모드용 탭 이름 매핑
+  const tabMap: Record<string, string> = { notice: 'notices', settings: 'settings', admin: 'admin', notices: 'notices', waitingrooms: 'waitingrooms', chairs: 'chairs' }
+  const resolvedTab = tabMap[widgetTab] || 'waitingrooms'
+  
   // 짧은 캐시 허용 (Cloudflare 엣지에서 즉시 응답, 5초마다 갱신)
   // s-maxage=5: Cloudflare CDN은 5초간 캐시 (한국 엣지에서 즉시 응답)
   // max-age=0: 브라우저는 캐시하지 않음 (항상 CDN에 확인)
@@ -4964,6 +4971,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>치과 TV 관리자</title>
+  ${widgetMode ? `<style>#dashboard>div:first-child,#tab-nav{display:none!important}#dtv-pg{border-radius:12px!important;border-top:1px solid #e5e7eb!important}</style>` : ''}
   <!-- preload만: 다운로드 시작하되 렌더 차단 안 함 -->
   <link rel="preload" href="/static/admin.js?v=${Date.now()}" as="script">
   <script>
@@ -11925,6 +11933,19 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       loadJS('https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js');
     })();
   </script>
+  ${widgetMode ? `<script>
+    // widget 모드: 요청된 탭 자동 선택
+    (function(){
+      var targetTab = '${resolvedTab}';
+      function tryShowTab(){
+        if(typeof showTab==='function'){showTab(targetTab);return true;}
+        return false;
+      }
+      if(!tryShowTab()){
+        var n=0,iv=setInterval(function(){if(tryShowTab()||++n>100)clearInterval(iv);},50);
+      }
+    })();
+  </script>` : ''}
 </body>
 </html>
   `)

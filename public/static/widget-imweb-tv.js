@@ -108,13 +108,20 @@
     }
   }
 
-  /* ===== full admin (iframe) for advanced tabs ===== */
+  /* ===== full admin (iframe without header/tabs) for advanced tabs ===== */
   function loadFull(t) {
     var el = document.getElementById('dtv-p-' + t);
     if (!el || el.querySelector('iframe')) return;
-    var map = { no: 'notice', st: 'settings', ad: 'admin' };
-    var url = API + '/embed/' + encodeURIComponent(ADMIN_CODE) + '?email=' + encodeURIComponent((DATA && DATA.userEmail) || '') + '&tab=' + (map[t] || t);
-    el.innerHTML = '<iframe src="' + url + '" width="100%" height="700" frameborder="0" style="border:none;border-radius:8px"></iframe>';
+    var map = { no: 'notices', st: 'settings', ad: 'admin' };
+    var url = API + '/embed/' + encodeURIComponent(ADMIN_CODE) + '?email=' + encodeURIComponent((DATA && DATA.userEmail) || '') + '&widget=1&tab=' + (map[t] || t);
+    el.innerHTML = '<iframe src="' + url + '" width="100%" frameborder="0" style="border:none;border-radius:8px;min-height:500px" onload="this.style.height=this.contentWindow.document.body.scrollHeight+\'px\'"></iframe>';
+    // Listen for height messages from iframe
+    var frame = el.querySelector('iframe');
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'setHeight' && frame) {
+        frame.style.height = (e.data.height + 30) + 'px';
+      }
+    });
   }
 
   /* ===== start ===== */
