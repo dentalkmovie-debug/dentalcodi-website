@@ -504,12 +504,7 @@ function init() {
   
   console.log('[DentalTV] init done in', Math.round(performance.now() - t0), 'ms');
   
-  // skeleton 제거 + app 표시 (UI가 완성된 상태로 한번에 전환)
-  var _sk = document.getElementById('skeleton-overlay');
-  var _ap = document.getElementById('app');
-  if (_ap) _ap.style.display = 'block';
-  if (_sk) { _sk.style.transition='opacity .15s'; _sk.style.opacity='0'; setTimeout(function(){ try{_sk.remove()}catch(e){} },200); }
-  // 부모 iframe에 콘텐츠 준비 완료 알림
+  // 부모 iframe에 콘텐츠 준비 완료 알림 (init 완료)
   try{if(window.parent!==window)window.parent.postMessage({type:'contentReady'},'*');}catch(e){}
   
   // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)

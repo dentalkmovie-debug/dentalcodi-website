@@ -4894,27 +4894,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- 모든 외부 CSS/Font/JS는 body 끝에서 lazy load (head 완전 비움 → 즉시 렌더링) -->
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
-  <!-- ★ 스켈레톤 오버레이: 가장 먼저 렌더링됨 (흰 화면 방지) -->
-  <div id="skeleton-overlay" style="position:fixed;inset:0;z-index:9999;background:#fff">
-    <div style="background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px">
-      <div style="height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px"></div>
-      <div style="height:12px;width:200px;background:rgba(255,255,255,.2);border-radius:3px"></div>
-    </div>
-    <div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff">
-      <span style="padding:11px 14px;font-size:13px;color:#2563eb;border-bottom:2px solid #2563eb;font-weight:700;font-family:-apple-system,sans-serif">대기실</span>
-      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">체어</span>
-      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">공지사항</span>
-      <span style="padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif">설정</span>
-    </div>
-    <div style="padding:16px;text-align:center;padding-top:60px">
-      <div style="width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:skp 0.8s linear infinite;margin:0 auto 12px"></div>
-      <p style="font-size:13px;color:#9ca3af;font-family:-apple-system,sans-serif">로딩 중...</p>
-    </div>
-    <style>@keyframes skp{to{transform:rotate(360deg)}}</style>
-  </div>
-  <!-- contentReady는 admin.js init 완료 시 전송 -->
+  <!-- skeleton 제거: SSR 카드가 즉시 보이도록 #app을 바로 표시 -->
 
-  <div id="app" style="display:none;width:100%">
+  <div id="app" style="width:100%">
     <!-- 로딩 (숨김 - JS에서 필요시 표시) -->
     <div id="loading" style="display:none;position:fixed;inset:0;background:#fff;z-index:50;align-items:center;justify-content:center">
       <div style="text-align:center">
@@ -5840,12 +5822,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       
       console.log('[DentalTV] init done in', Math.round(performance.now() - t0), 'ms');
       
-      // skeleton 제거 + app 표시 (UI가 완성된 상태로 한번에 전환)
-      var _sk = document.getElementById('skeleton-overlay');
-      var _ap = document.getElementById('app');
-      if (_ap) _ap.style.display = 'block';
-      if (_sk) { _sk.style.transition='opacity .15s'; _sk.style.opacity='0'; setTimeout(function(){ try{_sk.remove()}catch(e){} },200); }
-      // 부모 iframe에 콘텐츠 준비 완료 알림
+      // 부모 iframe에 콘텐츠 준비 완료 알림 (init 완료)
       try{if(window.parent!==window)window.parent.postMessage({type:'contentReady'},'*');}catch(e){}
       
       // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
