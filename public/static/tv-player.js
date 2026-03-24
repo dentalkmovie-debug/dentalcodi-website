@@ -38,20 +38,18 @@ function removeSSRThumbnail() {
   document.body.style.background = '#000';
 }
 
-// SSR 썸네일 위 로딩 프로그레스 바
+// SSR 썸네일 위 원형 로딩 스피너 (상단 중앙)
 function showThumbLoadingBar() {
   var thumb = document.getElementById('ssr-thumbnail');
   if (!thumb) return;
-  var bar = document.createElement('div');
-  bar.id = 'ssr-loading-bar';
-  bar.style.cssText = 'position:absolute;bottom:0;left:0;width:0;height:3px;background:rgba(255,255,255,0.7);z-index:51;border-radius:0 2px 2px 0;transition:width 8s linear';
-  thumb.appendChild(bar);
-  // 다음 프레임에서 애니메이션 시작
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      bar.style.width = '100%';
-    });
-  });
+  var wrap = document.createElement('div');
+  wrap.id = 'ssr-loading-bar';
+  wrap.style.cssText = 'position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:51';
+  wrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);border-radius:50%;animation:ssrSpin .8s linear infinite"></div>';
+  var st = document.createElement('style');
+  st.textContent = '@keyframes ssrSpin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(st);
+  thumb.appendChild(wrap);
 }
 // 페이지 로드 시 바로 실행
 showThumbLoadingBar();
