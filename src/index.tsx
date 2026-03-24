@@ -14,6 +14,56 @@ app.use('*', cors({
   allowHeaders: ['Content-Type'],
 }))
 
+// ── 접속 경로 디버그 로깅 (D1에 기록) ──
+app.use('*', async (c, next) => {
+  const url = c.req.url
+  const path = new URL(url).pathname
+  // admin/embed 관련 경로만 기록 (API 제외)
+  if ((path.startsWith('/admin') || path.startsWith('/embed') || path === '/') && !path.startsWith('/api/')) {
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO access_log (url, method, user_agent, referer, created_at) VALUES (?, ?, ?, ?, datetime('now'))`
+      ).bind(
+        url.slice(0, 500),
+        c.req.method,
+        (c.req.header('user-agent') || '').slice(0, 200),
+        (c.req.header('referer') || '').slice(0, 200)
+      ).run().catch(() => {})
+    } catch(e) {}
+  }
+  await next()
+})
+
+// 디버그: 최근 접속 경로 확인
+app.get('/api/debug/recent-hits', async (c) => {
+  try {
+    // 테이블 생성 (없으면)
+    await c.env.DB.prepare(`CREATE TABLE IF NOT EXISTS access_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT, method TEXT, user_agent TEXT, referer TEXT, created_at TEXT
+    )`).run()
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM access_log ORDER BY id DESC LIMIT 30'
+    ).all()
+    return c.json({ count: result.results?.length || 0, hits: result.results || [] })
+  } catch(e: any) {
+    return c.json({ error: e.message })
+  }
+})
+
+// 디버그: access_log 테이블 초기화
+app.get('/api/debug/init-log', async (c) => {
+  try {
+    await c.env.DB.prepare(`CREATE TABLE IF NOT EXISTS access_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT, method TEXT, user_agent TEXT, referer TEXT, created_at TEXT
+    )`).run()
+    return c.json({ ok: true })
+  } catch(e: any) {
+    return c.json({ error: e.message })
+  }
+})
+
 // favicon 요청 처리 (500 에러 방지)
 app.get('/favicon.ico', (c) => new Response(null, { status: 204 }))
 
@@ -2712,22 +2762,7 @@ app.get('/embed/:memberCode', async (c) => {
   const memberEmail = c.req.query('email') || ''
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
 
-  // ── 2단계 로딩: _full 파라미터가 없으면 즉시 로더 HTML 반환 ──
-  // imweb iframe 흰 화면 방지: DB 쿼리 없이 ~1.5KB 스켈레톤을 즉시 전송
-  // 스켈레톤이 표시된 후 fetch로 실제 admin HTML을 로드
-  if (!c.req.query('_full')) {
-    const qs = new URLSearchParams()
-    if (memberName) qs.set('name', memberName)
-    if (memberEmail) qs.set('email', memberEmail)
-    if (isAdmin) qs.set('is_admin', isAdmin)
-    qs.set('_full', '1')
-    const fullUrl = `/embed/${encodeURIComponent(memberCode)}?${qs.toString()}`
-    return c.html(getSkeletonHtml(fullUrl), 200, {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    })
-  }
+  // 2단계 로딩 제거 - 인라인 CSS를 body 끝으로 이동하여 렌더 차단 방지
 
   // admin_code(imweb_xxx)가 memberCode로 들어온 경우 → admin_code로 직접 매칭
   if (memberCode.startsWith('imweb_')) {
@@ -4810,8 +4845,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
     } catch (e) {}
   </script>
-  <!-- Admin CSS 인라인 (외부 요청 0개 → 즉시 스타일 적용) -->
-  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
+  <!-- Critical CSS: 최소한의 스타일만 head에 (렌더 차단 최소화) -->
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{margin:0;padding:0;width:100%;height:auto;overflow-x:hidden;overflow-y:auto;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    #app{display:block;width:100%}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+  <!-- Admin CSS: body 끝에서 비차단 로드 (렌더 차단 방지) -->
   <!-- Noto Sans KR 폰트: 비동기 (외부서버 느림 → 렌더 차단 안함) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4822,63 +4863,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <!-- FontAwesome: 비동기 로드 (렌더링 비차단) -->
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
-  <style>
-    /* body: 스크롤 가능 (imweb이 iframe 높이를 콘텐츠에 맞게 자동 조정) */
-    html, body { margin: 0; padding: 0; width: 100%; height: auto; overflow-x: hidden; overflow-y: auto; }
-    /* 모달 열릴 때 body 고정 (아임웹 iframe 환경 배경 이동 완전 차단) */
-    body.modal-open {
-      overflow: hidden !important;
-      width: 100% !important;
-      touch-action: none !important;
-    }
-    html.modal-open {
-      overflow: hidden !important;
-    }
-    .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
-    .modal-backdrop { display:none !important; }
-    .modal-card-shadow { box-shadow: 0 12px 48px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05); border-radius: 16px; }
-    .toast { animation: slideIn 0.3s ease; }
-    .playlist-item-highlight { background: #fef9c3 !important; box-shadow: 0 0 0 2px #facc15; }
-    .library-item-highlight { background: #dbeafe !important; box-shadow: 0 0 0 2px #3b82f6; }
-
-    /* ── 안내 모달(guide-url, script-download, tv-guide 등) 공통 ── */
-    /* zoom은 JS openModal에서 동적으로 적용 (visualViewport 기준)      */
-    /* 모달 박스 자체 overflow:visible → 스크롤 없이 zoom으로 축소       */
-    #tv-guide-modal .bg-white,
-    #script-download-modal .bg-white,
-    #shortcut-guide-modal .bg-white,
-    #autorun-guide-modal .bg-white,
-    #guide-url-modal .bg-white {
-      transform-origin: top center;
-      overflow: visible;
-    }
-    @keyframes slideIn {
-      from { transform: translateY(-100%); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    @keyframes dtvFadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .preview-frame {
-      aspect-ratio: 16/9;
-      background: #000;
-    }
-    .sortable-ghost {
-      opacity: 0.4;
-      background: #e0e7ff;
-    }
-    .sortable-drag {
-      background: white;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    }
-    .drag-handle {
-      cursor: grab;
-    }
-    .drag-handle:active {
-      cursor: grabbing;
-    }
-  </style>
+  <!-- 추가 CSS: body 끝에서 로드 (렌더 차단 방지) -->
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
   <div id="app" style="display:block;width:100%">
@@ -11764,6 +11749,26 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   </script>
   <!-- 빌드 시 인라인 JS가 제거되므로, 외부 admin.js를 defer로 로드 -->
   <!-- 개발 시에는 인라인 JS가 먼저 실행되고, _initDone 가드가 중복 실행 방지 -->
+  <!-- Admin CSS + 추가 스타일: body 끝에서 비차단 로드 -->
+  <style>/* @@ADMIN_CSS_INLINE@@ */</style>
+  <style>
+    body.modal-open{overflow:hidden!important;width:100%!important;touch-action:none!important}
+    html.modal-open{overflow:hidden!important}
+    .tab-active{border-bottom:2px solid #3b82f6;color:#3b82f6}
+    .modal-backdrop{display:none!important}
+    .modal-card-shadow{box-shadow:0 12px 48px rgba(0,0,0,.2),0 4px 16px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.05);border-radius:16px}
+    .toast{animation:slideIn .3s ease}
+    .playlist-item-highlight{background:#fef9c3!important;box-shadow:0 0 0 2px #facc15}
+    .library-item-highlight{background:#dbeafe!important;box-shadow:0 0 0 2px #3b82f6}
+    #tv-guide-modal .bg-white,#script-download-modal .bg-white,#shortcut-guide-modal .bg-white,#autorun-guide-modal .bg-white,#guide-url-modal .bg-white{transform-origin:top center;overflow:visible}
+    @keyframes slideIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes dtvFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .preview-frame{aspect-ratio:16/9;background:#000}
+    .sortable-ghost{opacity:.4;background:#e0e7ff}
+    .sortable-drag{background:#fff;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+    .drag-handle{cursor:grab}
+    .drag-handle:active{cursor:grabbing}
+  </style>
   <script defer src="/static/admin.js?v=${Date.now()}"></script>
 </body>
 </html>
@@ -11782,21 +11787,6 @@ app.get('/admin/:adminCode', async (c) => {
   const isAdminFlag = c.req.query('is_admin') === '1'
   const emailParam = (c.req.query('email') || '').trim().toLowerCase()
   const nameParam = c.req.query('name') || ''
-
-  // ── 2단계 로딩: _full 없으면 즉시 스켈레톤 반환 (흰 화면 방지) ──
-  if (!c.req.query('_full')) {
-    const qs = new URLSearchParams()
-    if (emailParam) qs.set('email', emailParam)
-    if (isAdminFlag) qs.set('is_admin', '1')
-    if (nameParam) qs.set('name', nameParam)
-    qs.set('_full', '1')
-    const fullUrl = `/admin/${encodeURIComponent(adminCode)}?${qs.toString()}`
-    return c.html(getSkeletonHtml(fullUrl), 200, {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    })
-  }
 
   return handleAdminPage(c, adminCode, emailParam, isAdminFlag, nameParam)
 })
