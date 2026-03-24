@@ -19,40 +19,29 @@ function hideLoadingScreen() {
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
-  // 썸네일은 여기서 제거하지 않음 - removeSSRThumbnail()에서 별도 처리
-}
-
-// SSR 썸네일 제거 (영상이 실제 재생 시작된 후 호출)
-let _ssrThumbRemoved = false;
-function removeSSRThumbnail() {
-  if (_ssrThumbRemoved) return;
-  _ssrThumbRemoved = true;
+  // SSR 썸네일 fade-out (재생 시작되면 자연스럽게 사라짐)
   const thumb = document.getElementById('ssr-thumbnail');
   if (thumb) {
     setTimeout(function() {
       thumb.style.transition = 'opacity 0.6s ease-out';
       thumb.style.opacity = '0';
-      setTimeout(function() { thumb.remove(); }, 650);
-    }, 150);
+      setTimeout(function() { thumb.remove(); document.body.style.background = '#000'; }, 700);
+    }, 200);
   }
-  document.body.style.background = '#000';
 }
 
-// SSR 썸네일 위 원형 로딩 스피너 (상단 중앙)
-function showThumbLoadingBar() {
+// SSR 썸네일 위 원형 로딩 스피너
+(function() {
   var thumb = document.getElementById('ssr-thumbnail');
   if (!thumb) return;
   var wrap = document.createElement('div');
-  wrap.id = 'ssr-loading-bar';
   wrap.style.cssText = 'position:absolute;top:15%;left:50%;transform:translateX(-50%);z-index:51';
   wrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);border-radius:50%;animation:ssrSpin .8s linear infinite"></div>';
   var st = document.createElement('style');
   st.textContent = '@keyframes ssrSpin{to{transform:rotate(360deg)}}';
   document.head.appendChild(st);
   thumb.appendChild(wrap);
-}
-// 페이지 로드 시 바로 실행
-showThumbLoadingBar();
+})();
 
 // 안정성 강화 변수
 let isTransitioning = false; // 중복 전환 방지
@@ -754,7 +743,6 @@ async function loadData(isInitial = false) {
       // ★★ 로딩 화면은 첫 미디어 재생 시작 시 숨김 (빈 검은 화면 방지)
       // 안전장치: 10초 후 강제 숨김 (미디어 로드 실패 대비)
       setTimeout(hideLoadingScreen, 10000);
-      setTimeout(removeSSRThumbnail, 12000);
       
       // ★★ API는 이미 페이지 시작 시 프리로드됨 (loadVimeoAPI/loadYouTubeAPI 미리 호출)
       const hasYouTube = playlist.items.some(i => i.item_type === 'youtube');
@@ -1376,7 +1364,6 @@ function setupYouTube(item, index) {
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) {
             hideLoadingScreen();
-            removeSSRThumbnail();
           }
           if (e.data === YT.PlayerState.ENDED && currentIndex === index) {
             console.log('YouTube ended:', index);
@@ -1411,7 +1398,7 @@ function setupImage(item, index) {
     container.appendChild(img);
     console.log('Image ready:', index);
     itemsReady[index] = true;
-    if (index === currentIndex) { hideLoadingScreen(); removeSSRThumbnail(); }
+    if (index === currentIndex) hideLoadingScreen();
   };
   
   img.onerror = () => {
@@ -1599,7 +1586,6 @@ function startVimeoPlayback(player, idx) {
     player.play().then(() => {
       console.log('Vimeo play SUCCESS, attempt:', attempt);
       hideLoadingScreen();
-      removeSSRThumbnail();
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
       if (attempt < 3 && thisSession === vimeoSessionId) {
@@ -2801,14 +2787,12 @@ if (window.__INITIAL_TV_DATA__) {
         Object.assign(subtitleSettings, data.subtitleSettings);
       }
       
-      // ★★ SSR 데이터 파싱 완료 즉시 로딩화면 숨기기 (검정화면 제거)
-      hideLoadingScreen();
-      
       // 빈 플레이리스트 처리
       if (!playlist || !playlist.items || playlist.items.length === 0) {
         showEmptyPlaylistScreen();
+        hideLoadingScreen();
       } else {
-        // API 로드 대기 (preload로 이미 거의 완료 상태 - 짧게 대기)
+        // API 로드 (최대 2초 대기)
         const loadPromises = [];
         if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
         if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
@@ -2825,6 +2809,9 @@ if (window.__INITIAL_TV_DATA__) {
         }
       }
       
+      // 10초 안전장치
+      setTimeout(hideLoadingScreen, 10000);
+      
     } catch(e) {
       console.error('[SSR] Init failed, falling back to API:', e);
       loadData(true);
@@ -2838,48 +2825,24 @@ if (window.__INITIAL_TV_DATA__) {
 if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
   userHasInteracted = true;
   shouldBeFullscreen = true;
-  // 즉시 전체화면 시도 (window.open에서 넘어온 경우 user gesture 전파될 수 있음)
-  var _fsAttempted = false;
-  function _tryFS() {
-    if (_fsAttempted && document.fullscreenElement) return;
-    _fsAttempted = true;
-    document.documentElement.requestFullscreen().then(function() {
-      console.log('[Autoplay] Fullscreen entered automatically');
-      _removeFSOverlay();
-    }).catch(function() {
-      console.log('[Autoplay] Auto fullscreen blocked, showing touch hint');
-      _showFSOverlay();
+  setTimeout(function() {
+    document.documentElement.requestFullscreen().catch(function() {
+      // 전체화면 실패 시 투명 오버레이로 터치 유도
+      var ov = document.createElement('div');
+      ov.id = 'fs-touch-overlay';
+      ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:pointer';
+      var hint = document.createElement('div');
+      hint.style.cssText = 'position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 24px;border-radius:24px;font-size:15px;white-space:nowrap';
+      hint.textContent = '화면을 터치하여 전체화면 시작';
+      ov.appendChild(hint);
+      ov.addEventListener('click', function() {
+        document.documentElement.requestFullscreen().catch(function(){});
+        ov.remove();
+      }, { once: true });
+      document.body.appendChild(ov);
+      setTimeout(function() { if (ov.parentNode) ov.remove(); }, 5000);
     });
-  }
-  function _showFSOverlay() {
-    // 투명 터치 영역 + 하단에 작은 힌트만 (영상은 그대로 보임)
-    if (document.getElementById('fs-touch-overlay')) return;
-    var ov = document.createElement('div');
-    ov.id = 'fs-touch-overlay';
-    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:pointer;background:transparent';
-    // 하단 힌트 텍스트
-    var hint = document.createElement('div');
-    hint.style.cssText = 'position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 24px;border-radius:24px;font-size:15px;white-space:nowrap;animation:fsPulse 2s ease-in-out infinite';
-    hint.textContent = '화면을 터치하여 전체화면 시작';
-    ov.appendChild(hint);
-    // 애니메이션 추가
-    var st = document.createElement('style');
-    st.textContent = '@keyframes fsPulse{0%,100%{opacity:0.7}50%{opacity:1}}';
-    document.head.appendChild(st);
-    ov.addEventListener('click', function() {
-      document.documentElement.requestFullscreen().catch(function(){});
-      _removeFSOverlay();
-    }, { once: true });
-    document.body.appendChild(ov);
-    // 5초 후 자동으로 힌트 사라짐 (전체화면 안해도 시청 가능)
-    setTimeout(function() { _removeFSOverlay(); }, 5000);
-  }
-  function _removeFSOverlay() {
-    var el = document.getElementById('fs-touch-overlay');
-    if (el) el.remove();
-  }
-  // 100ms 후 시도 (DOM 완전 로드 후)
-  setTimeout(_tryFS, 100);
+  }, 500);
 }
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
@@ -2949,15 +2912,14 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('pagehide', deactivateTV, true);
 window.addEventListener('beforeunload', deactivateTV, true);
 
-// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시 - autoplay가 아닌 경우에도)
-if (!(typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY)) {
-  document.addEventListener('click', function autoFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-    document.removeEventListener('click', autoFullscreen);
-  }, { once: true });
-}
+// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
+document.addEventListener('click', function autoFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+  // 한 번만 실행
+  document.removeEventListener('click', autoFullscreen);
+}, { once: true });
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
