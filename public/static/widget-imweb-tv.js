@@ -1,6 +1,6 @@
 (function(){
   var API = 'https://dental-tv-app.pages.dev';
-  var VERSION = '1.1.0';
+  var VERSION = '2.0.0';
 
   /* ===== root ===== */
   var root = document.getElementById('dtv-widget-root');
@@ -13,12 +13,6 @@
     else document.body.appendChild(root);
   }
   if (root.querySelector('.dtv-ok')) return;
-
-  /* ===== inline SVG icons (no FontAwesome needed) ===== */
-  var IC = {
-    couch: '<svg width="14" height="14" viewBox="0 0 640 512" fill="#fff"><path d="M64 160C64 89.3 121.3 32 192 32H448c70.7 0 128 57.3 128 128v33.6c-36.5 7.4-64 39.7-64 78.4v48H128V272c0-38.7-27.5-71-64-78.4V160zM544 272c0-20.9 13.4-38.7 32-45.3V272c0 26.5-21.5 48-48 48H112c-26.5 0-48-21.5-48-48V226.7c18.6 6.6 32 24.4 32 45.3v80h448V272zm32 128H64v32c0 17.7 14.3 32 32 32H544c17.7 0 32-14.3 32-32V400z"/></svg>',
-    tv: '<svg width="14" height="14" viewBox="0 0 640 512" fill="#fff"><path d="M64 64V352H576V64H64zM0 64C0 28.7 28.7 0 64 0H576c35.3 0 64 28.7 64 64V352c0 35.3-28.7 64-64 64H400v32h80c17.7 0 32 14.3 32 32s-14.3 32-32 32H160c-17.7 0-32-14.3-32-32s14.3-32 32-32h80V416H64c-35.3 0-64-28.7-64-64V64z"/></svg>'
-  };
 
   /* ===== member_code detection ===== */
   function getMC() {
@@ -41,88 +35,112 @@
   }
 
   /* ===== state ===== */
-  var ADMIN_CODE = '', BASE_URL = API, DATA = null;
+  var MC = '', EM = '', currentTab = 'waitingrooms';
+  var frames = {};
 
-  /* ===== render functions ===== */
-  function card(p, type) {
-    var on = !!(p.is_tv_active);
-    var never = !p.last_active_at && !p.external_short_url;
-    var off = !on && !never && (p.last_active_at || p.external_short_url);
-    var ch = type === 'chair';
-    var grad = on ? 'linear-gradient(135deg,#22c55e,#16a34a)' : (ch ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'linear-gradient(135deg,#3b82f6,#2563eb)');
-    var icon = ch ? IC.tv : IC.couch;
-    var bc = on ? '#bbf7d0' : '#e5e7eb';
-    var url = p.external_short_url ? p.external_short_url.replace('https://', '') : BASE_URL.replace('https://', '').replace('http://', '') + '/' + p.short_code;
-    var badge = '';
-    if (on) badge = '<span style="padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#15803d;font-size:10px;font-weight:700">&#9679; \uc0ac\uc6a9\uc911</span>';
-    else if (off) badge = '<span style="padding:2px 8px;border-radius:20px;background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:700">&#9679; \uc624\ud504\ub77c\uc778</span>';
-    else if (never) badge = '<span style="padding:2px 8px;border-radius:20px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700">' + (ch ? '\uccb4\uc5b4 \uc124\uc815 \ud544\uc694' : 'TV \uc5f0\uacb0 \ud544\uc694') + '</span>';
-    return '<div data-pid="' + p.id + '" style="background:#fff;border-radius:12px;border:1px solid ' + bc + ';overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="padding:14px 16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><div style="width:36px;height:36px;border-radius:10px;background:' + grad + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">' + icon + (on ? '<span style="position:absolute;top:-3px;right:-3px;width:10px;height:10px;background:#22c55e;border-radius:50%;border:2px solid #fff"></span>' : '') + '</div><div style="min-width:0;flex:1"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:14px;font-weight:700;color:#1f2937">' + p.name + '</span>' + badge + '</div><p style="font-size:11px;color:#9ca3af;margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#2563eb;font-family:monospace;font-size:10px">' + url + '</span><span style="margin:0 6px;color:#d1d5db">\u00b7</span>' + (p.item_count || 0) + '\uac1c \ubbf8\ub514\uc5b4</p></div></div></div></div>';
+  /* ===== build iframe URL ===== */
+  function iframeUrl(tab) {
+    return API + '/embed/' + encodeURIComponent(MC) + '?email=' + encodeURIComponent(EM) + '&widget=1&tab=' + tab;
   }
 
-  function render(d, ac, bu) {
-    ADMIN_CODE = ac; BASE_URL = bu; DATA = d;
-    var pl = d.playlists || [];
-    var cn = d.clinicName || '';
-    var mn = d.memberName || '';
-    var ue = d.userEmail || '';
-    var sa = d.isSuperAdmin;
-    var oa = d.isOwnerAdmin;
+  /* ===== render shell (header + tabs only, content = iframe) ===== */
+  function renderShell(data) {
+    var cn = data.clinicName || '';
+    var mn = data.memberName || '';
+    var ue = data.userEmail || '';
+    var sa = data.isSuperAdmin;
+    var oa = data.isOwnerAdmin;
     var dn = (cn && cn !== '\ub0b4 \uce58\uacfc') ? cn : (mn || (sa ? '\uad00\ub9ac\uc790' : '\ub0b4 \uce58\uacfc'));
     var role = sa ? '\ucd5c\uace0\uad00\ub9ac\uc790' : (oa ? '\uad00\ub9ac\uc790' : '\ub300\uae30\uc2e4 TV \uad00\ub9ac\uc790');
     var sub = role + (ue ? ' \u00b7 ' + ue : '');
-    var wr = pl.filter(function(p) { return p.name.indexOf('\uccb4\uc5b4') === -1; }).sort(function(a, b) { return (a.sort_order || 999) - (b.sort_order || 999); });
-    var cr = pl.filter(function(p) { return p.name.indexOf('\uccb4\uc5b4') !== -1; }).sort(function(a, b) { return (a.sort_order || 999) - (b.sort_order || 999); });
-    var wrH = wr.length ? '<div style="display:grid;gap:10px">' + wr.map(function(p) { return card(p, 'wr'); }).join('') + '</div>' : '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center"><p style="font-size:14px;color:#6b7280;margin:0">\ub4f1\ub85d\ub41c \ub300\uae30\uc2e4\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.</p></div>';
-    var crH = cr.length ? '<div style="display:grid;gap:10px">' + cr.map(function(p) { return card(p, 'chair'); }).join('') + '</div>' : '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:32px;text-align:center"><p style="font-size:14px;color:#6b7280;margin:0">\ub4f1\ub85d\ub41c \uccb4\uc5b4\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.</p></div>';
     var adm = sa ? 'inline-block' : 'none';
+
+    var tabs = [
+      { id: 'waitingrooms', label: '\ub300\uae30\uc2e4' },
+      { id: 'chairs', label: '\uccb4\uc5b4' },
+      { id: 'notices', label: '\uacf5\uc9c0\uc0ac\ud56d' },
+      { id: 'settings', label: '\uc124\uc815' },
+      { id: 'admin', label: '\uad00\ub9ac', display: adm }
+    ];
+
+    var tabHtml = '';
+    for (var i = 0; i < tabs.length; i++) {
+      var t = tabs[i];
+      var isActive = t.id === 'waitingrooms';
+      var disp = t.display || 'inline-block';
+      tabHtml += '<button data-t="' + t.id + '" class="dtv-tb" style="display:' + disp + ';padding:11px 14px;border:none;background:none;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;'
+        + (isActive ? 'font-weight:700;color:#2563eb;border-bottom:2px solid #2563eb' : 'font-weight:500;color:#6b7280;border-bottom:2px solid transparent')
+        + '">' + t.label + '</button>';
+    }
 
     root.innerHTML = '<div class="dtv-ok" style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">'
       + '<div style="background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px;border-radius:12px 12px 0 0"><div style="font-size:18px;font-weight:700;color:#fff">' + dn + '</div><div style="font-size:12px;color:rgba(255,255,255,.7);margin-top:4px">' + sub + '</div></div>'
-      + '<div id="dtv-tabs" style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff;overflow-x:auto">'
-      + '<button data-t="wr" class="dtv-tb dtv-act" style="padding:11px 14px;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;color:#2563eb;border-bottom:2px solid #2563eb;font-family:inherit;white-space:nowrap">\ub300\uae30\uc2e4</button>'
-      + '<button data-t="ch" class="dtv-tb" style="padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap">\uccb4\uc5b4</button>'
-      + '<button data-t="no" class="dtv-tb" style="padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap">\uacf5\uc9c0\uc0ac\ud56d</button>'
-      + '<button data-t="st" class="dtv-tb" style="padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap">\uc124\uc815</button>'
-      + '<button data-t="ad" class="dtv-tb" style="display:' + adm + ';padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap">\uad00\ub9ac</button>'
-      + '</div>'
-      + '<div style="padding:16px;background:#f9fafb;min-height:400px">'
-      + '<div id="dtv-p-wr"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px;font-weight:700;color:#1f2937">\ub300\uae30\uc2e4 \uad00\ub9ac</span><span style="font-size:11px;background:#dbeafe;color:#2563eb;padding:2px 8px;border-radius:10px;font-weight:600">' + wr.length + '\uac1c</span></div>' + wrH + '</div>'
-      + '<div id="dtv-p-ch" style="display:none"><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:15px;font-weight:700;color:#1f2937">\uccb4\uc5b4 \uad00\ub9ac</span><span style="font-size:11px;background:#e0e7ff;color:#6366f1;padding:2px 8px;border-radius:10px;font-weight:600">' + cr.length + '\uac1c</span></div>' + crH + '</div>'
-      + '<div id="dtv-p-no" style="display:none"><div style="padding:40px;text-align:center;color:#9ca3af;font-size:13px">\uc804\uccb4 \uae30\ub2a5 \ub85c\ub529 \uc911...</div></div>'
-      + '<div id="dtv-p-st" style="display:none"><div style="padding:40px;text-align:center;color:#9ca3af;font-size:13px">\uc804\uccb4 \uae30\ub2a5 \ub85c\ub529 \uc911...</div></div>'
-      + '<div id="dtv-p-ad" style="display:none"><div style="padding:40px;text-align:center;color:#9ca3af;font-size:13px">\uc804\uccb4 \uae30\ub2a5 \ub85c\ub529 \uc911...</div></div>'
-      + '</div></div>';
+      + '<div style="display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff;overflow-x:auto">' + tabHtml + '</div>'
+      + '<div id="dtv-frame-container" style="background:#f9fafb;min-height:500px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;overflow:hidden"></div>'
+      + '</div>';
 
-    /* tab events */
+    // Load default tab iframe
+    switchTab('waitingrooms');
+
+    // Tab click events
     var tbs = root.querySelectorAll('.dtv-tb');
-    var pnl = { wr: 'dtv-p-wr', ch: 'dtv-p-ch', no: 'dtv-p-no', st: 'dtv-p-st', ad: 'dtv-p-ad' };
-    for (var i = 0; i < tbs.length; i++) {
-      tbs[i].addEventListener('click', function() {
-        var t = this.getAttribute('data-t');
-        for (var j = 0; j < tbs.length; j++) { tbs[j].style.color = '#6b7280'; tbs[j].style.fontWeight = '500'; tbs[j].style.borderBottom = '2px solid transparent'; }
-        this.style.color = '#2563eb'; this.style.fontWeight = '700'; this.style.borderBottom = '2px solid #2563eb';
-        for (var k in pnl) { var el = document.getElementById(pnl[k]); if (el) el.style.display = k === t ? 'block' : 'none'; }
-        if (t === 'no' || t === 'st' || t === 'ad') loadFull(t);
+    for (var j = 0; j < tbs.length; j++) {
+      tbs[j].addEventListener('click', function() {
+        var tid = this.getAttribute('data-t');
+        // Update tab styles
+        for (var k = 0; k < tbs.length; k++) {
+          tbs[k].style.color = '#6b7280';
+          tbs[k].style.fontWeight = '500';
+          tbs[k].style.borderBottom = '2px solid transparent';
+        }
+        this.style.color = '#2563eb';
+        this.style.fontWeight = '700';
+        this.style.borderBottom = '2px solid #2563eb';
+        switchTab(tid);
       });
     }
   }
 
-  /* ===== full admin (iframe without header/tabs) for advanced tabs ===== */
-  function loadFull(t) {
-    var el = document.getElementById('dtv-p-' + t);
-    if (!el || el.querySelector('iframe')) return;
-    var map = { no: 'notices', st: 'settings', ad: 'admin' };
-    var url = API + '/embed/' + encodeURIComponent(ADMIN_CODE) + '?email=' + encodeURIComponent((DATA && DATA.userEmail) || '') + '&widget=1&tab=' + (map[t] || t);
-    el.innerHTML = '<iframe src="' + url + '" width="100%" frameborder="0" style="border:none;border-radius:8px;min-height:500px" onload="this.style.height=this.contentWindow.document.body.scrollHeight+\'px\'"></iframe>';
-    // Listen for height messages from iframe
-    var frame = el.querySelector('iframe');
-    window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'setHeight' && frame) {
-        frame.style.height = (e.data.height + 30) + 'px';
-      }
-    });
+  /* ===== switch tab: show/hide cached iframes ===== */
+  function switchTab(tab) {
+    currentTab = tab;
+    var container = document.getElementById('dtv-frame-container');
+    if (!container) return;
+
+    // Hide all existing iframes
+    for (var k in frames) {
+      if (frames[k]) frames[k].style.display = 'none';
+    }
+
+    // Create or show iframe for this tab
+    if (frames[tab]) {
+      frames[tab].style.display = 'block';
+    } else {
+      var f = document.createElement('iframe');
+      f.src = iframeUrl(tab);
+      f.style.cssText = 'width:100%;border:none;min-height:500px;display:block';
+      f.setAttribute('frameborder', '0');
+      container.appendChild(f);
+      frames[tab] = f;
+    }
   }
+
+  /* ===== message handler for iframe height ===== */
+  window.addEventListener('message', function(e) {
+    if (!e.data) return;
+    if (e.data.type === 'setHeight') {
+      // Find the visible iframe and set height
+      var f = frames[currentTab];
+      if (f) f.style.height = (e.data.height + 30) + 'px';
+    }
+    if (e.data.type === 'contentReady') {
+      var f = frames[currentTab];
+      if (f) f.style.minHeight = '0';
+    }
+    if (e.data.type === 'scrollToTop') {
+      root.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+  });
 
   /* ===== start ===== */
   var info = getMC();
@@ -137,11 +155,12 @@
   }
 
   function go(mc, em) {
+    MC = mc; EM = em;
     var url = API + '/api/widget/init/' + encodeURIComponent(mc);
     if (em) url += '?email=' + encodeURIComponent(em);
     fetch(url).then(function(r) { return r.json(); }).then(function(res) {
       if (!res.ok) { root.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;font-size:13px">' + (res.error || '\ub370\uc774\ud130 \uc624\ub958') + '</div>'; return; }
-      render(res.data, res.adminCode, res.baseUrl);
+      renderShell(res.data);
     }).catch(function(e) {
       root.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;font-size:13px">\uc11c\ubc84 \uc5f0\uacb0 \uc2e4\ud328</div>';
     });
