@@ -10743,6 +10743,21 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // ── 단순 표시 ──
       el.style.display = 'flex';
       
+      // ── 모달을 화면 중앙에 배치 (스크롤 없이) ──
+      var innerWrap = el.querySelector('.absolute.inset-0.flex');
+      if (innerWrap) {
+        innerWrap.classList.remove('items-start');
+        innerWrap.classList.add('items-center');
+        innerWrap.style.overflowY = '';
+        innerWrap.style.paddingTop = '0';
+        var mc = innerWrap.querySelector('.bg-white');
+        if (mc) {
+          mc.style.maxHeight = '95vh';
+          mc.style.overflowY = 'auto';
+          mc.style.marginBottom = '0';
+        }
+      }
+      
       // ── 모달 카드에 그림자 추가 (배경 대신) ──
       var card = el.querySelector('.bg-white');
       if (card) card.classList.add('modal-card-shadow');
