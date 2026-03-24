@@ -128,31 +128,9 @@ html,body{background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe
 <button class="sk-err-btn" onclick="location.reload()">다시 시도</button>
 </div>
 <script>
-(function(){
-  var url='${fullUrl}';
-  var timeout=setTimeout(function(){
-    // 15초 후에도 안 되면 에러 표시
-    document.getElementById('sk-container').style.display='none';
-    document.getElementById('sk-error').style.display='block';
-    document.getElementById('sk-error-msg').textContent='서버 응답이 너무 느립니다. 다시 시도해주세요.';
-  },15000);
-  fetch(url,{credentials:'same-origin'})
-  .then(function(r){
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return r.text();
-  })
-  .then(function(html){
-    clearTimeout(timeout);
-    document.open();document.write(html);document.close();
-  })
-  .catch(function(e){
-    clearTimeout(timeout);
-    document.getElementById('sk-container').style.display='none';
-    var errDiv=document.getElementById('sk-error');
-    errDiv.style.display='block';
-    document.getElementById('sk-error-msg').textContent='로딩 실패: '+e.message;
-  });
-})();
+// 스켈레톤을 잠시 보여준 후 실제 페이지로 네비게이션
+// fetch 대신 location.replace 사용 (iframe cross-origin fetch 차단 방지)
+window.location.replace('${fullUrl}');
 </script>
 </body>
 </html>`
