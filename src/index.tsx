@@ -4924,11 +4924,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     <style>@keyframes skp{to{transform:rotate(360deg)}}</style>
   </div>
   <script>
-    // 스켈레톤 제거: DOMContentLoaded 시
-    document.addEventListener('DOMContentLoaded',function(){
+    // 스켈레톤 즉시 제거 (SSR 카드가 이미 HTML에 있으므로 기다릴 필요 없음)
+    (function(){
       var sk=document.getElementById('skeleton-overlay');
-      if(sk){sk.style.transition='opacity .2s';sk.style.opacity='0';setTimeout(function(){try{sk.remove()}catch(e){}},250)}
-    });
+      if(sk){sk.style.transition='opacity .15s';sk.style.opacity='0';setTimeout(function(){try{sk.remove()}catch(e){}},200)}
+      // 부모 iframe(아임웹 위젯)에 콘텐츠 준비 완료 알림
+      try{if(window.parent!==window)window.parent.postMessage({type:'contentReady'},'*');}catch(e){}
+    })();
   </script>
 
   <div id="app" style="display:block;width:100%">
