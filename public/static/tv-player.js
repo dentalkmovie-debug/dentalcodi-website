@@ -2808,10 +2808,13 @@ if (window.__INITIAL_TV_DATA__) {
       if (!playlist || !playlist.items || playlist.items.length === 0) {
         showEmptyPlaylistScreen();
       } else {
-        // API는 이미 preload + 스크립트 로드 중 - 기다리지 않고 즉시 재생 시작
-        // 플레이어 생성 시점에 API 미로드면 내부에서 대기/재시도
-        loadYouTubeAPI();
-        loadVimeoAPI();
+        // API 로드 대기 (preload로 이미 거의 완료 상태 - 짧게 대기)
+        const loadPromises = [];
+        if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
+        if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
+        if (loadPromises.length > 0) {
+          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 500))]);
+        }
         
         // 재생 시간 체크 시작
         if (scheduleCheckInterval) clearInterval(scheduleCheckInterval);
