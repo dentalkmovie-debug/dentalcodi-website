@@ -370,37 +370,8 @@ function safeRestartPlayback() {
   initializeAllMedia();
   startPlaybackWatchdog();
   
-  // ★★ 전체화면 복원 강화 (DOM 재구성 후 여러 시점에서 복원)
-  if (wasFullscreen || (shouldBeFullscreen && userHasInteracted)) {
-    // 즉시 시도
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-    // iframe 생성 직후 (200ms)
-    setTimeout(() => {
-      if (!document.fullscreenElement && shouldBeFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    }, 200);
-    // iframe 로드 후 (500ms)
-    setTimeout(() => {
-      if (!document.fullscreenElement && shouldBeFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    }, 500);
-    // Vimeo Player ready 이후 (1초)
-    setTimeout(() => {
-      if (!document.fullscreenElement && shouldBeFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    }, 1000);
-    // 최종 확인 (2초)
-    setTimeout(() => {
-      if (!document.fullscreenElement && shouldBeFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
-    }, 2000);
-  }
+  // 전체화면은 CSS 의사 전체화면(100vw x 100vh)으로 처리
+  // requestFullscreen 반복 호출 제거 - Vimeo iframe과 충돌하여 영상 끊김/멈춤 유발 (특히 노트북)
 }
 
 let _consecutive404Count = 0; // 연속 404 횟수
@@ -2611,14 +2582,9 @@ document.addEventListener('fullscreenchange', updateFullscreenState);
 // 초기 상태 설정
 updateFullscreenState();
 
-// ★★ 전체화면 주기적 감시 강화 (Vimeo/YouTube iframe 생성 시 fullscreenchange 이벤트 누락 대비)
-// 1.5초마다 확인 (이전 3초 → 더 빠른 복원)
-setInterval(() => {
-  if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
-    console.log('[fullscreen] Periodic check - restoring');
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-}, 1500);
+// 전체화면 주기적 감시 제거 - requestFullscreen 반복 호출이 Vimeo iframe과 충돌
+// 노트북 등 저사양 환경에서 영상 끊김/멈춤/처음으로 돌아가는 문제의 핵심 원인
+// CSS 의사 전체화면(100vw x 100vh)이 항상 적용되므로 불필요
 
 // 전체화면에서 마우스 움직이면 버튼 표시 (2초 후 자동 숨김)
 // CSS 의사 전체화면이므로 전체화면 여부와 관계없이 동작
@@ -2640,20 +2606,17 @@ if (hoverZone) {
 }
 
 // 전체화면 진입
-// ★ 전체화면 복원 헬퍼 (iframe 생성 후 호출용 - 플레이어 생성 시 자동 호출)
+// 전체화면 복원 헬퍼 - iframe allow 속성만 설정 (requestFullscreen 제거)
+// requestFullscreen이 Vimeo iframe 재생을 방해하여 끊김/멈춤 유발
 function ensureFullscreen() {
-  if (shouldBeFullscreen && userHasInteracted && !document.fullscreenElement) {
-    // ★★ iframe의 allow 속성 확인 (Vimeo/YouTube iframe이 fullscreen 허용하는지)
-    document.querySelectorAll('#media-container iframe').forEach(iframe => {
-      if (!iframe.getAttribute('allow') || !iframe.getAttribute('allow').includes('fullscreen')) {
-        iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
-      }
-      if (!iframe.hasAttribute('allowfullscreen')) {
-        iframe.setAttribute('allowfullscreen', '');
-      }
-    });
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
+  document.querySelectorAll('#media-container iframe').forEach(iframe => {
+    if (!iframe.getAttribute('allow') || !iframe.getAttribute('allow').includes('fullscreen')) {
+      iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+    }
+    if (!iframe.hasAttribute('allowfullscreen')) {
+      iframe.setAttribute('allowfullscreen', '');
+    }
+  });
 }
 
 function enterFullscreen() {
@@ -2884,14 +2847,8 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('pagehide', deactivateTV, true);
 window.addEventListener('beforeunload', deactivateTV, true);
 
-// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
-document.addEventListener('click', function autoFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-  // 한 번만 실행
-  document.removeEventListener('click', autoFullscreen);
-}, { once: true });
+// 매 클릭 전체화면 진입 제거 - Vimeo 재생/일시정지 클릭과 충돌
+// autoplay 시 한 번만 시도 (위의 IS_AUTOPLAY 블록에서 처리)
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
