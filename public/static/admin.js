@@ -4977,9 +4977,9 @@ function openTVMirror(shortCode, itemCount) {
     alert('TV 코드가 없습니다. 관리자에게 문의하세요.');
     return;
   }
-  // 아이템 개수 검증은 서버에서 처리 (공용 영상 포함 시 0일 수 있음)
   const url = '/tv/' + shortCode + '?autoplay=1';
-  const opened = window.open(url, '_blank');
+  const w = screen.width, h = screen.height;
+  const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
   if (!opened) {
     window.location.href = url;
   }

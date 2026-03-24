@@ -19,6 +19,9 @@ function hideLoadingScreen() {
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
+  // SSR 썸네일도 함께 제거 (영상이 재생 시작되면)
+  const thumb = document.getElementById('ssr-thumbnail');
+  if (thumb) thumb.style.display = 'none';
 }
 
 // 안정성 강화 변수

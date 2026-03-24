@@ -4721,7 +4721,8 @@ app.get('/embed-old/:memberCode', async (c) => {
         return;
       }
       const url = '/tv/' + shortCode + '?autoplay=1';
-      const opened = window.open(url, '_blank');
+      const w = screen.width, h = screen.height;
+      const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
       if (!opened) {
         window.location.href = url;
       }
@@ -10405,9 +10406,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         alert('TV 코드가 없습니다. 관리자에게 문의하세요.');
         return;
       }
-      // 아이템 개수 검증은 서버에서 처리 (공용 영상 포함 시 0일 수 있음)
       const url = '/tv/' + shortCode + '?autoplay=1';
-      const opened = window.open(url, '_blank');
+      const w = screen.width, h = screen.height;
+      const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
       if (!opened) {
         window.location.href = url;
       }
@@ -12405,6 +12406,15 @@ app.get('/tv/:shortCode', async (c) => {
   </style>
 </head>
 <body style="background:#000;margin:0">
+  ${(() => {
+    // SSR: 첫 번째 아이템 썸네일을 즉시 배경으로 표시 (검정화면 제거)
+    const firstItem = ssrData?.playlist?.items?.[0]
+    const thumb = firstItem?.thumbnail_url || ''
+    if (thumb && ssrData) {
+      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;background:#000"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover" alt=""></div>`
+    }
+    return ''
+  })()}
   <div id="loading-screen"${ssrData ? ' class="hidden"' : ''}><div class="spinner"></div><p>로딩 중...</p></div>
 
   <div id="error-screen" style="display:none">
