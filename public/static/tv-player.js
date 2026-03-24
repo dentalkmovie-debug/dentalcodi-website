@@ -44,7 +44,7 @@ function showThumbLoadingBar() {
   if (!thumb) return;
   var wrap = document.createElement('div');
   wrap.id = 'ssr-loading-bar';
-  wrap.style.cssText = 'position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:51';
+  wrap.style.cssText = 'position:absolute;top:15%;left:50%;transform:translateX(-50%);z-index:51';
   wrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);border-radius:50%;animation:ssrSpin .8s linear infinite"></div>';
   var st = document.createElement('style');
   st.textContent = '@keyframes ssrSpin{to{transform:rotate(360deg)}}';
@@ -765,10 +765,10 @@ async function loadData(isInitial = false) {
       if (hasVimeo) loadPromises.push(loadVimeoAPI());
       
       if (loadPromises.length > 0) {
-        // API가 이미 프리로드 중이므로 최대 2초만 대기
+        // API가 이미 프리로드 중이므로 최대 800ms만 대기
         await Promise.race([
           Promise.all(loadPromises),
-          new Promise(resolve => setTimeout(resolve, 2000))
+          new Promise(resolve => setTimeout(resolve, 800))
         ]);
       }
       
@@ -1603,7 +1603,7 @@ function startVimeoPlayback(player, idx) {
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
       if (attempt < 3 && thisSession === vimeoSessionId) {
-        setTimeout(() => tryPlay(attempt + 1), 2000);
+        setTimeout(() => tryPlay(attempt + 1), 1000);
       }
     });
   };
@@ -2813,7 +2813,7 @@ if (window.__INITIAL_TV_DATA__) {
         if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
         if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
         if (loadPromises.length > 0) {
-          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 2000))]);
+          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 800))]);
         }
         
         // 재생 시간 체크 시작
