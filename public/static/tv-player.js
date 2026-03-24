@@ -2801,30 +2801,38 @@ if (window.__INITIAL_TV_DATA__) {
 // ★★ autoplay=1: 자동 전체화면 진입 (사용자 상호작용 없이)
 // 관리자 페이지에서 '내보내기' 클릭 시 새 탭으로 열리므로 사용자 제스처가 있음
 if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
-  // 즉시 전체화면 시도 (새 탭 열기는 사용자 제스처로 간주됨)
   userHasInteracted = true;
   shouldBeFullscreen = true;
-  // ★★ 즉시 + 다단계 재시도로 전체화면 확실히 진입
-  function tryFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
-  }
-  tryFullscreen(); // 즉시
-  setTimeout(tryFullscreen, 100);
-  setTimeout(tryFullscreen, 300);
-  setTimeout(tryFullscreen, 500);
-  setTimeout(tryFullscreen, 1000);
-  setTimeout(() => {
-    if (!document.fullscreenElement) {
-      // 최종 실패 시 클릭으로 진입하도록 힌트
-      const hint = document.getElementById('fullscreen-hint');
-      if (hint) {
-        hint.style.display = 'block';
-        hint.textContent = '클릭하면 전체화면으로 재생됩니다';
+  
+  // ★★ autoplay 오버레이가 있으면 그 클릭을 기다림 (사용자 제스처로 전체화면 진입)
+  const overlay = document.getElementById('autoplay-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', function() {
+      overlay.style.display = 'none';
+      document.documentElement.requestFullscreen().catch(function() {});
+    }, { once: true });
+    // 오버레이가 없어지면 자동 시도 (fallback)
+  } else {
+    // 오버레이 없이 직접 시도
+    function tryFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(function() {});
       }
     }
-  }, 2000);
+    tryFullscreen();
+    setTimeout(tryFullscreen, 100);
+    setTimeout(tryFullscreen, 500);
+    setTimeout(tryFullscreen, 1000);
+    setTimeout(function() {
+      if (!document.fullscreenElement) {
+        var hint = document.getElementById('fullscreen-hint');
+        if (hint) {
+          hint.style.display = 'block';
+          hint.textContent = '클릭하면 전체화면으로 재생됩니다';
+        }
+      }
+    }, 2000);
+  }
 }
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)

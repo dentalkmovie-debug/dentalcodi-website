@@ -12405,6 +12405,13 @@ app.get('/tv/:shortCode', async (c) => {
   </style>
 </head>
 <body style="background:#000;margin:0">
+  ${ssrData && isAutoplay ? `<div id="autoplay-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:linear-gradient(135deg,#0f172a,#1e293b);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;user-select:none" onclick="this.style.display='none';document.documentElement.requestFullscreen().catch(function(){})">
+    <div style="font-size:64px;margin-bottom:24px">📺</div>
+    <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:8px">${ssrData?.playlist?.clinic_name || ssrData?.playlist?.name || 'TV'}</div>
+    <div style="font-size:15px;color:#94a3b8;margin-bottom:32px">${ssrData?.playlist?.name || ''} · ${ssrData?.playlist?.items?.length || 0}개 미디어</div>
+    <div style="padding:16px 40px;background:#3b82f6;border-radius:16px;font-size:18px;font-weight:600;color:#fff;box-shadow:0 4px 20px rgba(59,130,246,.4);animation:pulse2 2s ease-in-out infinite">▶ 터치하여 전체화면 재생</div>
+    <style>@keyframes pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}</style>
+  </div>` : ''}
   <div id="loading-screen"${ssrData ? ' class="hidden"' : ''}><div class="spinner"></div><p>로딩 중...</p></div>
 
   <div id="error-screen" style="display:none">
