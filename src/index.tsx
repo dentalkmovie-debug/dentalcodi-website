@@ -2173,7 +2173,11 @@ app.get('/api/tv/:shortCode/temp-check', async (c) => {
     ).bind(result.user_id).first() as any,
     c.env.DB.prepare(
       'SELECT updated_at, notice_enabled, notice_font_size, notice_scroll_speed FROM users WHERE id = ?'
-    ).bind(result.user_id).first() as any
+    ).bind(result.user_id).first() as any,
+    // heartbeat: temp-check가 3초마다 호출되므로 last_active_at도 함께 갱신 (fire-and-forget)
+    c.env.DB.prepare(
+      'UPDATE playlists SET last_active_at = datetime(\'now\') WHERE short_code = ?'
+    ).bind(shortCode).run()
   ])
   
   // 해시: notice_enabled + 공지 수 + 공지 최신 수정시간 + 유저설정 수정시간
@@ -4852,7 +4856,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const [playlistsData, noticesData] = await Promise.all([
     c.env.DB.prepare(`
       SELECT p.*, 
-        (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+        (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count,
+        CASE WHEN p.last_active_at IS NOT NULL 
+          AND (strftime('%s','now') - strftime('%s', p.last_active_at)) < 90
+          THEN 1 ELSE 0 END as is_tv_active
       FROM playlists p
       WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
       ORDER BY p.id
