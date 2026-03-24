@@ -2802,21 +2802,6 @@ app.get('/embed/:memberCode', async (c) => {
   const memberEmail = c.req.query('email') || ''
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
 
-  // ★ 2단계 로딩: _full=1 파라미터가 없으면 경량 셸 즉시 반환 (DB 쿼리 없이)
-  if (!c.req.query('_full')) {
-    // 현재 URL에 _full=1 추가
-    const currentUrl = c.req.url
-    const sep = currentUrl.includes('?') ? '&' : '?'
-    const fullUrl = currentUrl + sep + '_full=1'
-    return c.html(getSkeletonHtml(fullUrl), 200, {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    })
-  }
-
-  // _full=1인 경우: 실제 admin 페이지 렌더링 (기존 로직)
-
   // admin_code(imweb_xxx)가 memberCode로 들어온 경우 → admin_code로 직접 매칭
   if (memberCode.startsWith('imweb_')) {
     const userByAdminCode = await c.env.DB.prepare(
@@ -11878,18 +11863,6 @@ app.get('/admin/:adminCode', async (c) => {
   const isAdminFlag = c.req.query('is_admin') === '1'
   const emailParam = (c.req.query('email') || '').trim().toLowerCase()
   const nameParam = c.req.query('name') || ''
-
-  // ★ 2단계 로딩: _full=1 파라미터가 없으면 경량 셸 즉시 반환
-  if (!c.req.query('_full')) {
-    const currentUrl = c.req.url
-    const sep = currentUrl.includes('?') ? '&' : '?'
-    const fullUrl = currentUrl + sep + '_full=1'
-    return c.html(getSkeletonHtml(fullUrl), 200, {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    })
-  }
 
   return handleAdminPage(c, adminCode, emailParam, isAdminFlag, nameParam)
 })
