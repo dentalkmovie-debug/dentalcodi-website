@@ -73,57 +73,86 @@ app.get('/favicon.ico', (c) => new Response(null, { status: 204 }))
 
 // 차단 페이지 HTML 생성
 // ── 스켈레톤 로더 HTML: 즉시 표시용 (DB 쿼리 없이 반환) ──
+// fullUrl: _full=1이 붙은 URL (fetch로 실제 admin HTML을 가져올 대상)
 function getSkeletonHtml(fullUrl: string): string {
   return `<!DOCTYPE html>
-<html lang="ko" style="background:#fff">
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
+<title>치과 TV 관리자</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-.sk{background:#fff;min-height:100vh}
-.sk-hd{background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px;border-radius:12px 12px 0 0}
+html,body{background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+.sk{max-width:480px;margin:0 auto;background:#fff;min-height:100vh}
+.sk-hd{background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px}
 .sk-hd-t{height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px}
-.sk-hd-s{height:12px;width:180px;background:rgba(255,255,255,.2);border-radius:3px}
-.sk-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff}
-.sk-tab{padding:11px 14px;font-size:13px;color:#d1d5db;border-bottom:2px solid transparent}
-.sk-tab:first-child{color:#2563eb;border-bottom-color:#2563eb;font-weight:700}
+.sk-hd-s{height:12px;width:200px;background:rgba(255,255,255,.2);border-radius:3px}
+.sk-tabs{display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff}
+.sk-tab{padding:11px 14px;font-size:13px;color:#d1d5db;border-bottom:2px solid transparent;font-family:inherit}
+.sk-tab-active{color:#2563eb;border-bottom-color:#2563eb;font-weight:700}
 .sk-body{padding:12px 16px}
-.sk-sec{margin-bottom:16px}
-.sk-sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sk-sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .sk-sec-t{height:16px;width:100px;background:#e5e7eb;border-radius:4px}
-.sk-badge{height:20px;width:32px;background:#e5e7eb;border-radius:10px}
+.sk-badge{height:22px;width:36px;background:#e5e7eb;border-radius:10px}
 .sk-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:8px}
 .sk-card-row{display:flex;align-items:center;gap:10px}
 .sk-dot{width:36px;height:36px;border-radius:10px;background:#e5e7eb;flex-shrink:0}
-.sk-lines{flex:1}
-.sk-l1{height:14px;width:80px;background:#e5e7eb;border-radius:3px;margin-bottom:6px}
-.sk-l2{height:10px;width:140px;background:#f3f4f6;border-radius:3px}
+.sk-l1{height:14px;width:90px;background:#e5e7eb;border-radius:3px;margin-bottom:6px}
+.sk-l2{height:10px;width:160px;background:#f3f4f6;border-radius:3px}
 .sk-btns{display:flex;gap:6px;margin-top:10px;padding-left:46px}
-.sk-btn{height:28px;width:72px;background:#f3f4f6;border-radius:8px}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.sk-pulse{animation:pulse 1.5s ease-in-out infinite}
+.sk-btn{height:28px;width:80px;background:#f3f4f6;border-radius:8px}
+@keyframes skPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sk-p{animation:skPulse 1.5s ease-in-out infinite}
+.sk-err{display:none;padding:40px 20px;text-align:center}
+.sk-err-ico{font-size:48px;margin-bottom:16px}
+.sk-err-msg{font-size:15px;color:#6b7280;margin-bottom:16px}
+.sk-err-btn{padding:10px 24px;border-radius:10px;border:none;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="sk">
-<div class="sk-hd"><div class="sk-hd-t sk-pulse"></div><div class="sk-hd-s sk-pulse"></div></div>
-<div class="sk-tabs"><span class="sk-tab">대기실</span><span class="sk-tab">체어</span><span class="sk-tab">공지사항</span><span class="sk-tab">설정</span></div>
+<div class="sk" id="sk-container">
+<div class="sk-hd"><div class="sk-hd-t sk-p"></div><div class="sk-hd-s sk-p"></div></div>
+<div class="sk-tabs"><span class="sk-tab sk-tab-active">대기실</span><span class="sk-tab">체어</span><span class="sk-tab">공지사항</span><span class="sk-tab">설정</span></div>
 <div class="sk-body">
-<div class="sk-sec">
-<div class="sk-sec-hd"><div class="sk-sec-t sk-pulse"></div><div class="sk-badge sk-pulse"></div></div>
-<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
-<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
+<div class="sk-sec-hd"><div class="sk-sec-t sk-p"></div><div class="sk-badge sk-p"></div></div>
+<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-p"></div><div style="flex:1"><div class="sk-l1 sk-p"></div><div class="sk-l2 sk-p"></div></div></div><div class="sk-btns"><div class="sk-btn sk-p"></div><div class="sk-btn sk-p"></div></div></div>
+<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-p"></div><div style="flex:1"><div class="sk-l1 sk-p" style="width:110px"></div><div class="sk-l2 sk-p" style="width:140px"></div></div></div><div class="sk-btns"><div class="sk-btn sk-p"></div><div class="sk-btn sk-p"></div></div></div>
+<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-p"></div><div style="flex:1"><div class="sk-l1 sk-p" style="width:70px"></div><div class="sk-l2 sk-p" style="width:130px"></div></div></div><div class="sk-btns"><div class="sk-btn sk-p"></div><div class="sk-btn sk-p"></div></div></div>
 </div>
 </div>
+<div class="sk-err" id="sk-error">
+<div class="sk-err-ico">⚠️</div>
+<div class="sk-err-msg" id="sk-error-msg">로딩에 실패했습니다.</div>
+<button class="sk-err-btn" onclick="location.reload()">다시 시도</button>
 </div>
 <script>
-fetch('${fullUrl}',{credentials:'same-origin'})
-.then(function(r){return r.text()})
-.then(function(html){document.open();document.write(html);document.close()})
-.catch(function(e){document.body.innerHTML='<div style="padding:20px;text-align:center;color:#ef4444">로딩 실패. 새로고침 해주세요.</div>'})
+(function(){
+  var url='${fullUrl}';
+  var timeout=setTimeout(function(){
+    // 15초 후에도 안 되면 에러 표시
+    document.getElementById('sk-container').style.display='none';
+    document.getElementById('sk-error').style.display='block';
+    document.getElementById('sk-error-msg').textContent='서버 응답이 너무 느립니다. 다시 시도해주세요.';
+  },15000);
+  fetch(url,{credentials:'same-origin'})
+  .then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  })
+  .then(function(html){
+    clearTimeout(timeout);
+    document.open();document.write(html);document.close();
+  })
+  .catch(function(e){
+    clearTimeout(timeout);
+    document.getElementById('sk-container').style.display='none';
+    var errDiv=document.getElementById('sk-error');
+    errDiv.style.display='block';
+    document.getElementById('sk-error-msg').textContent='로딩 실패: '+e.message;
+  });
+})();
 </script>
 </body>
 </html>`
@@ -2795,7 +2824,20 @@ app.get('/embed/:memberCode', async (c) => {
   const memberEmail = c.req.query('email') || ''
   const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
 
-  // 2단계 로딩 제거 - 인라인 CSS를 body 끝으로 이동하여 렌더 차단 방지
+  // ★ 2단계 로딩: _full=1 파라미터가 없으면 경량 셸 즉시 반환 (DB 쿼리 없이)
+  if (!c.req.query('_full')) {
+    // 현재 URL에 _full=1 추가
+    const currentUrl = c.req.url
+    const sep = currentUrl.includes('?') ? '&' : '?'
+    const fullUrl = currentUrl + sep + '_full=1'
+    return c.html(getSkeletonHtml(fullUrl), 200, {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    })
+  }
+
+  // _full=1인 경우: 실제 admin 페이지 렌더링 (기존 로직)
 
   // admin_code(imweb_xxx)가 memberCode로 들어온 경우 → admin_code로 직접 매칭
   if (memberCode.startsWith('imweb_')) {
@@ -11858,6 +11900,18 @@ app.get('/admin/:adminCode', async (c) => {
   const isAdminFlag = c.req.query('is_admin') === '1'
   const emailParam = (c.req.query('email') || '').trim().toLowerCase()
   const nameParam = c.req.query('name') || ''
+
+  // ★ 2단계 로딩: _full=1 파라미터가 없으면 경량 셸 즉시 반환
+  if (!c.req.query('_full')) {
+    const currentUrl = c.req.url
+    const sep = currentUrl.includes('?') ? '&' : '?'
+    const fullUrl = currentUrl + sep + '_full=1'
+    return c.html(getSkeletonHtml(fullUrl), 200, {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    })
+  }
 
   return handleAdminPage(c, adminCode, emailParam, isAdminFlag, nameParam)
 })
