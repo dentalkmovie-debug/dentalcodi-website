@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Iframe Load Test</title></head>
+<body>
+<p id="status">Loading...</p>
+<script>
+var start = Date.now();
+var iframe = document.createElement('iframe');
+iframe.style.width = '100%';
+iframe.style.height = '600px';
+iframe.style.border = 'none';
+iframe.src = 'https://dental-tv-app.pages.dev/embed/imweb_m20260214417be017b9fd6?email=dentalkmovie@gmail.com';
+iframe.onload = function() {
+  var elapsed = Date.now() - start;
+  console.log('IFRAME_LOAD_TIME: ' + elapsed + 'ms');
+  document.getElementById('status').textContent = 'Loaded in ' + elapsed + 'ms';
+};
+document.body.appendChild(iframe);
+console.log('IFRAME_SRC_SET: ' + (Date.now() - start) + 'ms');
+</script>
+</body>
+</html>

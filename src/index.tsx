@@ -4854,8 +4854,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>치과 TV 관리자</title>
+  <!-- preload만: 다운로드 시작하되 렌더 차단 안 함 -->
   <link rel="preload" href="/static/admin.js?v=${Date.now()}" as="script">
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js" as="script">
   <script>
     // bfcache(뒤로/앞으로 캐시)에서 복원 시 강제 새로고침
     window.addEventListener('pageshow', function(e) {
@@ -4891,18 +4891,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     #app{display:block;width:100%}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
-  <!-- Admin CSS: body 끝에서 비차단 로드 (렌더 차단 방지) -->
-  <!-- Noto Sans KR 폰트: 비동기 (외부서버 느림 → 렌더 차단 안함) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap"></noscript>
-  <!-- SortableJS: defer로 렌더링 비차단 -->
-  <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-  <!-- FontAwesome: 비동기 로드 (렌더링 비차단) -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
-  <!-- 추가 CSS: body 끝에서 로드 (렌더 차단 방지) -->
+  <!-- 모든 외부 CSS/Font/JS는 body 끝에서 lazy load (head 완전 비움 → 즉시 렌더링) -->
 </head>
 <body style="margin:0;padding:0;background:#fff;font-family:'Noto Sans KR',sans-serif">
   <!-- ★ 스켈레톤 오버레이: 가장 먼저 렌더링됨 (흰 화면 방지) -->
@@ -11839,6 +11828,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     .drag-handle:active{cursor:grabbing}
   </style>
   <script defer src="/static/admin.js?v=${Date.now()}"></script>
+  <script>
+    // 외부 CSS/Font/JS lazy load (렌더 차단 완전 제거)
+    (function(){
+      function loadCSS(href){var l=document.createElement('link');l.rel='stylesheet';l.href=href;document.head.appendChild(l);}
+      function loadJS(src){var s=document.createElement('script');s.src=src;s.defer=true;document.body.appendChild(s);}
+      loadCSS('https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css');
+      loadCSS('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+      loadJS('https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js');
+    })();
+  </script>
 </body>
 </html>
   `)
