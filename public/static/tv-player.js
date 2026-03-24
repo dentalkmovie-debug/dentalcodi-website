@@ -19,13 +19,25 @@ function hideLoadingScreen() {
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
-  // SSR 썸네일 부드럽게 페이드아웃 (영상이 뒤에서 준비되면 서서히 사라짐)
+  // 썸네일은 여기서 제거하지 않음 - removeSSRThumbnail()에서 별도 처리
+}
+
+// SSR 썸네일 제거 (영상이 실제 재생 시작된 후 호출)
+let _ssrThumbRemoved = false;
+function removeSSRThumbnail() {
+  if (_ssrThumbRemoved) return;
+  _ssrThumbRemoved = true;
   const thumb = document.getElementById('ssr-thumbnail');
   if (thumb) {
-    thumb.style.transition = 'opacity 0.5s ease-out';
-    thumb.style.opacity = '0';
-    setTimeout(function() { thumb.remove(); }, 600);
+    // 1초 대기 후 fade-out (영상이 확실히 화면에 렌더링된 후)
+    setTimeout(function() {
+      thumb.style.transition = 'opacity 0.8s ease-out';
+      thumb.style.opacity = '0';
+      setTimeout(function() { thumb.remove(); }, 900);
+    }, 500);
   }
+  // body 배경 이미지도 제거 (영상 뒤에서 안보이게)
+  document.body.style.background = '#000';
 }
 
 // 안정성 강화 변수
@@ -728,6 +740,7 @@ async function loadData(isInitial = false) {
       // ★★ 로딩 화면은 첫 미디어 재생 시작 시 숨김 (빈 검은 화면 방지)
       // 안전장치: 10초 후 강제 숨김 (미디어 로드 실패 대비)
       setTimeout(hideLoadingScreen, 10000);
+      setTimeout(removeSSRThumbnail, 12000);
       
       // ★★ API는 이미 페이지 시작 시 프리로드됨 (loadVimeoAPI/loadYouTubeAPI 미리 호출)
       const hasYouTube = playlist.items.some(i => i.item_type === 'youtube');
@@ -1349,6 +1362,7 @@ function setupYouTube(item, index) {
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) {
             hideLoadingScreen();
+            removeSSRThumbnail();
           }
           if (e.data === YT.PlayerState.ENDED && currentIndex === index) {
             console.log('YouTube ended:', index);
@@ -1383,7 +1397,7 @@ function setupImage(item, index) {
     container.appendChild(img);
     console.log('Image ready:', index);
     itemsReady[index] = true;
-    if (index === currentIndex) hideLoadingScreen();
+    if (index === currentIndex) { hideLoadingScreen(); removeSSRThumbnail(); }
   };
   
   img.onerror = () => {
@@ -1571,6 +1585,7 @@ function startVimeoPlayback(player, idx) {
     player.play().then(() => {
       console.log('Vimeo play SUCCESS, attempt:', attempt);
       hideLoadingScreen();
+      removeSSRThumbnail();
     }).catch((err) => {
       console.log('Vimeo play FAILED, attempt:', attempt, 'error:', err?.name);
       if (attempt < 3 && thisSession === vimeoSessionId) {
