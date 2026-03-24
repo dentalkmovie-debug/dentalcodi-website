@@ -29,16 +29,32 @@ function removeSSRThumbnail() {
   _ssrThumbRemoved = true;
   const thumb = document.getElementById('ssr-thumbnail');
   if (thumb) {
-    // 1초 대기 후 fade-out (영상이 확실히 화면에 렌더링된 후)
     setTimeout(function() {
       thumb.style.transition = 'opacity 0.8s ease-out';
       thumb.style.opacity = '0';
       setTimeout(function() { thumb.remove(); }, 900);
     }, 500);
   }
-  // body 배경 이미지도 제거 (영상 뒤에서 안보이게)
   document.body.style.background = '#000';
 }
+
+// SSR 썸네일 위 로딩 프로그레스 바
+function showThumbLoadingBar() {
+  var thumb = document.getElementById('ssr-thumbnail');
+  if (!thumb) return;
+  var bar = document.createElement('div');
+  bar.id = 'ssr-loading-bar';
+  bar.style.cssText = 'position:absolute;bottom:0;left:0;width:0;height:3px;background:rgba(255,255,255,0.7);z-index:51;border-radius:0 2px 2px 0;transition:width 8s linear';
+  thumb.appendChild(bar);
+  // 다음 프레임에서 애니메이션 시작
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      bar.style.width = '100%';
+    });
+  });
+}
+// 페이지 로드 시 바로 실행
+showThumbLoadingBar();
 
 // 안정성 강화 변수
 let isTransitioning = false; // 중복 전환 방지
