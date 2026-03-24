@@ -30,10 +30,10 @@ function removeSSRThumbnail() {
   const thumb = document.getElementById('ssr-thumbnail');
   if (thumb) {
     setTimeout(function() {
-      thumb.style.transition = 'opacity 0.8s ease-out';
+      thumb.style.transition = 'opacity 0.6s ease-out';
       thumb.style.opacity = '0';
-      setTimeout(function() { thumb.remove(); }, 900);
-    }, 500);
+      setTimeout(function() { thumb.remove(); }, 650);
+    }, 150);
   }
   document.body.style.background = '#000';
 }
@@ -2808,13 +2808,10 @@ if (window.__INITIAL_TV_DATA__) {
       if (!playlist || !playlist.items || playlist.items.length === 0) {
         showEmptyPlaylistScreen();
       } else {
-        // API 로드 (최대 2초 대기)
-        const loadPromises = [];
-        if (playlist.items.some(i => i.item_type === 'youtube')) loadPromises.push(loadYouTubeAPI());
-        if (playlist.items.some(i => i.item_type === 'vimeo')) loadPromises.push(loadVimeoAPI());
-        if (loadPromises.length > 0) {
-          await Promise.race([Promise.all(loadPromises), new Promise(r => setTimeout(r, 800))]);
-        }
+        // API는 이미 preload + 스크립트 로드 중 - 기다리지 않고 즉시 재생 시작
+        // 플레이어 생성 시점에 API 미로드면 내부에서 대기/재시도
+        loadYouTubeAPI();
+        loadVimeoAPI();
         
         // 재생 시간 체크 시작
         if (scheduleCheckInterval) clearInterval(scheduleCheckInterval);
