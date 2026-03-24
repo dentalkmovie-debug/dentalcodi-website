@@ -509,6 +509,8 @@ function init() {
   var _ap = document.getElementById('app');
   if (_ap) _ap.style.display = 'block';
   if (_sk) { _sk.style.transition='opacity .15s'; _sk.style.opacity='0'; setTimeout(function(){ try{_sk.remove()}catch(e){} },200); }
+  // 부모 iframe에 콘텐츠 준비 완료 알림
+  try{if(window.parent!==window)window.parent.postMessage({type:'contentReady'},'*');}catch(e){}
   
   // 5초마다 플레이리스트 자동 갱신 (사용중 상태 실시간 반영)
   // 편집 모달이 열려있을 때는 갱신 skip (덮어쓰기 방지)
