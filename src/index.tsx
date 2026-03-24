@@ -2158,7 +2158,7 @@ app.post('/api/tv/:shortCode/clear-temp', async (c) => {
 app.get('/api/tv/:shortCode/temp-check', async (c) => {
   const shortCode = c.req.param('shortCode')
   const result = await c.env.DB.prepare(
-    'SELECT p.temp_video_url, p.temp_video_type, p.temp_started_at, p.user_id FROM playlists p WHERE p.short_code = ?'
+    'SELECT p.temp_video_url, p.temp_video_type, p.temp_started_at, p.temp_return_time, p.user_id FROM playlists p WHERE p.short_code = ?'
   ).bind(shortCode).first() as any
   
   if (!result) {
@@ -2184,6 +2184,7 @@ app.get('/api/tv/:shortCode/temp-check', async (c) => {
     url: result.temp_video_url || null,
     type: result.temp_video_type || null,
     started_at: result.temp_started_at || null,
+    return_time: result.temp_return_time || 'end',
     notice_hash: noticeHash
   })
 })

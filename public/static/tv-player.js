@@ -423,15 +423,19 @@ async function loadData(isInitial = false) {
     const serverTempVideo = data.tempVideo;
     
     // ★★ 방금 클리어한 임시영상이 서버에 아직 남아있으면 무시 (clear 반영 전 폴링 방어)
-    // 30초 이내에 클리어한 같은 URL이면 서버 응답을 무시
+    // 60초 이내에 클리어한 같은 URL이면 서버 응답을 무시
     let effectiveTempVideo = serverTempVideo;
     if (serverTempVideo && _lastClearedTempUrl && serverTempVideo.url === _lastClearedTempUrl) {
       const sinceClear = Date.now() - _lastClearedTempTime;
-      if (sinceClear < 30000) {
+      if (sinceClear < 60000) {
         console.log('[loadData] Ignoring stale temp video (cleared', Math.round(sinceClear/1000), 's ago):', serverTempVideo.url);
         effectiveTempVideo = null;
+        // 서버에 아직 남아있으므로 클리어 재시도
+        if (sinceClear > 5000 && _clearTempRetryCount === 0) {
+          clearTempVideoOnServer(_lastClearedTempUrl);
+        }
       } else {
-        // 30초 지났으면 관리자가 의도적으로 같은 영상을 다시 전송한 것으로 간주
+        // 60초 지났으면 관리자가 의도적으로 같은 영상을 다시 전송한 것으로 간주
         _lastClearedTempUrl = null;
         _lastClearedTempTime = 0;
       }
@@ -2137,6 +2141,9 @@ function goToNext() {
       currentTempVideo = null;
       tempVideoLoopCount = 0;
       cachedVimeoDuration = 0; // ★★ 이전 영상의 duration 캐시 초기화 (잘못된 종료 감지 방지)
+      // ★★ fast poll 상태도 즉시 동기화 (클리어 후 fast poll이 다시 감지하는 것 방지)
+      _lastKnownTempUrl = null;
+      _lastKnownTempStarted = null;
       
       // 서버에 임시 영상 해제 요청 (★ 해당 URL만 클리어 - 새로 전송된 영상 보호)
       clearTempVideoOnServer(_lastClearedTempUrl);
@@ -2720,9 +2727,21 @@ if (window.__INITIAL_TV_DATA__) {
         document.documentElement.style.setProperty('--transition-duration', transitionDuration + 'ms');
       }
       
-      // 임시 영상 처리
+      // 임시 영상 처리 (SSR 초기 데이터에서 즉시 반영)
       if (data.tempVideo && data.tempVideo.url) {
-        playlist._tempVideo = data.tempVideo;
+        currentTempVideo = data.tempVideo;
+        tempVideoLoopCount = 0;
+        originalPlaylist = JSON.parse(JSON.stringify(playlist));
+        playlist.items = [{
+          id: 'temp-video',
+          item_type: data.tempVideo.type,
+          url: data.tempVideo.url,
+          title: data.tempVideo.title,
+          duration: 0,
+          sort_order: 0
+        }];
+        // fast poll 상태도 동기화
+        _lastKnownTempUrl = data.tempVideo.url;
       }
       
       // 공지 설정
@@ -2818,7 +2837,7 @@ setInterval(() => loadData(false), POLL_INTERVAL);
 let _lastKnownTempUrl = null; // 마지막으로 인지한 임시영상 URL
 let _lastKnownTempStarted = null; // 마지막 started_at 값
 let _lastKnownNoticeHash = null; // 마지막 공지 해시 (공지 변경 감지용)
-const FAST_TEMP_POLL = 2000;
+const FAST_TEMP_POLL = 1500;
 setInterval(async () => {
   try {
     const res = await fetch('/api/tv/' + SHORT_CODE + '/temp-check?t=' + Date.now());
@@ -2828,6 +2847,18 @@ setInterval(async () => {
     const newUrl = data.url || null;
     const newStarted = data.started_at || null;
     const newNoticeHash = data.notice_hash || '';
+    
+    // ★★ 방금 클리어한 URL이면 무시 (서버 반영 지연 방어)
+    if (newUrl && _lastClearedTempUrl && newUrl === _lastClearedTempUrl) {
+      const sinceClear = Date.now() - _lastClearedTempTime;
+      if (sinceClear < 60000) {
+        // 클리어한 URL이 아직 서버에 남아있음 - 무시
+        _lastKnownTempUrl = null; // null로 동기화 (클리어 상태)
+        _lastKnownTempStarted = null;
+        _lastKnownNoticeHash = newNoticeHash;
+        return;
+      }
+    }
     
     // 임시영상 변경 감지: URL이 바뀌었거나, 같은 URL이지만 started_at이 바뀜 (재전송)
     const tempChanged = (newUrl !== _lastKnownTempUrl) || 
