@@ -2765,10 +2765,12 @@ if (window.__INITIAL_TV_DATA__) {
         Object.assign(subtitleSettings, data.subtitleSettings);
       }
       
+      // ★★ SSR 데이터 파싱 완료 즉시 로딩화면 숨기기 (검정화면 제거)
+      hideLoadingScreen();
+      
       // 빈 플레이리스트 처리
       if (!playlist || !playlist.items || playlist.items.length === 0) {
         showEmptyPlaylistScreen();
-        hideLoadingScreen();
       } else {
         // API 로드 (최대 2초 대기)
         const loadPromises = [];
@@ -2787,9 +2789,6 @@ if (window.__INITIAL_TV_DATA__) {
         }
       }
       
-      // 10초 안전장치
-      setTimeout(hideLoadingScreen, 10000);
-      
     } catch(e) {
       console.error('[SSR] Init failed, falling back to API:', e);
       loadData(true);
@@ -2805,16 +2804,27 @@ if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
   // 즉시 전체화면 시도 (새 탭 열기는 사용자 제스처로 간주됨)
   userHasInteracted = true;
   shouldBeFullscreen = true;
+  // ★★ 즉시 + 다단계 재시도로 전체화면 확실히 진입
+  function tryFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }
+  tryFullscreen(); // 즉시
+  setTimeout(tryFullscreen, 100);
+  setTimeout(tryFullscreen, 300);
+  setTimeout(tryFullscreen, 500);
+  setTimeout(tryFullscreen, 1000);
   setTimeout(() => {
-    document.documentElement.requestFullscreen().catch(() => {
-      // 전체화면 실패 시 클릭 한번으로 진입하도록 힌트 표시
+    if (!document.fullscreenElement) {
+      // 최종 실패 시 클릭으로 진입하도록 힌트
       const hint = document.getElementById('fullscreen-hint');
       if (hint) {
         hint.style.display = 'block';
         hint.textContent = '클릭하면 전체화면으로 재생됩니다';
       }
-    });
-  }, 500);
+    }
+  }, 2000);
 }
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)

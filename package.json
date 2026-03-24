@@ -26,8 +26,10 @@
     "@hono/vite-cloudflare-pages": "^0.4.3",
     "@hono/vite-dev-server": "^0.18.2",
     "autoprefixer": "^10.4.27",
+    "html-minifier-terser": "^7.2.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
+    "terser": "^5.46.1",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
   }

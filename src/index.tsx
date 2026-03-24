@@ -12405,7 +12405,7 @@ app.get('/tv/:shortCode', async (c) => {
   </style>
 </head>
 <body style="background:#000;margin:0">
-  <div id="loading-screen"><div class="spinner"></div><p>로딩 중...</p></div>
+  <div id="loading-screen"${ssrData ? ' class="hidden"' : ''}><div class="spinner"></div><p>로딩 중...</p></div>
 
   <div id="error-screen" style="display:none">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
