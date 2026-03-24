@@ -4971,15 +4971,14 @@ function openQuickPreview(shortCode) {
   openModal('preview-modal');
 }
 
-// TV 미러링 열기 (팝업 차단 방지를 위해 동기적으로 창 열기)
+// TV 미러링 열기 (새 탭에서 열고, TV 페이지에서 전체화면 자동 처리)
 function openTVMirror(shortCode, itemCount) {
   if (!shortCode) {
     alert('TV 코드가 없습니다. 관리자에게 문의하세요.');
     return;
   }
   const url = '/tv/' + shortCode + '?autoplay=1';
-  const w = screen.width, h = screen.height;
-  const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
+  const opened = window.open(url, '_blank');
   if (!opened) {
     window.location.href = url;
   }

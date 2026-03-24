@@ -4721,8 +4721,7 @@ app.get('/embed-old/:memberCode', async (c) => {
         return;
       }
       const url = '/tv/' + shortCode + '?autoplay=1';
-      const w = screen.width, h = screen.height;
-      const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
+      const opened = window.open(url, '_blank');
       if (!opened) {
         window.location.href = url;
       }
@@ -10400,15 +10399,14 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       openModal('preview-modal');
     }
     
-    // TV 미러링 열기 (팝업 차단 방지를 위해 동기적으로 창 열기)
+    // TV 미러링 열기 (새 탭에서 열고, TV 페이지에서 전체화면 자동 처리)
     function openTVMirror(shortCode, itemCount) {
       if (!shortCode) {
         alert('TV 코드가 없습니다. 관리자에게 문의하세요.');
         return;
       }
       const url = '/tv/' + shortCode + '?autoplay=1';
-      const w = screen.width, h = screen.height;
-      const opened = window.open(url, '_blank', 'width=' + w + ',height=' + h + ',top=0,left=0,menubar=no,toolbar=no,location=no,status=no');
+      const opened = window.open(url, '_blank');
       if (!opened) {
         window.location.href = url;
       }
@@ -12344,7 +12342,7 @@ app.get('/tv/:shortCode', async (c) => {
   
   // ★★ 단일 HTML 응답: 모든 CSS는 head에, JS는 외부 defer + preload
   return c.html(`<!DOCTYPE html>
-<html lang="ko" style="background:#000">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -12354,14 +12352,15 @@ app.get('/tv/:shortCode', async (c) => {
   <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
     #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
     .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
     #loading-screen p{color:#666;margin-top:20px}
     .hidden{display:none!important}
-    #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:#000}
-    .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
+    #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:transparent}
+    .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
+    .media-item.has-content{background:#000}
     .media-item.active{opacity:1;z-index:2;pointer-events:auto}
     .media-item.active ~ .media-item.active{z-index:1}
     .media-item iframe,.media-item video,.media-item img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:100%;min-height:100%;width:auto;height:auto;border:none;object-fit:cover}
@@ -12405,15 +12404,14 @@ app.get('/tv/:shortCode', async (c) => {
     body.is-fullscreen #btn-fullscreen{display:none}
   </style>
 </head>
-<body style="background:#000;margin:0">
+<body style="margin:0;background:${(() => { const fi = ssrData?.playlist?.items?.[0]; let t = fi?.thumbnail_url || ''; if (t) t = t.replace(/_\d+x\d+/, '_1920x1080'); return t ? '#111' : '#000'; })()}">
   ${(() => {
-    // SSR: 첫 번째 아이템 썸네일을 즉시 배경으로 표시 (검정화면 제거)
+    // SSR: 첫 번째 아이템 썸네일을 즉시 전체화면으로 표시 (검정화면 완전 제거)
     const firstItem = ssrData?.playlist?.items?.[0]
     let thumb = firstItem?.thumbnail_url || ''
-    // Vimeo 썸네일 고해상도로 변환
     if (thumb) thumb = thumb.replace(/_\d+x\d+/, '_1920x1080')
     if (thumb && ssrData) {
-      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;background:#000"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover" alt=""></div>`
+      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;background:#111"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.background='#000'" alt=""></div>`
     }
     return ''
   })()}

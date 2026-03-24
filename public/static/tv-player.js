@@ -19,9 +19,13 @@ function hideLoadingScreen() {
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
-  // SSR 썸네일도 함께 제거 (영상이 재생 시작되면)
+  // SSR 썸네일 부드럽게 페이드아웃 (영상이 뒤에서 준비되면 서서히 사라짐)
   const thumb = document.getElementById('ssr-thumbnail');
-  if (thumb) thumb.style.display = 'none';
+  if (thumb) {
+    thumb.style.transition = 'opacity 0.5s ease-out';
+    thumb.style.opacity = '0';
+    setTimeout(function() { thumb.remove(); }, 600);
+  }
 }
 
 // 안정성 강화 변수
@@ -2801,18 +2805,52 @@ if (window.__INITIAL_TV_DATA__) {
   loadData(true);
 }
 
-// ★★ autoplay=1: 자동 전체화면 진입 (사용자 상호작용 없이)
-// 관리자 페이지에서 '내보내기' 클릭 시 새 탭으로 열리므로 사용자 제스처가 있음
+// ★★ autoplay=1: 자동 전체화면 진입
 if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
   userHasInteracted = true;
   shouldBeFullscreen = true;
-  // 첫 클릭/터치 시 전체화면 진입 (브라우저 정책상 사용자 제스처 필요)
-  document.addEventListener('click', function _af() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(function() {});
-    }
-    document.removeEventListener('click', _af);
-  }, { once: true });
+  // 즉시 전체화면 시도 (window.open에서 넘어온 경우 user gesture 전파될 수 있음)
+  var _fsAttempted = false;
+  function _tryFS() {
+    if (_fsAttempted && document.fullscreenElement) return;
+    _fsAttempted = true;
+    document.documentElement.requestFullscreen().then(function() {
+      console.log('[Autoplay] Fullscreen entered automatically');
+      _removeFSOverlay();
+    }).catch(function() {
+      console.log('[Autoplay] Auto fullscreen blocked, showing touch hint');
+      _showFSOverlay();
+    });
+  }
+  function _showFSOverlay() {
+    // 투명 터치 영역 + 하단에 작은 힌트만 (영상은 그대로 보임)
+    if (document.getElementById('fs-touch-overlay')) return;
+    var ov = document.createElement('div');
+    ov.id = 'fs-touch-overlay';
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:pointer;background:transparent';
+    // 하단 힌트 텍스트
+    var hint = document.createElement('div');
+    hint.style.cssText = 'position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 24px;border-radius:24px;font-size:15px;white-space:nowrap;animation:fsPulse 2s ease-in-out infinite';
+    hint.textContent = '🖥️ 화면을 터치하여 전체화면 시작';
+    ov.appendChild(hint);
+    // 애니메이션 추가
+    var st = document.createElement('style');
+    st.textContent = '@keyframes fsPulse{0%,100%{opacity:0.7}50%{opacity:1}}';
+    document.head.appendChild(st);
+    ov.addEventListener('click', function() {
+      document.documentElement.requestFullscreen().catch(function(){});
+      _removeFSOverlay();
+    }, { once: true });
+    document.body.appendChild(ov);
+    // 5초 후 자동으로 힌트 사라짐 (전체화면 안해도 시청 가능)
+    setTimeout(function() { _removeFSOverlay(); }, 5000);
+  }
+  function _removeFSOverlay() {
+    var el = document.getElementById('fs-touch-overlay');
+    if (el) el.remove();
+  }
+  // 100ms 후 시도 (DOM 완전 로드 후)
+  setTimeout(_tryFS, 100);
 }
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
@@ -2882,14 +2920,15 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('pagehide', deactivateTV, true);
 window.addEventListener('beforeunload', deactivateTV, true);
 
-// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
-document.addEventListener('click', function autoFullscreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-  // 한 번만 실행
-  document.removeEventListener('click', autoFullscreen);
-}, { once: true });
+// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시 - autoplay가 아닌 경우에도)
+if (!(typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY)) {
+  document.addEventListener('click', function autoFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    document.removeEventListener('click', autoFullscreen);
+  }, { once: true });
+}
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
