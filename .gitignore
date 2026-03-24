@@ -40,3 +40,6 @@ logs/
 # Backup files
 *.backup
 *.bak
+tv-export
+dental-tv-*.tar.gz
+tv-player-fixed-*.js
