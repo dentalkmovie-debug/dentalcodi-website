@@ -2792,6 +2792,116 @@ app.get('/api/tv/:shortCode', async (c) => {
 })
 
 // ============================================
+// ============================================
+// 위젯용 API: initialData를 JSON으로 반환 (iframe 대신 script 위젯용)
+// ============================================
+app.get('/api/widget/init/:memberCode', async (c) => {
+  let memberCode = c.req.param('memberCode')
+  const memberEmail = c.req.query('email') || ''
+  const isAdmin = c.req.query('is_admin') || c.req.query('admin') || ''
+  const memberName = c.req.query('name') || ''
+
+  c.header('Access-Control-Allow-Origin', '*')
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=5, stale-while-revalidate=10')
+
+  try {
+    // admin_code(imweb_xxx)가 memberCode로 들어온 경우
+    let adminCode = ''
+    let rawEmail = ''
+    let isAdminFlag = isAdmin === '1' || isAdmin === 'true' || isAdmin === 'Y' || isAdmin === 'yes'
+
+    if (memberCode.startsWith('imweb_')) {
+      const userByAdminCode = await c.env.DB.prepare(
+        'SELECT * FROM users WHERE admin_code = ?'
+      ).bind(memberCode).first() as any
+      if (userByAdminCode) {
+        adminCode = userByAdminCode.admin_code
+        rawEmail = normalizeEmail(memberEmail) || userByAdminCode.imweb_email || ''
+        if (adminCode === 'master_admin') isAdminFlag = true
+      } else {
+        memberCode = memberCode.replace(/^imweb_/, '')
+      }
+    }
+
+    if (!adminCode) {
+      const normalizedEmail = normalizeEmail(memberEmail)
+      const existingUser = await c.env.DB.prepare(
+        'SELECT * FROM users WHERE imweb_member_id = ?'
+      ).bind(memberCode).first() as any
+      if (existingUser) {
+        adminCode = existingUser.admin_code
+        rawEmail = normalizedEmail || existingUser.imweb_email || ''
+        if (adminCode === 'master_admin') isAdminFlag = true
+      } else {
+        // 신규 사용자 생성
+        const newAdminCode = 'imweb_' + memberCode
+        await c.env.DB.prepare(
+          'INSERT OR IGNORE INTO users (admin_code, imweb_member_id, imweb_email, member_name) VALUES (?, ?, ?, ?)'
+        ).bind(newAdminCode, memberCode, normalizedEmail, memberName).run()
+        adminCode = newAdminCode
+        rawEmail = normalizedEmail
+      }
+    }
+
+    // 사용자 조회
+    const user = await c.env.DB.prepare('SELECT * FROM users WHERE admin_code = ?').bind(adminCode).first() as any
+    if (!user) return c.json({ error: '사용자를 찾을 수 없습니다.' }, 404)
+
+    const emailParam = normalizeEmail(rawEmail) || normalizeEmail(user.imweb_email) || ''
+    const isOwnerAdmin = isAdminFlag || user?.is_site_admin === 1 || isAdminEmail(user?.imweb_email) || isAdminEmail(emailParam)
+    const isSuperAdmin = isAdminEmail(user?.imweb_email) || isAdminEmail(emailParam) || user?.is_master === 1 || isAdminFlag
+
+    // 플레이리스트 + 공지사항 (병렬)
+    const [playlistsData, noticesData] = await Promise.all([
+      c.env.DB.prepare(`
+        SELECT p.*, 
+          (SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+        FROM playlists p
+        WHERE p.user_id = ? AND (p.is_master_playlist = 0 OR p.is_master_playlist IS NULL)
+        ORDER BY p.id
+      `).bind(user?.id || 0).all(),
+      c.env.DB.prepare('SELECT * FROM notices WHERE user_id = ? ORDER BY sort_order ASC, id DESC')
+        .bind(user?.id || 0).all()
+    ])
+
+    const playlistsWithItems = (playlistsData.results || []).map((p: any) => {
+      let activeItemIds: number[] = []
+      try {
+        const raw = p.active_item_ids
+        if (raw === null || raw === undefined) activeItemIds = []
+        else {
+          activeItemIds = JSON.parse(raw || '[]')
+          activeItemIds = Array.isArray(activeItemIds) ? activeItemIds.map((id: any) => Number(id)).filter((id: number) => Number.isFinite(id)) : []
+        }
+      } catch (e) { activeItemIds = [] }
+      return { ...p, items: [], activeItemIds }
+    })
+
+    const baseUrl = new URL(c.req.url).origin
+
+    return c.json({
+      ok: true,
+      adminCode,
+      baseUrl,
+      data: {
+        playlists: playlistsWithItems,
+        notices: noticesData.results || [],
+        masterItems: [],
+        clinicName: user?.clinic_name || '',
+        memberName: memberName || user?.member_name || '',
+        userEmail: emailParam || adminCode || '',
+        isOwnerAdmin,
+        isSuperAdmin,
+        adminCode,
+        userId: user?.id || 0,
+        allClinics: []
+      }
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message || 'Internal error' }, 500)
+  }
+})
+
 // 아임웹 임베드용 관리자 페이지 (admin 페이지로 리다이렉트)
 // ============================================
 
