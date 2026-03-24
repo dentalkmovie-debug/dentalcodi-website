@@ -2875,12 +2875,8 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('pagehide', deactivateTV, true);
 window.addEventListener('beforeunload', deactivateTV, true);
 
-// 페이지 클릭 시 전체화면 진입 (매번 시도 - iframe이 클릭 가로챌 수 있으므로)
-document.addEventListener('click', function() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(function() {});
-  }
-});
+// 전체화면 진입은 autoplay 시 한 번만 시도 (위의 IS_AUTOPLAY 블록에서 처리)
+// 매 클릭마다 requestFullscreen 호출하면 Vimeo iframe과 충돌하여 영상 끊김 유발
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
