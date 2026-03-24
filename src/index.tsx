@@ -22,6 +22,63 @@ app.get('/favicon.ico', (c) => new Response(null, { status: 204 }))
 // ============================================
 
 // 차단 페이지 HTML 생성
+// ── 스켈레톤 로더 HTML: 즉시 표시용 (DB 쿼리 없이 반환) ──
+function getSkeletonHtml(fullUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="ko" style="background:#fff">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.sk{background:#fff;min-height:100vh}
+.sk-hd{background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px;border-radius:12px 12px 0 0}
+.sk-hd-t{height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px}
+.sk-hd-s{height:12px;width:180px;background:rgba(255,255,255,.2);border-radius:3px}
+.sk-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff}
+.sk-tab{padding:11px 14px;font-size:13px;color:#d1d5db;border-bottom:2px solid transparent}
+.sk-tab:first-child{color:#2563eb;border-bottom-color:#2563eb;font-weight:700}
+.sk-body{padding:12px 16px}
+.sk-sec{margin-bottom:16px}
+.sk-sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sk-sec-t{height:16px;width:100px;background:#e5e7eb;border-radius:4px}
+.sk-badge{height:20px;width:32px;background:#e5e7eb;border-radius:10px}
+.sk-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:8px}
+.sk-card-row{display:flex;align-items:center;gap:10px}
+.sk-dot{width:36px;height:36px;border-radius:10px;background:#e5e7eb;flex-shrink:0}
+.sk-lines{flex:1}
+.sk-l1{height:14px;width:80px;background:#e5e7eb;border-radius:3px;margin-bottom:6px}
+.sk-l2{height:10px;width:140px;background:#f3f4f6;border-radius:3px}
+.sk-btns{display:flex;gap:6px;margin-top:10px;padding-left:46px}
+.sk-btn{height:28px;width:72px;background:#f3f4f6;border-radius:8px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.sk-pulse{animation:pulse 1.5s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div class="sk">
+<div class="sk-hd"><div class="sk-hd-t sk-pulse"></div><div class="sk-hd-s sk-pulse"></div></div>
+<div class="sk-tabs"><span class="sk-tab">대기실</span><span class="sk-tab">체어</span><span class="sk-tab">공지사항</span><span class="sk-tab">설정</span></div>
+<div class="sk-body">
+<div class="sk-sec">
+<div class="sk-sec-hd"><div class="sk-sec-t sk-pulse"></div><div class="sk-badge sk-pulse"></div></div>
+<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
+<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
+</div>
+</div>
+</div>
+<script>
+fetch('${fullUrl}',{credentials:'same-origin'})
+.then(function(r){return r.text()})
+.then(function(html){document.open();document.write(html);document.close()})
+.catch(function(e){document.body.innerHTML='<div style="padding:20px;text-align:center;color:#ef4444">로딩 실패. 새로고침 해주세요.</div>'})
+</script>
+</body>
+</html>`
+}
+
 function getBlockedPageHtml(title: string, reason: string, message: string): string {
   return `
 <!DOCTYPE html>
@@ -2665,60 +2722,7 @@ app.get('/embed/:memberCode', async (c) => {
     if (isAdmin) qs.set('is_admin', isAdmin)
     qs.set('_full', '1')
     const fullUrl = `/embed/${encodeURIComponent(memberCode)}?${qs.toString()}`
-    
-    return c.html(`<!DOCTYPE html>
-<html lang="ko" style="background:#fff">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-store,no-cache,must-revalidate,max-age=0">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-.sk{background:#fff;min-height:100vh}
-.sk-hd{background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px;border-radius:12px 12px 0 0}
-.sk-hd-t{height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px}
-.sk-hd-s{height:12px;width:180px;background:rgba(255,255,255,.2);border-radius:3px}
-.sk-tabs{display:flex;gap:0;border-bottom:1px solid #e5e7eb;padding:0 8px;background:#fff}
-.sk-tab{padding:11px 14px;font-size:13px;color:#d1d5db;border-bottom:2px solid transparent}
-.sk-tab:first-child{color:#2563eb;border-bottom-color:#2563eb;font-weight:700}
-.sk-body{padding:12px 16px}
-.sk-sec{margin-bottom:16px}
-.sk-sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.sk-sec-t{height:16px;width:100px;background:#e5e7eb;border-radius:4px}
-.sk-badge{height:20px;width:32px;background:#e5e7eb;border-radius:10px}
-.sk-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:8px}
-.sk-card-row{display:flex;align-items:center;gap:10px}
-.sk-dot{width:36px;height:36px;border-radius:10px;background:#e5e7eb;flex-shrink:0}
-.sk-lines{flex:1}
-.sk-l1{height:14px;width:80px;background:#e5e7eb;border-radius:3px;margin-bottom:6px}
-.sk-l2{height:10px;width:140px;background:#f3f4f6;border-radius:3px}
-.sk-btns{display:flex;gap:6px;margin-top:10px;padding-left:46px}
-.sk-btn{height:28px;width:72px;background:#f3f4f6;border-radius:8px}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.sk-pulse{animation:pulse 1.5s ease-in-out infinite}
-</style>
-</head>
-<body>
-<div class="sk">
-<div class="sk-hd"><div class="sk-hd-t sk-pulse"></div><div class="sk-hd-s sk-pulse"></div></div>
-<div class="sk-tabs"><span class="sk-tab">대기실</span><span class="sk-tab">체어</span><span class="sk-tab">공지사항</span><span class="sk-tab">설정</span></div>
-<div class="sk-body">
-<div class="sk-sec">
-<div class="sk-sec-hd"><div class="sk-sec-t sk-pulse"></div><div class="sk-badge sk-pulse"></div></div>
-<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
-<div class="sk-card"><div class="sk-card-row"><div class="sk-dot sk-pulse"></div><div class="sk-lines"><div class="sk-l1 sk-pulse"></div><div class="sk-l2 sk-pulse"></div></div></div><div class="sk-btns"><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div><div class="sk-btn sk-pulse"></div></div></div>
-</div>
-</div>
-</div>
-<script>
-fetch('${fullUrl}',{credentials:'same-origin'})
-.then(function(r){return r.text()})
-.then(function(html){document.open();document.write(html);document.close()})
-.catch(function(e){document.body.innerHTML='<div style="padding:20px;text-align:center;color:#ef4444">로딩 실패. 새로고침 해주세요.</div>'})
-</script>
-</body>
-</html>`, 200, {
+    return c.html(getSkeletonHtml(fullUrl), 200, {
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
       'Pragma': 'no-cache',
       'Expires': '0'
@@ -11778,6 +11782,22 @@ app.get('/admin/:adminCode', async (c) => {
   const isAdminFlag = c.req.query('is_admin') === '1'
   const emailParam = (c.req.query('email') || '').trim().toLowerCase()
   const nameParam = c.req.query('name') || ''
+
+  // ── 2단계 로딩: _full 없으면 즉시 스켈레톤 반환 (흰 화면 방지) ──
+  if (!c.req.query('_full')) {
+    const qs = new URLSearchParams()
+    if (emailParam) qs.set('email', emailParam)
+    if (isAdminFlag) qs.set('is_admin', '1')
+    if (nameParam) qs.set('name', nameParam)
+    qs.set('_full', '1')
+    const fullUrl = `/admin/${encodeURIComponent(adminCode)}?${qs.toString()}`
+    return c.html(getSkeletonHtml(fullUrl), 200, {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    })
+  }
+
   return handleAdminPage(c, adminCode, emailParam, isAdminFlag, nameParam)
 })
 
