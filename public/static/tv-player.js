@@ -2803,36 +2803,13 @@ if (window.__INITIAL_TV_DATA__) {
 if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
   userHasInteracted = true;
   shouldBeFullscreen = true;
-  
-  // ★★ autoplay 오버레이가 있으면 그 클릭을 기다림 (사용자 제스처로 전체화면 진입)
-  const overlay = document.getElementById('autoplay-overlay');
-  if (overlay) {
-    overlay.addEventListener('click', function() {
-      overlay.style.display = 'none';
+  // 첫 클릭/터치 시 전체화면 진입 (브라우저 정책상 사용자 제스처 필요)
+  document.addEventListener('click', function _af() {
+    if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(function() {});
-    }, { once: true });
-    // 오버레이가 없어지면 자동 시도 (fallback)
-  } else {
-    // 오버레이 없이 직접 시도
-    function tryFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(function() {});
-      }
     }
-    tryFullscreen();
-    setTimeout(tryFullscreen, 100);
-    setTimeout(tryFullscreen, 500);
-    setTimeout(tryFullscreen, 1000);
-    setTimeout(function() {
-      if (!document.fullscreenElement) {
-        var hint = document.getElementById('fullscreen-hint');
-        if (hint) {
-          hint.style.display = 'block';
-          hint.textContent = '클릭하면 전체화면으로 재생됩니다';
-        }
-      }
-    }, 2000);
-  }
+    document.removeEventListener('click', _af);
+  }, { once: true });
 }
 
 // 실시간 동기화 (10초마다 - 네트워크 부하 최소화로 끊김 방지)
