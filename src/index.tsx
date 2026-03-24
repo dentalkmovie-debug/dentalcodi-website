@@ -12515,6 +12515,11 @@ app.get('/', (c) => {
 // 비로그인/관리자 계정 안내 페이지
 // ============================================
 
+// 초경량 로딩 페이지 (~1KB) - iframe 초기 src로 사용
+app.get('/loading', (c) => {
+  return c.html(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#fff;font-family:-apple-system,sans-serif}.h{background:linear-gradient(135deg,#2563eb,#3b82f6);padding:16px 20px}.h div{height:20px;width:120px;background:rgba(255,255,255,.3);border-radius:4px;margin-bottom:6px}.h p{height:12px;width:200px;background:rgba(255,255,255,.2);border-radius:3px}.t{display:flex;border-bottom:1px solid #e5e7eb;padding:0 8px}.t span{padding:11px 14px;font-size:13px;color:#d1d5db;font-family:-apple-system,sans-serif}.t span:first-child{color:#2563eb;border-bottom:2px solid #2563eb;font-weight:700}.c{padding:60px 16px;text-align:center}.c div{width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:s .8s linear infinite;margin:0 auto 12px}.c p{font-size:13px;color:#9ca3af}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="h"><div></div><p></p></div><div class="t"><span>대기실</span><span>체어</span><span>공지사항</span><span>설정</span></div><div class="c"><div></div><p>로딩 중...</p></div></body></html>`)
+})
+
 app.get('/not-logged-in', (c) => {
   return c.html(`
 <!DOCTYPE html>
