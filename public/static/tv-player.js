@@ -2875,14 +2875,12 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('pagehide', deactivateTV, true);
 window.addEventListener('beforeunload', deactivateTV, true);
 
-// 페이지 로드 후 자동 전체화면 시도 (사용자 클릭 시)
-document.addEventListener('click', function autoFullscreen() {
+// 페이지 클릭 시 전체화면 진입 (매번 시도 - iframe이 클릭 가로챌 수 있으므로)
+document.addEventListener('click', function() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
+    document.documentElement.requestFullscreen().catch(function() {});
   }
-  // 한 번만 실행
-  document.removeEventListener('click', autoFullscreen);
-}, { once: true });
+});
 
 // 전체화면 주기적 복원 제거 - CSS 의사 전체화면이 항상 활성화되므로 불필요
 // requestFullscreen 반복 호출이 Vimeo iframe과 충돌하여 영상 끊김/깜빡임 유발
