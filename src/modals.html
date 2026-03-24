@@ -895,19 +895,20 @@
   <!-- 임시 영상 전송 모달 -->
   <div id="temp-video-modal" style="display:none" class="fixed inset-0 z-50">
     <div class="modal-backdrop absolute inset-0" onclick="closeModal('temp-video-modal')"></div>
-    <div class="absolute inset-0 flex items-start justify-center overflow-y-auto p-4 pt-2" style="pointer-events:none">
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[600px] my-2" style="pointer-events:auto;flex-shrink:0">
-        <div class="p-4">
-        <div class="flex items-center justify-between mb-4">
+    <div class="absolute inset-0 flex items-start justify-center overflow-y-auto p-2" style="pointer-events:none">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-[540px] my-1" style="pointer-events:auto;flex-shrink:0">
+        <div class="flex flex-col p-3 pb-2">
+        <!-- 헤더 -->
+        <div class="flex items-center justify-between mb-2">
           <div>
-            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
               <i class="fas fa-paper-plane text-orange-500"></i>
               임시 영상 전송
             </h3>
-            <p class="text-sm text-gray-500 mt-1" id="temp-video-target-name">1번 체어에 전송</p>
+            <p class="text-xs text-gray-500 mt-0.5" id="temp-video-target-name">1번 체어에 전송</p>
           </div>
-          <button onclick="closeModal('temp-video-modal')" class="text-gray-400 hover:text-gray-600 p-2">
-            <i class="fas fa-times text-xl"></i>
+          <button onclick="closeModal('temp-video-modal')" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fas fa-times text-lg"></i>
           </button>
         </div>
         
@@ -915,54 +916,54 @@
         <input type="hidden" id="temp-video-short-code">
         
         <!-- 영상 선택 탭 -->
-        <div class="flex border-b mb-4">
+        <div class="flex border-b mb-2">
           <button onclick="switchTempVideoTab('shared')" id="temp-tab-shared" 
-            class="flex-1 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">
+            class="flex-1 py-1.5 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">
             재생목록
           </button>
           <button onclick="switchTempVideoTab('url')" id="temp-tab-url"
-            class="flex-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+            class="flex-1 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700">
             URL 직접 입력
           </button>
         </div>
         
         <!-- 재생목록 (공용 + 내 영상) -->
         <div id="temp-video-shared-tab">
-          <div class="mb-3 flex gap-2">
+          <div class="mb-2 flex gap-2">
             <input type="text" id="temp-video-search" placeholder="영상 이름 검색"
               oninput="updateTempVideoSearch()"
-              class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+              class="flex-1 px-2 py-1.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
             <button type="button" onclick="updateTempVideoSearch()"
-              class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600">검색</button>
+              class="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600">검색</button>
           </div>
-          <div id="temp-video-search-results" class="border rounded-lg max-h-40 overflow-y-auto mb-3 hidden"></div>
-          <div id="temp-video-shared-list" class="border rounded-lg max-h-44 overflow-y-auto mb-3">
+          <div id="temp-video-search-results" class="border rounded-lg max-h-32 overflow-y-auto mb-2 hidden"></div>
+          <div id="temp-video-shared-list" class="border rounded-lg max-h-36 overflow-y-auto mb-2">
             <!-- 공용자료 목록이 여기에 렌더링됨 -->
           </div>
         </div>
         
         <!-- URL 직접 입력 -->
         <div id="temp-video-url-tab" class="hidden">
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">YouTube 또는 Vimeo URL</label>
+          <div class="mb-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">YouTube 또는 Vimeo URL</label>
             <input type="text" id="temp-video-url" 
-              class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
               placeholder="https://youtube.com/watch?v=... 또는 https://vimeo.com/...">
           </div>
         </div>
         
         <!-- 자동 복귀 설정 (단순화) -->
-        <div class="bg-gray-50 rounded-lg p-3 mb-3">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
+        <div class="bg-gray-50 rounded-lg p-2 mb-2">
+          <label class="block text-xs font-medium text-gray-700 mb-1">
             복귀 설정
           </label>
-          <div class="flex gap-3">
-            <label class="flex-1 flex items-center justify-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-white transition"
+          <div class="flex gap-2">
+            <label class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 border rounded-lg cursor-pointer hover:bg-white transition text-sm"
               onclick="document.getElementById('temp-return-time').value='end'">
               <input type="radio" name="return-type" value="end" class="text-indigo-600" checked>
               <span class="text-sm font-medium">영상 끝나면 복귀</span>
             </label>
-            <label class="flex-1 flex items-center justify-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-white transition"
+            <label class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 border rounded-lg cursor-pointer hover:bg-white transition text-sm"
               onclick="document.getElementById('temp-return-time').value='manual'">
               <input type="radio" name="return-type" value="manual" class="text-indigo-600">
               <span class="text-sm font-medium">수동 복귀 (반복)</span>
@@ -972,27 +973,27 @@
         </div>
         
         <!-- 현재 상태 표시 -->
-        <div id="temp-video-current-status" class="hidden bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3">
+        <div id="temp-video-current-status" class="hidden bg-orange-50 border border-orange-200 rounded-lg p-2 mb-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <i class="fas fa-play-circle text-orange-500"></i>
-              <span class="text-sm text-orange-800">현재 임시 영상 재생 중</span>
+              <span class="text-xs text-orange-800">현재 임시 영상 재생 중</span>
             </div>
-            <button onclick="stopTempVideo()" class="text-xs bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">
-              <i class="fas fa-stop mr-1"></i>기본으로 복귀
+            <button onclick="stopTempVideo()" class="text-xs bg-orange-500 text-white px-2 py-0.5 rounded hover:bg-orange-600">
+              <i class="fas fa-stop mr-1"></i>복귀
             </button>
           </div>
         </div>
         
         <!-- 버튼 -->
-        <div class="flex gap-3">
+        <div class="flex gap-2">
           <button onclick="closeModal('temp-video-modal')" 
-            class="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50 text-gray-700">
+            class="flex-1 px-3 py-2 border rounded-lg hover:bg-gray-50 text-gray-700 text-sm">
             취소
           </button>
           <button onclick="sendTempVideo()" 
-            class="flex-1 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium">
-            <i class="fas fa-paper-plane mr-2"></i>전송
+            class="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium text-sm">
+            <i class="fas fa-paper-plane mr-1"></i>전송
           </button>
         </div>
       </div>
