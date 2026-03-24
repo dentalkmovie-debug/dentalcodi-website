@@ -4839,10 +4839,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const ssrChCount = ssrChairs.length + '개'
   // ── SSR 끝 ──
   
-  // 강력한 캐시 방지 헤더 설정 (아임웹 iframe 캐시 문제 방지)
-  c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-  c.header('Pragma', 'no-cache')
-  c.header('Expires', '0')
+  // 짧은 캐시 허용 (Cloudflare 엣지에서 즉시 응답, 5초마다 갱신)
+  // s-maxage=5: Cloudflare CDN은 5초간 캐시 (한국 엣지에서 즉시 응답)
+  // max-age=0: 브라우저는 캐시하지 않음 (항상 CDN에 확인)
+  // stale-while-revalidate=10: 캐시 만료 후에도 기존 캐시를 즉시 제공하면서 백그라운드 갱신
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=5, stale-while-revalidate=10')
+  c.header('CDN-Cache-Control', 'public, max-age=5, stale-while-revalidate=10')
   
   return c.html(`
 <!DOCTYPE html>
@@ -4850,9 +4852,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+
   <title>치과 TV 관리자</title>
   <!-- preload만: 다운로드 시작하되 렌더 차단 안 함 -->
   <link rel="preload" href="/static/admin.js?v=${Date.now()}" as="script">
