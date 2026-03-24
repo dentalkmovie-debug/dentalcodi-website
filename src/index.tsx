@@ -12358,9 +12358,8 @@ app.get('/tv/:shortCode', async (c) => {
     @keyframes spin{to{transform:rotate(360deg)}}
     #loading-screen p{color:#666;margin-top:20px}
     .hidden{display:none!important}
-    #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:transparent}
-    .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
-    .media-item.has-content{background:#000}
+    #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:#000}
+    .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
     .media-item.active{opacity:1;z-index:2;pointer-events:auto}
     .media-item.active ~ .media-item.active{z-index:1}
     .media-item iframe,.media-item video,.media-item img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:100%;min-height:100%;width:auto;height:auto;border:none;object-fit:cover}
