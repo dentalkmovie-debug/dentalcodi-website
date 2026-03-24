@@ -2041,16 +2041,23 @@ app.get('/api/:adminCode/temp-video-batch', async (c) => {
     return c.json({ statuses: {} })
   }
   
-  // 안전한 쿼리: playlist IDs로 직접 조회
+  // 안전한 쿼리: playlist IDs로 직접 조회 (is_tv_active 포함)
   const placeholders = ids.map(() => '?').join(',')
   const results = await c.env.DB.prepare(`
-    SELECT id, temp_video_url, temp_video_title, temp_video_type, temp_return_time
+    SELECT id, temp_video_url, temp_video_title, temp_video_type, temp_return_time,
+      CASE WHEN last_active_at IS NOT NULL AND (strftime('%s','now') - strftime('%s', last_active_at)) < 90 THEN 1 ELSE 0 END as is_tv_active
     FROM playlists WHERE id IN (${placeholders}) AND temp_video_url IS NOT NULL
   `).bind(...ids).all<any>()
   
   const statuses: Record<string, any> = {}
+  const staleIds: string[] = []
   if (results.results) {
     for (const r of results.results) {
+      if (!r.is_tv_active) {
+        // TV 오프라인 → 임시 영상 상태를 active로 표시하지 않고, 정리 대상으로 기록
+        staleIds.push(r.id)
+        continue
+      }
       statuses[r.id] = {
         active: true,
         url: r.temp_video_url,
@@ -2059,6 +2066,18 @@ app.get('/api/:adminCode/temp-video-batch', async (c) => {
         return_time: r.temp_return_time
       }
     }
+  }
+  
+  // 오프라인 TV의 stale temp_video_url 자동 정리 (비동기, 응답 차단하지 않음)
+  if (staleIds.length > 0) {
+    const stalePlaceholders = staleIds.map(() => '?').join(',')
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare(`
+        UPDATE playlists 
+        SET temp_video_url = NULL, temp_video_title = NULL, temp_video_type = NULL, temp_return_time = NULL, temp_started_at = NULL
+        WHERE id IN (${stalePlaceholders})
+      `).bind(...staleIds).run()
+    )
   }
   
   return c.json({ statuses })
@@ -7510,22 +7529,40 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         tempVideoCacheByPlaylist[playlistId] = tempVideoPlaylistItems;
         renderTempVideoSharedList();
       } else {
-        document.getElementById('temp-video-shared-list').innerHTML = '<div class="text-center py-4 text-gray-500">로딩 중...</div>';
+        // masterItemsCache가 아직 없어도 playlists에서 내 영상은 바로 표시 가능
+        const basePlaylist2 = playlists ? playlists.find(p => p.id == playlistId) : null;
+        const currentItems2 = (basePlaylist2?.items || []);
+        if (currentItems2.length > 0) {
+          const allUserItems2 = [...currentItems2];
+          const seenUrls2 = new Set(currentItems2.map(i => i.url));
+          if (Array.isArray(playlists)) {
+            playlists.forEach(function(p) {
+              if (String(p.id) === String(playlistId)) return;
+              (p.items || []).forEach(function(item) {
+                if (!seenUrls2.has(item.url)) {
+                  seenUrls2.add(item.url);
+                  allUserItems2.push(item);
+                }
+              });
+            });
+          }
+          tempVideoPlaylistItems = allUserItems2.map(item => ({ ...item, is_master: false }));
+          renderTempVideoSharedList();
+        } else {
+          document.getElementById('temp-video-shared-list').innerHTML = '<div class="text-center py-3 text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i>로딩 중...</div>';
+        }
       }
       
       // 백그라운드에서 최신 데이터 로드 (캐시 갱신 + 현재 전송 영상 확인)
-      // 이미 즉시 렌더링된 경우 재렌더링 없이 캐시만 갱신
-      const alreadyRendered = tempVideoPlaylistItems.length > 0;
+      // API 로드 완료 후 항상 최신 데이터로 렌더링
       Promise.all([
         loadTempVideoPlaylistItems(playlistId),
         checkCurrentTempVideo(playlistId)
       ]).then(() => {
-        if (!alreadyRendered) {
-          // 즉시 렌더링 못 한 경우(masterItemsCache 없었을 때)만 렌더링
-          renderTempVideoSharedList();
-        }
-        // 현재 전송 중인 영상 상태 표시는 항상 갱신
-        checkCurrentTempVideo(playlistId);
+        // 항상 최신 데이터로 렌더링 (로딩 중 표시 해제 + 캐시 갱신)
+        renderTempVideoSharedList();
+      }).catch(() => {
+        document.getElementById('temp-video-shared-list').innerHTML = '<div class="text-center py-4 text-red-500">목록을 불러오지 못했습니다. 모달을 닫고 다시 열어주세요.</div>';
       });
     }
     
@@ -10767,13 +10804,13 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       // ── 모달을 화면 중앙에 배치 ──
       var innerWrap = el.querySelector('.absolute.inset-0.flex');
       if (innerWrap) {
-        // 큰 모달(임시영상 등)은 items-start + 내부 스크롤로 전체 보이게
+        // 큰 모달(임시영상 등)은 items-start + 외부 래퍼 스크롤로 모달 전체가 보이게
         var TALL_MODALS = ['temp-video-modal', 'edit-playlist-modal', 'script-download-modal'];
         if (TALL_MODALS.indexOf(id) !== -1) {
           innerWrap.classList.remove('items-center');
           innerWrap.classList.add('items-start');
           innerWrap.style.overflowY = 'auto';
-          innerWrap.style.paddingTop = '8px';
+          innerWrap.style.paddingTop = '4px';
         } else {
           innerWrap.classList.remove('items-start');
           innerWrap.classList.add('items-center');
@@ -10782,9 +10819,16 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         }
         var mc = innerWrap.querySelector('.bg-white');
         if (mc) {
-          mc.style.maxHeight = '95vh';
-          mc.style.overflowY = 'auto';
-          mc.style.marginBottom = '16px';
+          if (TALL_MODALS.indexOf(id) !== -1) {
+            // 큰 모달: maxHeight 제한하지 않고 래퍼 스크롤에 위임
+            mc.style.maxHeight = '';
+            mc.style.overflowY = '';
+            mc.style.marginBottom = '8px';
+          } else {
+            mc.style.maxHeight = '95vh';
+            mc.style.overflowY = 'auto';
+            mc.style.marginBottom = '16px';
+          }
         }
       }
       
