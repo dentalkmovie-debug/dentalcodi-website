@@ -2831,7 +2831,7 @@ if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
     // 하단 힌트 텍스트
     var hint = document.createElement('div');
     hint.style.cssText = 'position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 24px;border-radius:24px;font-size:15px;white-space:nowrap;animation:fsPulse 2s ease-in-out infinite';
-    hint.textContent = '🖥️ 화면을 터치하여 전체화면 시작';
+    hint.textContent = '화면을 터치하여 전체화면 시작';
     ov.appendChild(hint);
     // 애니메이션 추가
     var st = document.createElement('style');

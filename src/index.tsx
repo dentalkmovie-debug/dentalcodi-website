@@ -12404,14 +12404,13 @@ app.get('/tv/:shortCode', async (c) => {
     body.is-fullscreen #btn-fullscreen{display:none}
   </style>
 </head>
-<body style="margin:0;background:${(() => { const fi = ssrData?.playlist?.items?.[0]; let t = fi?.thumbnail_url || ''; if (t) t = t.replace(/_\d+x\d+/, '_1920x1080'); return t ? '#111' : '#000'; })()}">
+<body style="margin:0;${(() => { const fi = ssrData?.playlist?.items?.[0]; let t = fi?.thumbnail_url || ''; if (t) t = t.replace(/_\d+x\d+/, '_1920x1080'); return t ? `background:url('${t}') center/cover no-repeat #222` : 'background:#000'; })()}">
   ${(() => {
-    // SSR: 첫 번째 아이템 썸네일을 즉시 전체화면으로 표시 (검정화면 완전 제거)
     const firstItem = ssrData?.playlist?.items?.[0]
     let thumb = firstItem?.thumbnail_url || ''
     if (thumb) thumb = thumb.replace(/_\d+x\d+/, '_1920x1080')
     if (thumb && ssrData) {
-      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50;background:#111"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.style.background='#000'" alt=""></div>`
+      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>`
     }
     return ''
   })()}
