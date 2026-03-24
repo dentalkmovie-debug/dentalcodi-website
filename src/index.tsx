@@ -2024,7 +2024,40 @@ app.put('/api/:adminCode/playlists/:playlistId/active-items', async (c) => {
 })
 
 // ===== 임시 영상 전송 API =====
-// 임시 영상 상태 조회
+
+// 배치 임시 영상 상태 조회 (모든 playlist 한번에 - ids 쿼리 파라미터)
+app.get('/api/:adminCode/temp-video-batch', async (c) => {
+  const idsParam = c.req.query('ids') || ''
+  const ids = idsParam.split(',').filter(id => id && /^\d+$/.test(id))
+  
+  if (ids.length === 0) {
+    return c.json({ statuses: {} })
+  }
+  
+  // 안전한 쿼리: playlist IDs로 직접 조회
+  const placeholders = ids.map(() => '?').join(',')
+  const results = await c.env.DB.prepare(`
+    SELECT id, temp_video_url, temp_video_title, temp_video_type, temp_return_time
+    FROM playlists WHERE id IN (${placeholders}) AND temp_video_url IS NOT NULL
+  `).bind(...ids).all<any>()
+  
+  const statuses: Record<string, any> = {}
+  if (results.results) {
+    for (const r of results.results) {
+      statuses[r.id] = {
+        active: true,
+        url: r.temp_video_url,
+        title: r.temp_video_title,
+        type: r.temp_video_type,
+        return_time: r.temp_return_time
+      }
+    }
+  }
+  
+  return c.json({ statuses })
+})
+
+// 임시 영상 상태 조회 (개별 - 하위 호환)
 app.get('/api/:adminCode/playlists/:playlistId/temp-video', async (c) => {
   const playlistId = c.req.param('playlistId')
   
@@ -6838,29 +6871,31 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       initPlaylistSortable();
     }
     
-    // 임시 영상 상태 확인
+    // 임시 영상 상태 확인 (배치 API 사용 - 1회 요청으로 모든 playlist 확인)
     async function checkTempVideoStatus() {
-      for (const p of playlists) {
-        try {
-          const res = await fetch(API_BASE + '/playlists/' + p.id + '/temp-video');
-          const data = await res.json();
+      try {
+        const ids = playlists.map(p => p.id).join(',');
+        if (!ids) return;
+        const res = await fetch(API_BASE + '/temp-video-batch?ids=' + ids);
+        const data = await res.json();
+        const statuses = data.statuses || {};
+        
+        for (const p of playlists) {
           const indicator = document.getElementById('temp-indicator-' + p.id);
+          const status = statuses[p.id];
           
-          if (data.active) {
-            const rt = data.return_time || 'end';
+          if (status && status.active) {
+            const rt = status.return_time || 'end';
             _tempVideoActiveCache[p.id] = { active: true, return_time: rt };
-            // 인디케이터는 수동복귀일 때만 표시
             if (indicator) indicator.style.display = (rt === 'manual') ? '' : 'none';
-            // return_time이 'manual'일 때만 복귀 버튼 활성화
             setStopButtonState(p.id, rt === 'manual');
           } else {
             _tempVideoActiveCache[p.id] = { active: false, return_time: null };
-            // 임시 영상 없음 - 인디케이터와 복귀 버튼 숨김
             if (indicator) indicator.style.display = 'none';
             setStopButtonState(p.id, false);
           }
-        } catch (e) {}
-      }
+        }
+      } catch (e) {}
     }
     
     // TV 섹션 토글

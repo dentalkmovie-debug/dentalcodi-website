@@ -1550,29 +1550,31 @@ function renderPlaylists() {
   initPlaylistSortable();
 }
 
-// 임시 영상 상태 확인
+// 임시 영상 상태 확인 (배치 API 사용 - 1회 요청으로 모든 playlist 확인)
 async function checkTempVideoStatus() {
-  for (const p of playlists) {
-    try {
-      const res = await fetch(API_BASE + '/playlists/' + p.id + '/temp-video');
-      const data = await res.json();
+  try {
+    const ids = playlists.map(p => p.id).join(',');
+    if (!ids) return;
+    const res = await fetch(API_BASE + '/temp-video-batch?ids=' + ids);
+    const data = await res.json();
+    const statuses = data.statuses || {};
+    
+    for (const p of playlists) {
       const indicator = document.getElementById('temp-indicator-' + p.id);
+      const status = statuses[p.id];
       
-      if (data.active) {
-        const rt = data.return_time || 'end';
+      if (status && status.active) {
+        const rt = status.return_time || 'end';
         _tempVideoActiveCache[p.id] = { active: true, return_time: rt };
-        // 인디케이터는 수동복귀일 때만 표시
         if (indicator) indicator.style.display = (rt === 'manual') ? '' : 'none';
-        // return_time이 'manual'일 때만 복귀 버튼 활성화
         setStopButtonState(p.id, rt === 'manual');
       } else {
         _tempVideoActiveCache[p.id] = { active: false, return_time: null };
-        // 임시 영상 없음 - 인디케이터와 복귀 버튼 숨김
         if (indicator) indicator.style.display = 'none';
         setStopButtonState(p.id, false);
       }
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
 }
 
 // TV 섹션 토글
