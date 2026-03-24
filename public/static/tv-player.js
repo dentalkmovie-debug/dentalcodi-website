@@ -19,29 +19,7 @@ function hideLoadingScreen() {
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
-  // SSR 썸네일 fade-out (재생 시작되면 자연스럽게 사라짐)
-  const thumb = document.getElementById('ssr-thumbnail');
-  if (thumb) {
-    setTimeout(function() {
-      thumb.style.transition = 'opacity 0.6s ease-out';
-      thumb.style.opacity = '0';
-      setTimeout(function() { thumb.remove(); document.body.style.background = '#000'; }, 700);
-    }, 200);
-  }
 }
-
-// SSR 썸네일 위 원형 로딩 스피너
-(function() {
-  var thumb = document.getElementById('ssr-thumbnail');
-  if (!thumb) return;
-  var wrap = document.createElement('div');
-  wrap.style.cssText = 'position:absolute;top:15%;left:50%;transform:translateX(-50%);z-index:51';
-  wrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:rgba(255,255,255,0.8);border-radius:50%;animation:ssrSpin .8s linear infinite"></div>';
-  var st = document.createElement('style');
-  st.textContent = '@keyframes ssrSpin{to{transform:rotate(360deg)}}';
-  document.head.appendChild(st);
-  thumb.appendChild(wrap);
-})();
 
 // 안정성 강화 변수
 let isTransitioning = false; // 중복 전환 방지
@@ -2803,26 +2781,20 @@ if (window.__INITIAL_TV_DATA__) {
   loadData(true);
 }
 
-// ★★ autoplay=1: 자동 전체화면 진입
+// ★★ autoplay=1: 자동 전체화면 진입 (사용자 상호작용 없이)
+// 관리자 페이지에서 '내보내기' 클릭 시 새 탭으로 열리므로 사용자 제스처가 있음
 if (typeof IS_AUTOPLAY !== 'undefined' && IS_AUTOPLAY) {
+  // 즉시 전체화면 시도 (새 탭 열기는 사용자 제스처로 간주됨)
   userHasInteracted = true;
   shouldBeFullscreen = true;
-  setTimeout(function() {
-    document.documentElement.requestFullscreen().catch(function() {
-      // 전체화면 실패 시 투명 오버레이로 터치 유도
-      var ov = document.createElement('div');
-      ov.id = 'fs-touch-overlay';
-      ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:pointer';
-      var hint = document.createElement('div');
-      hint.style.cssText = 'position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;padding:10px 24px;border-radius:24px;font-size:15px;white-space:nowrap';
-      hint.textContent = '화면을 터치하여 전체화면 시작';
-      ov.appendChild(hint);
-      ov.addEventListener('click', function() {
-        document.documentElement.requestFullscreen().catch(function(){});
-        ov.remove();
-      }, { once: true });
-      document.body.appendChild(ov);
-      setTimeout(function() { if (ov.parentNode) ov.remove(); }, 5000);
+  setTimeout(() => {
+    document.documentElement.requestFullscreen().catch(() => {
+      // 전체화면 실패 시 클릭 한번으로 진입하도록 힌트 표시
+      const hint = document.getElementById('fullscreen-hint');
+      if (hint) {
+        hint.style.display = 'block';
+        hint.textContent = '클릭하면 전체화면으로 재생됩니다';
+      }
     });
   }, 500);
 }
@@ -2837,7 +2809,7 @@ setInterval(() => loadData(false), POLL_INTERVAL);
 let _lastKnownTempUrl = null; // 마지막으로 인지한 임시영상 URL
 let _lastKnownTempStarted = null; // 마지막 started_at 값
 let _lastKnownNoticeHash = null; // 마지막 공지 해시 (공지 변경 감지용)
-const FAST_TEMP_POLL = 1500;
+const FAST_TEMP_POLL = 2000;
 setInterval(async () => {
   try {
     const res = await fetch('/api/tv/' + SHORT_CODE + '/temp-check?t=' + Date.now());

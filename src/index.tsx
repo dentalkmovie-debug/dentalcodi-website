@@ -12358,7 +12358,7 @@ app.get('/tv/:shortCode', async (c) => {
   
   // ★★ 단일 HTML 응답: 모든 CSS는 head에, JS는 외부 defer + preload
   return c.html(`<!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" style="background:#000">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -12368,7 +12368,7 @@ app.get('/tv/:shortCode', async (c) => {
   <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+    html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
     #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
     .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -12419,17 +12419,8 @@ app.get('/tv/:shortCode', async (c) => {
     body.is-fullscreen #btn-fullscreen{display:none}
   </style>
 </head>
-<body style="margin:0;${(() => { const fi = ssrData?.playlist?.items?.[0]; let t = fi?.thumbnail_url || ''; if (t) t = t.replace(/_\d+x\d+/, '_1920x1080'); return t ? `background:url('${t}') center/cover no-repeat #222` : 'background:#000'; })()}">
-  ${(() => {
-    const firstItem = ssrData?.playlist?.items?.[0]
-    let thumb = firstItem?.thumbnail_url || ''
-    if (thumb) thumb = thumb.replace(/_\d+x\d+/, '_1920x1080')
-    if (thumb && ssrData) {
-      return `<div id="ssr-thumbnail" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:50"><img src="${thumb}" style="width:100%;height:100%;object-fit:cover;display:block" alt=""></div>`
-    }
-    return ''
-  })()}
-  <div id="loading-screen"${ssrData ? ' class="hidden"' : ''}><div class="spinner"></div><p>로딩 중...</p></div>
+<body style="background:#000;margin:0">
+  <div id="loading-screen"><div class="spinner"></div><p>로딩 중...</p></div>
 
   <div id="error-screen" style="display:none">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>
