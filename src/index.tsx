@@ -12641,6 +12641,17 @@ app.get('/', (c) => {
       launched = true;
       var url = host + '/embed/' + encodeURIComponent(info.mc);
       if (info.em) url += '?email=' + encodeURIComponent(info.em);
+      // skeleton을 iframe 위에 overlay로 복사 (src 교체 시 흰화면 방지)
+      var wrap = frame.parentNode;
+      if (wrap) {
+        wrap.style.position = 'relative';
+        var ov = document.createElement('div');
+        ov.id = 'dtv-overlay';
+        ov.innerHTML = frame.srcdoc || '';
+        ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;z-index:1;background:#fff';
+        wrap.insertBefore(ov, frame);
+      }
+      frame.style.opacity = '0';
       frame.src = url;
     }
   }
@@ -12662,7 +12673,7 @@ app.get('/', (c) => {
   // 창 리사이즈/스크롤 시 재전달
   window.addEventListener('resize', sendIframeTop);
   window.addEventListener('scroll', sendIframeTop);
-  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight'){ var newH=(e.data.height+30)+'px'; if(frame.style.height!==newH) frame.style.height=newH; } if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
+  window.addEventListener('message', function(e){ if(e.data&amp;&amp;e.data.type==='setHeight'){ var newH=(e.data.height+30)+'px'; if(frame.style.height!==newH) frame.style.height=newH; } if(e.data&amp;&amp;e.data.type==='contentReady'){ frame.style.opacity='1'; var ov=document.getElementById('dtv-overlay'); if(ov) ov.parentNode.removeChild(ov); } if(e.data&amp;&amp;e.data.type==='scrollToTop'){ try{ document.documentElement.scrollTop=0; document.body.scrollTop=0; frame.scrollIntoView({behavior:'instant',block:'start'}); setTimeout(sendIframeTop,50); }catch(err){} } });
 })();
 &lt;/script&gt;</pre>
       <p class="note">* 아임웹 로그인 회원의 계정으로 자동 접속됩니다 (비로그인/관리자 계정은 안내 페이지 표시)</p>
