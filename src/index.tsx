@@ -12429,6 +12429,22 @@ app.get('/tv/:shortCode', async (c) => {
   
   const ssrDataScript = ssrData ? `<script>window.__INITIAL_TV_DATA__=${JSON.stringify(ssrData).replace(/</g, '\\u003c')};</script>` : ''
   
+  // ★★ 첫 번째 아이템 썸네일을 로딩 화면 배경으로 사용 (검정화면 방지)
+  let firstThumbUrl = ''
+  const ssrItems = ssrData && ssrData.playlist && ssrData.playlist.items
+  if (ssrItems && ssrItems.length > 0) {
+    const firstItem = ssrItems[0]
+    if (firstItem.thumbnail_url) {
+      firstThumbUrl = firstItem.thumbnail_url
+    } else if (firstItem.item_type === 'vimeo' && firstItem.url) {
+      const vidMatch = firstItem.url.match(/vimeo\.com\/(?:video\/)?(\d+)/)
+      if (vidMatch) firstThumbUrl = 'https://vumbnail.com/' + vidMatch[1] + '.jpg'
+    } else if (firstItem.item_type === 'youtube' && firstItem.url) {
+      const yidMatch = firstItem.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
+      if (yidMatch) firstThumbUrl = 'https://img.youtube.com/vi/' + yidMatch[1] + '/maxresdefault.jpg'
+    }
+  }
+  
   // ★★ 단일 HTML 응답: 모든 CSS는 head에, JS는 외부 defer + preload
   return c.html(`<!DOCTYPE html>
 <html lang="ko" style="background:#000">
@@ -12442,10 +12458,13 @@ app.get('/tv/:shortCode', async (c) => {
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;padding:0!important;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-    #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200}
-    .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+    #loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity 0.4s ease}
+    #loading-screen.fade-out{opacity:0;pointer-events:none}
+    #loading-poster{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 0.3s ease}
+    #loading-poster.show{opacity:1}
+    .spinner{width:50px;height:50px;border:3px solid #333;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;position:relative;z-index:1}
     @keyframes spin{to{transform:rotate(360deg)}}
-    #loading-screen p{color:#666;margin-top:20px}
+    #loading-screen p{color:#666;margin-top:20px;position:relative;z-index:1}
     .hidden{display:none!important}
     #media-container{position:fixed;top:0;left:0;width:100%;height:100%;background:#000}
     .media-item{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;z-index:1;transition:opacity var(--transition-duration) ease-in-out;pointer-events:none}
@@ -12493,7 +12512,7 @@ app.get('/tv/:shortCode', async (c) => {
   </style>
 </head>
 <body style="background:#000;margin:0">
-  <div id="loading-screen"><div class="spinner"></div><p>로딩 중...</p></div>
+  <div id="loading-screen">${firstThumbUrl ? '<img id="loading-poster" src="' + firstThumbUrl + '" onload="this.classList.add(\'show\')" onerror="">' : ''}<div class="spinner"></div><p>로딩 중...</p></div>
 
   <div id="error-screen" style="display:none">
     <div style="font-size: 60px; color: #ef4444; margin-bottom: 20px;">⚠️</div>

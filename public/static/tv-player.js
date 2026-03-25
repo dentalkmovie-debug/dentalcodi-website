@@ -18,7 +18,11 @@ function hideLoadingScreen() {
   if (_loadingScreenHidden) return;
   _loadingScreenHidden = true;
   const ls = document.getElementById('loading-screen');
-  if (ls) ls.classList.add('hidden');
+  if (ls) {
+    // fade-out 후 hidden 처리 (썸네일 → 영상 자연스러운 전환)
+    ls.classList.add('fade-out');
+    setTimeout(() => ls.classList.add('hidden'), 500);
+  }
 }
 
 // 안정성 강화 변수
@@ -756,8 +760,8 @@ async function loadData(isInitial = false) {
     
     if (isInitial) {
       // ★★ 로딩 화면은 첫 미디어 재생 시작 시 숨김 (빈 검은 화면 방지)
-      // 안전장치: 10초 후 강제 숨김 (미디어 로드 실패 대비)
-      setTimeout(hideLoadingScreen, 10000);
+      // 안전장치: 3초 후 강제 숨김 (썸네일이 있으므로 빨리 전환)
+      setTimeout(hideLoadingScreen, 3000);
       
       // ★★ API는 이미 페이지 시작 시 프리로드됨 (loadVimeoAPI/loadYouTubeAPI 미리 호출)
       const hasYouTube = playlist.items.some(i => i.item_type === 'youtube');
@@ -1317,6 +1321,8 @@ function createAndPlayVimeoForStart(idx, item) {
       }
       if (currentIndex === idx) {
         console.log('[createVimeoForStart] Ready:', idx, 'session:', thisSession);
+        // ★ ready 시점에 로딩 화면 숨기기 (play 전이라도 iframe이 보이므로)
+        hideLoadingScreen();
         // ★ 재생 전 muted 상태 확실히 보장 (Chrome autoplay 정책)
         player.setVolume(0).catch(() => {});
         startVimeoPlayback(player, idx);
@@ -1395,7 +1401,9 @@ function setupYouTube(item, index) {
           } catch(e) {}
           // YouTube iframe 생성 후 전체화면 복원
           setTimeout(ensureFullscreen, 200);
+          // ★ ready 시점에 로딩 화면 숨기기 (iframe 로드 완료 → 썸네일에서 자연스럽게 전환)
           if (currentIndex === index) {
+            hideLoadingScreen();
             try { players[index].playVideo(); } catch (e) {}
           }
         },
@@ -2989,8 +2997,8 @@ if (window.__INITIAL_TV_DATA__) {
         }
       }
       
-      // 10초 안전장치
-      setTimeout(hideLoadingScreen, 10000);
+      // 3초 안전장치 (썸네일이 있으므로 빨리 전환)
+      setTimeout(hideLoadingScreen, 3000);
       
     } catch(e) {
       console.error('[SSR] Init failed, falling back to API:', e);
