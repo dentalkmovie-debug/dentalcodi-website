@@ -669,6 +669,38 @@ app.post('/api/auth/imweb-match', async (c) => {
   
   if (!imweb_member_id) return c.json({ error: '아임웹 회원 ID가 필요합니다.' }, 400)
 
+  // ★★★ v5.10.15: mno_ 접두사(member_no) → 아임웹 API로 실제 member_code 조회 ★★★
+  // 위젯에서 sdk_jwt가 없을 때 member_no(숫자)를 'mno_12345' 형태로 전송함
+  // 서버에서 아임웹 API를 통해 member_no → member_code(m...) 변환 후 매칭
+  let resolved_member_id = imweb_member_id
+  if (String(imweb_member_id).startsWith('mno_')) {
+    const memberNo = String(imweb_member_id).slice(4) // 'mno_' 제거
+    try {
+      const authRes = await fetch('https://api.imweb.me/v2/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: c.env.IMWEB_API_KEY || '6e0afc05cea3b4966b5d937be58a97bbec5a157f77', secret: c.env.IMWEB_API_SECRET || '9d7e63a446bdf2eb16a754' })
+      })
+      const authData: any = await authRes.json()
+      const accessToken = authData.access_token || ''
+      if (accessToken) {
+        // member_no로 회원 목록 조회 후 매칭
+        const membersRes = await fetch(`https://api.imweb.me/v2/member/members?limit=200&offset=0`, {
+          headers: { 'access-token': accessToken }
+        })
+        const membersData: any = await membersRes.json()
+        const memberList = membersData.data?.list || membersData.data || []
+        const found = memberList.find((m: any) => String(m.member_no) === memberNo || String(m.no) === memberNo)
+        if (found && found.member_code) {
+          resolved_member_id = found.member_code
+          _logEntry.steps.push({ step: 'mno-resolve', from: imweb_member_id, to: resolved_member_id })
+        }
+      }
+    } catch(e: any) {
+      _logEntry.steps.push({ step: 'mno-resolve-error', error: e.message })
+    }
+  }
+
   // ★★★ v5.10.5: 매칭 로직 - imweb_member_id가 최우선 식별자 ★★★
   // 핵심 원칙:
   // 1) imweb_member_id가 매칭의 핵심 — 같은 ID = 같은 사람
@@ -681,7 +713,7 @@ app.post('/api/auth/imweb-match', async (c) => {
   // ===== Phase A: 해당 imweb_member_id로 등록된 모든 계정 조회 =====
   const allByImwebId = await c.env.DB.prepare(
     "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.imweb_member_id = ? AND m.status = 'approved'"
-  ).bind(imweb_member_id).all()
+  ).bind(resolved_member_id).all()
   const candidates = (allByImwebId.results || []) as any[]
   _logEntry.steps.push({ step: 'A-candidates', count: candidates.length, list: candidates.map((c:any) => ({ id: c.id, name: c.name, role: c.role, clinic_id: c.clinic_id })) })
 
@@ -784,7 +816,7 @@ app.post('/api/auth/imweb-match', async (c) => {
   if (!member && imweb_email && imweb_email.includes('@')) {
     const byEmail = await c.env.DB.prepare(
       "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.email = ? AND m.imweb_member_id = ? AND m.status = 'approved' AND m.role IN ('clinic_admin','super_admin')"
-    ).bind(imweb_email, imweb_member_id).first()
+    ).bind(imweb_email, resolved_member_id).first()
     if (byEmail) {
       member = byEmail
       _logEntry.steps.push({ step: 'C-email+id', id: (byEmail as any).id })
@@ -795,7 +827,7 @@ app.post('/api/auth/imweb-match', async (c) => {
       ).bind(imweb_email).first()
       if (byEmailNoId) {
         // 아임웹 연동 안 된 기존 계정 → imweb_member_id 업데이트 후 매칭
-        await c.env.DB.prepare("UPDATE members SET imweb_member_id = ?, updated_at = datetime('now') WHERE id = ?").bind(imweb_member_id, (byEmailNoId as any).id).run()
+        await c.env.DB.prepare("UPDATE members SET imweb_member_id = ?, updated_at = datetime('now') WHERE id = ?").bind(resolved_member_id, (byEmailNoId as any).id).run()
         member = await c.env.DB.prepare('SELECT * FROM members WHERE id = ?').bind((byEmailNoId as any).id).first()
         _logEntry.steps.push({ step: 'C-email-link', id: (byEmailNoId as any).id })
       } else {
@@ -814,12 +846,12 @@ app.post('/api/auth/imweb-match', async (c) => {
        AND m.imweb_member_id != ?
        AND ca.admin_role = 'owner'
        ORDER BY m.created_at ASC LIMIT 1`
-    ).bind(imweb_group, imweb_member_id).first()
+    ).bind(imweb_group, resolved_member_id).first()
     if (groupOwner) {
       groupClinicId = (groupOwner as any).clinic_id
       const existingInGroup = await c.env.DB.prepare(
         "SELECT m.* FROM members m JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.imweb_member_id = ? AND ca.clinic_id = ? AND m.status = 'approved'"
-      ).bind(imweb_member_id, groupClinicId).first()
+      ).bind(resolved_member_id, groupClinicId).first()
       if (existingInGroup) {
         member = existingInGroup
         _logEntry.steps.push({ step: 'E-group', id: (existingInGroup as any).id })
@@ -828,14 +860,14 @@ app.post('/api/auth/imweb-match', async (c) => {
   }
 
   // ===== Phase F: Migration (old site_/login_/hdr_ IDs) =====
-  if (!member && previous_id && previous_id !== imweb_member_id && (previous_id.startsWith('site_') || previous_id.startsWith('login_') || previous_id.startsWith('hdr_'))) {
+  if (!member && previous_id && previous_id !== resolved_member_id && (previous_id.startsWith('site_') || previous_id.startsWith('login_') || previous_id.startsWith('hdr_'))) {
     const prevMember = await c.env.DB.prepare(
       'SELECT * FROM members WHERE imweb_member_id = ?'
     ).bind(previous_id).first()
     if (prevMember) {
       await c.env.DB.prepare(
         "UPDATE members SET imweb_member_id = ?, updated_at = datetime('now') WHERE id = ?"
-      ).bind(imweb_member_id, prevMember.id).run()
+      ).bind(resolved_member_id, prevMember.id).run()
       member = await c.env.DB.prepare('SELECT * FROM members WHERE id = ?').bind(prevMember.id).first()
       _logEntry.steps.push({ step: 'F-migration', id: (prevMember as any).id })
     }
@@ -845,7 +877,7 @@ app.post('/api/auth/imweb-match', async (c) => {
     // Already exists - update phone/email/group if provided and changed
     const updates: string[] = []
     const vals: any[] = []
-    if (imweb_phone && imweb_phone !== `imweb-${imweb_member_id}` && member.phone !== imweb_phone) { updates.push('phone = ?'); vals.push(imweb_phone) }
+    if (imweb_phone && imweb_phone !== `imweb-${resolved_member_id}` && member.phone !== imweb_phone) { updates.push('phone = ?'); vals.push(imweb_phone) }
     if (imweb_email && member.email !== imweb_email) { updates.push('email = ?'); vals.push(imweb_email) }
     // ★ 그룹 정보 업데이트 (새로 감지된 경우)
     if (imweb_group && (member as any).imweb_group !== imweb_group) { updates.push('imweb_group = ?'); vals.push(imweb_group) }
@@ -860,7 +892,7 @@ app.post('/api/auth/imweb-match', async (c) => {
     const currentName = (member as any).name || ''
     const isInvalidStoredName = MATCH_INVALID_NAMES_UPDATE.includes(currentName)
     // 이름이 INVALID이거나, imweb_name이 비어있고(위젯 감지 실패) imweb_member_id가 있을 때 API 조회
-    const needsNameVerification = isInvalidStoredName && imweb_member_id
+    const needsNameVerification = isInvalidStoredName && resolved_member_id
     if (needsNameVerification) {
       // 아임웹 API에서 실제 이름 조회 (member_code 기반)
       try {
@@ -868,7 +900,7 @@ app.post('/api/auth/imweb-match', async (c) => {
         const iSecret = c.env.IMWEB_SECRET || '9d7e63a446bdf2eb16a754'
         const iToken = await getImwebToken(iKey, iSecret)
         if (iToken) {
-          const iResp = await fetch(`https://api.imweb.me/v2/member/members/${imweb_member_id}`, {
+          const iResp = await fetch(`https://api.imweb.me/v2/member/members/${resolved_member_id}`, {
             headers: { 'access-token': iToken }
           })
           const iData: any = await iResp.json()
@@ -968,7 +1000,7 @@ app.post('/api/auth/imweb-match', async (c) => {
     : (hasClinicName ? imweb_clinic_name.trim() : 'unknown')
 
   const name = hasValidName ? imweb_name : clinicName
-  const phone = imweb_phone || `imweb-${imweb_member_id}-${name.replace(/\s/g, '')}`
+  const phone = imweb_phone || `imweb-${resolved_member_id}-${name.replace(/\s/g, '')}`
 
   // ★ Step 3: phone 중복 방지 - 동일 phone으로 이미 등록된 계정이 있으면 그 계정을 사용
   // (같은 ID+이름 조합이 여러 번 INSERT 시도될 때 발생하는 UNIQUE 오류 방지)
@@ -982,7 +1014,7 @@ app.post('/api/auth/imweb-match', async (c) => {
     if ((existingByPhone as any).imweb_member_id !== imweb_member_id) {
       await c.env.DB.prepare(
         "UPDATE members SET imweb_member_id = ?, updated_at = datetime('now') WHERE id = ?"
-      ).bind(imweb_member_id, (existingByPhone as any).id).run()
+      ).bind(resolved_member_id, (existingByPhone as any).id).run()
     }
     member = await c.env.DB.prepare('SELECT * FROM members WHERE id = ?').bind((existingByPhone as any).id).first()
     const existClinics = await c.env.DB.prepare(
@@ -1001,7 +1033,7 @@ app.post('/api/auth/imweb-match', async (c) => {
 
   const memberResult = await c.env.DB.prepare(
     'INSERT INTO members (imweb_member_id, imweb_group, name, phone, email, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(imweb_member_id, imweb_group || null, name, phone, imweb_email || null, 'clinic_admin', 'approved').run()
+  ).bind(resolved_member_id, imweb_group || null, name, phone, imweb_email || null, 'clinic_admin', 'approved').run()
   const memberId = memberResult.meta.last_row_id
 
   // ★ 그룹 클리닉 합류: imweb_group이 있고 같은 그룹의 오너 클리닉이 있으면 그 클리닉에 합류

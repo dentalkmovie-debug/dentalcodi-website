@@ -163,12 +163,14 @@
         }
       }
       if (bs) {
+        /* ★ v5.10.15: member_code(m...) 우선 → 서버 DB 키와 일치 보장 */
+        if (bs.sdk_jwt) { try { var p = JSON.parse(atob(bs.sdk_jwt.split('.')[1])); var sub = p.sub || p.member_code || p.mc || ''; if (sub && sub !== 'null' && String(sub).indexOf('m') === 0) { dlog('ID:jwt_mc=' + sub); return String(sub); } } catch(e) {} }
+        if (bs.member_code && String(bs.member_code).indexOf('m') === 0) { dlog('ID:bs_mc=' + bs.member_code); return String(bs.member_code); }
+        if (bs.member && bs.member.code && String(bs.member.code).indexOf('m') === 0) { dlog('ID:member_code=' + bs.member.code); return String(bs.member.code); }
         var no = bs.member_no || bs.memberNo || (bs.member && bs.member.no);
-        if (no) { dlog('ID:member_no=' + no); return String(no); }
+        if (no) { dlog('ID:member_no=' + no); return 'mno_' + String(no); }
         if (bs.sdk_jwt) {
-          var p = JSON.parse(atob(bs.sdk_jwt.split('.')[1]));
-          var sub = p.sub || p.member_code || p.mc || '';
-          if (sub && sub !== 'null') { dlog('ID:jwt.sub=' + sub); return String(sub); }
+          try { var p2 = JSON.parse(atob(bs.sdk_jwt.split('.')[1])); var sub2 = p2.sub || p2.member_code || p2.mc || ''; if (sub2 && sub2 !== 'null') { dlog('ID:jwt=' + sub2); return String(sub2); } } catch(e) {}
         }
       }
     } catch(e) { dlog('ID오류:' + e.message); }
