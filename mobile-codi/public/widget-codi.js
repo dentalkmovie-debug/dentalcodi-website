@@ -253,6 +253,11 @@
   }
 
   /* ===== localStorage API 캐시 복원/저장 ===== */
+  /* ★ v5.10.20: imweb-members는 항상 실시간 조회 - localStorage 캐시에서 제외 */
+  var _NO_PERSIST_KEYS = ['/codi/admin/imweb-members', '/imweb/members'];
+  function _isNoPersist(k) {
+    return _NO_PERSIST_KEYS.some(function(p) { return k.indexOf(p) !== -1; });
+  }
   function _restoreApiCache() {
     try {
       var raw = localStorage.getItem('codi_api_cache');
@@ -260,6 +265,7 @@
       var saved = JSON.parse(raw);
       if (saved && typeof saved === 'object') {
         Object.keys(saved).forEach(function(k) {
+          if (_isNoPersist(k)) return; /* imweb-members는 캐시 복원 제외 */
           _apiCache[k] = { data: saved[k], ts: Date.now() }; /* 복원된 데이터는 fresh로 취급 */
         });
         dlog('API캐시 복원: ' + Object.keys(saved).length + '개');
@@ -270,6 +276,7 @@
     try {
       var toSave = {};
       Object.keys(_apiCache).forEach(function(k) {
+        if (_isNoPersist(k)) return; /* imweb-members는 캐시 저장 제외 */
         if (_apiCache[k] && _apiCache[k].data) toSave[k] = _apiCache[k].data;
       });
       localStorage.setItem('codi_api_cache', JSON.stringify(toSave));
@@ -468,7 +475,7 @@
       /* super_admin이면 관리 탭 API도 프리페치 */
       if (authMember && authMember.role === 'super_admin') {
         _prefetchList.push(callAPI('/codi/admin/clinics').catch(function(){}));
-        _prefetchList.push(callAPI('/codi/admin/imweb-members').catch(function(){}));
+        /* ★ v5.10.20: imweb-members는 항상 실시간 조회이므로 프리페치에서 제외 */
       }
       /* 프리페치 완료 후 API 캐시를 localStorage에 저장 (다음 진입 시 즉시 렌더용) */
       Promise.all(_prefetchList).then(function(){ _persistApiCache(); }).catch(function(){});
@@ -1293,10 +1300,10 @@
       /* 클리닉 + 아임웹 회원을 병렬로 로드
          ★ /api/imweb/members: 아임웹 API 실시간 조회 (아임웹 API 연동 시 17명 등 최신 목록)
          ★ fallback: /api/codi/admin/imweb-members (DB 기반) */
-      if (!_getStale('/codi/admin/clinics') || !_getStale('/imweb/members')) body.innerHTML = SPIN;
+      if (!_getStale('/codi/admin/clinics')) body.innerHTML = SPIN;
       Promise.all([
         adminClinics ? Promise.resolve(null) : callAPI('/codi/admin/clinics'),
-        callAPI('/imweb/members').catch(function() { return callAPI('/codi/admin/imweb-members'); })
+        callAPI('/imweb/members', {noCache:true}).catch(function() { return callAPI('/codi/admin/imweb-members', {noCache:true}); }) /* ★ v5.10.20: 항상 실시간 조회 */
       ]).then(function(res) {
         if (res[0]) {
           adminClinics = res[0].clinics || [];
@@ -1717,7 +1724,7 @@
       body.innerHTML = SPIN;
       Promise.all([
         callAPI('/codi/admin/all-templates', {noCache:true}),
-        callAPI('/codi/admin/imweb-members')
+        callAPI('/codi/admin/imweb-members', {noCache:true}) /* ★ v5.10.20: 항상 실시간 조회 */
       ]).then(function(results) {
         var tpls = (results[0] && results[0].templates) || [];
         var imMembers = (results[1] && results[1].members) || [];
