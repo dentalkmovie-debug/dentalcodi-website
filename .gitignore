@@ -43,3 +43,11 @@ logs/
 tv-export
 dental-tv-*.tar.gz
 tv-player-fixed-*.js
+
+# 압축 다운로드 파일 (로컬 전용)
+dental-point_COMPLETE_*.tar.gz
+dental-point_full_*.tar.gz
+mobile-codi_COMPLETE_*.tar.gz
+mobile-codi_full_*.tar.gz
+download-server.py
+*.png
