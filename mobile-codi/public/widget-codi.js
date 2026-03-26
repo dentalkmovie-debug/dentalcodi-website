@@ -339,7 +339,7 @@
   function _bgReauth() {
     var mid = getMemberId();
     var curEmail = getLoginEmail();
-    /* ★ v5.10.17: 이메일로 계정 불일치 감지 강화 */
+    /* ★ v5.10.18: 이메일 불일치 또는 구버전 캐시 → 항상 현재 계정으로 재인증 */
     var cachedEmail=(authMember&&authMember.email)||'';
     /* 케이스1: cachedEmail 있고 현재 이메일과 다름 → 확실한 계정 불일치 */
     if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
@@ -359,6 +359,8 @@
       doMatch(mid,ln2);
       return;
     }
+    /* ★ v5.10.18 핵심: mid가 있어도 curEmail이 있으면 서버에 이메일도 함께 전송
+       → 서버가 imweb_member_id + email 두 정보로 올바른 계정 특정 가능 */
     /* SDK ID 기반 불일치 감지 */
     if(mid&&!mid.startsWith('site_')){
       var cachedMid=(authMember&&authMember.imweb_member_id)||'';
@@ -397,7 +399,7 @@
     var cn='',cp='';
     try{var te=document.querySelector('title');if(te){var tr=te.textContent.split('|')[0].split('-')[0].trim();if(!isSysWord(tr))cn=tr;}var tls=document.querySelectorAll('a[href^="tel:"]');if(tls.length)cp=(tls[0].getAttribute('href')||'').replace('tel:','');}catch(e){}
     var body={imweb_member_id:mid,imweb_name:ln,imweb_email:le,imweb_group:lg,imweb_phone:'',imweb_clinic_name:cn,imweb_clinic_phone:cp,imweb_clinic_addr:''};
-    dlog('백그라운드 auth 시작');
+    dlog('백그라운드 auth 시작: id='+mid+' email='+le);
     fetch(API+'/api/auth/imweb-match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json();})
     .then(function(d){
@@ -405,16 +407,18 @@
         dlog('백그라운드 auth 성공 - 토큰 갱신');
         var prevMemberId=authMember&&authMember.id;
         var prevClinicId=currentClinic&&currentClinic.id;
+        var prevName=authMember&&authMember.name;
         authToken=d.token;
         if(d.member)authMember=d.member;
         var clinics=d.clinics||[];
         if(clinics.length)currentClinic=clinics[0];
         try{localStorage.setItem('dpt_admin_token',d.token);localStorage.setItem('dpt_admin_member',JSON.stringify(authMember));localStorage.setItem('dpt_admin_clinics',JSON.stringify(clinics));if(currentClinic)localStorage.setItem('dpt_admin_current_clinic',JSON.stringify(currentClinic));}catch(e){}
-        /* ★ v5.10.14: 계정/클리닉 변경된 경우 renderApp() 재호출 */
+        /* ★ v5.10.18: 계정/클리닉/이름 중 하나라도 변경되면 renderApp 재호출 */
         var newMemberId=d.member&&d.member.id;
         var newClinicId=currentClinic&&currentClinic.id;
-        if(prevMemberId!==newMemberId||prevClinicId!==newClinicId){
-          dlog('백그라운드 auth: 계정/클리닉 변경 감지 → renderApp 재호출');
+        var newName=d.member&&d.member.name;
+        if(prevMemberId!==newMemberId||prevClinicId!==newClinicId||prevName!==newName){
+          dlog('백그라운드 auth: 변경 감지(id:'+prevMemberId+'→'+newMemberId+' name:'+prevName+'→'+newName+') → renderApp 재호출');
           renderApp();
         }
       } else if(d.need_name || !d.matched) {

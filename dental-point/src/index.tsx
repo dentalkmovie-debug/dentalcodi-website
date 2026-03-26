@@ -729,6 +729,26 @@ app.post('/api/auth/imweb-match', async (c) => {
   // 5) 같은 이메일을 여러 계정이 공유할 수 있음 (운영자가 여러 치과 관리)
   let member: any = null
 
+  // ★ v5.10.18: ID와 이메일이 동시에 있을 때 계정 불일치 감지
+  if (resolved_member_id && imweb_email && imweb_email.includes('@')) {
+    const idCheck = await c.env.DB.prepare(
+      "SELECT id, name, email, imweb_member_id FROM members WHERE imweb_member_id = ? AND status = 'approved' LIMIT 1"
+    ).bind(resolved_member_id).first() as any
+    if (idCheck && idCheck.email && idCheck.email !== imweb_email) {
+      _logEntry.steps.push({ step: 'A-id-email-mismatch', id_email: idCheck.email, login_email: imweb_email, switching_to_email: true })
+      const correctByEmail = await c.env.DB.prepare(
+        "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.email = ? AND m.status = 'approved' AND m.role IN ('clinic_admin','super_admin') ORDER BY m.created_at ASC LIMIT 1"
+      ).bind(imweb_email).first() as any
+      if (correctByEmail) {
+        const clinicRow2 = correctByEmail.clinic_id ? await c.env.DB.prepare('SELECT * FROM clinics WHERE id = ?').bind(correctByEmail.clinic_id).first() : null
+        const token2 = createToken(correctByEmail)
+        const clinics2 = clinicRow2 ? [clinicRow2] : []
+        _logEntry.steps.push({ step: 'A-email-override', id: correctByEmail.id, name: correctByEmail.name })
+        return c.json({ matched: true, token: token2, member: correctByEmail, clinics: clinics2, clinic: clinicRow2 || null })
+      }
+    }
+  }
+
   // ===== Phase A: 해당 imweb_member_id로 등록된 모든 계정 조회 =====
   const allByImwebId = await c.env.DB.prepare(
     "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.imweb_member_id = ? AND m.status = 'approved'"
