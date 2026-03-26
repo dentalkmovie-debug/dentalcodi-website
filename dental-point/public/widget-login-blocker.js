@@ -139,19 +139,33 @@
   }
 
   /* ─────────────────────────────────────────
-     로그인 여부
+     로그인 여부 — 엄격하게 판단
+     (logout 링크 체크 제거: 비로그인 시에도 존재)
   ───────────────────────────────────────── */
   function isLoggedIn() {
+    /* ① SDK에 실제 회원 데이터가 있을 때만 */
     try {
       var bs = window.__bs_imweb || {};
-      if (bs.member_no || bs.memberNo || bs.sdk_jwt || bs.member_code) return true;
+      /* sdk_jwt가 있고 sub가 실제 값일 때 */
+      if (bs.sdk_jwt) {
+        var p = _jwt(bs.sdk_jwt);
+        if (p && p.sub && p.sub !== 'null' && p.sub.length > 2) return true;
+        if (p && p.member_code && p.member_code.length > 2) return true;
+      }
+      /* member_no/member_code 직접 값 */
+      if (bs.member_no && bs.member_no !== 0 && bs.member_no !== '0') return true;
+      if (bs.memberNo  && bs.memberNo  !== 0 && bs.memberNo  !== '0') return true;
+      if (bs.member_code && bs.member_code.length > 2) return true;
     } catch (_) {}
-    if (_cookie('imweb_member_no') || _cookie('member_no') ||
-        _cookie('mb_code') || _cookie('imweb_session')) return true;
-    if (getMid()) return true;
-    if (document.querySelector('[data-page="logout"],[data-action="logout"],[href*="logout"]')) return true;
-    var my = document.querySelector('[data-page="mypage"],.imweb-member-mypage,[href*="mypage"]');
-    if (my && my.offsetParent !== null) return true;
+
+    /* ② 쿠키에 member_no 실제 값 있을 때 */
+    var ck = _cookie('imweb_member_no') || _cookie('member_no') || _cookie('mb_code');
+    if (ck && ck.length > 2 && ck !== '0') return true;
+
+    /* ③ getMid()가 실제 member_id를 반환할 때 */
+    var mid = getMid();
+    if (mid && mid.length > 4 && mid.indexOf('ANON_') !== 0) return true;
+
     return false;
   }
 
