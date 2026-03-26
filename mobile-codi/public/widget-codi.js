@@ -288,13 +288,28 @@
   function tryAuth() {
     try{authToken=localStorage.getItem('dpt_admin_token')||'';authMember=JSON.parse(localStorage.getItem('dpt_admin_member')||'null');var clinics=JSON.parse(localStorage.getItem('dpt_admin_clinics')||'[]');var saved=localStorage.getItem('dpt_admin_current_clinic');currentClinic=saved?JSON.parse(saved):(clinics[0]||null);}catch(e){}
     if(authToken&&authMember&&currentClinic){
-      /* ★ v5.10.16: 이메일 비교 우선 - SDK 로드 여부 무관하게 계정 불일치 감지 */
+      /* ★ v5.10.17: 이메일 비교 강화 - cachedEmail 없어도 curEmail 있으면 항상 검증 */
       /* __bs_imweb 쿠키는 SDK보다 먼저 읽힘 → 이메일로 신뢰도 높은 비교 가능 */
       var curEmail=getLoginEmail();
       var cachedEmail=(authMember&&authMember.email)||'';
+      /* cachedEmail이 없는 오래된 캐시: curEmail이 있으면 무조건 _bgReauth에서 재검증 */
       if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
         dlog('계정 불일치(이메일) - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
         _clearAuthCache();
+      }
+      /* cachedEmail 없는 구버전 캐시: imweb_member_id로 한번 더 검증 */
+      if(authToken&&authMember&&!cachedEmail&&curEmail){
+        var curMidCheck=getMemberId();
+        var storedId=localStorage.getItem('dpt_imweb_id')||'';
+        /* storedId가 있고 curMid와 다르면 다른 계정 → 캐시 무효화 */
+        if(storedId&&curMidCheck&&!curMidCheck.startsWith('site_')&&storedId!==curMidCheck){
+          dlog('계정 불일치(구캐시+ID) - 캐시 무효화: stored='+storedId+' cur='+curMidCheck);
+          _clearAuthCache();
+        } else if(!storedId){
+          /* storedId도 없는 아주 오래된 캐시 → 안전하게 캐시 삭제 후 재인증 */
+          dlog('구버전 캐시(email/id 없음) - 캐시 무효화 후 재인증');
+          _clearAuthCache();
+        }
       }
     }
     if(authToken&&authMember&&currentClinic){
@@ -324,15 +339,24 @@
   function _bgReauth() {
     var mid = getMemberId();
     var curEmail = getLoginEmail();
-    /* ★ v5.10.16: 이메일로 계정 불일치 감지 (SDK 미로드 시에도 작동) */
+    /* ★ v5.10.17: 이메일로 계정 불일치 감지 강화 */
     var cachedEmail=(authMember&&authMember.email)||'';
+    /* 케이스1: cachedEmail 있고 현재 이메일과 다름 → 확실한 계정 불일치 */
     if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
       dlog('_bgReauth: 이메일 불일치 - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
       _clearAuthCache();
       var ln=getLoginName();
-      /* mid 없으면 이메일만으로 매칭 시도 */
       if(!mid||mid.startsWith('site_'))mid='';
       doMatch(mid,ln);
+      return;
+    }
+    /* 케이스2: cachedEmail 없는 구버전 캐시 + 현재 이메일 있음 → 재인증으로 검증 */
+    if(curEmail&&!cachedEmail&&authMember){
+      dlog('_bgReauth: 구캐시(email없음) - 이메일로 재검증: '+curEmail);
+      _clearAuthCache();
+      var ln2=getLoginName();
+      if(!mid||mid.startsWith('site_'))mid='';
+      doMatch(mid,ln2);
       return;
     }
     /* SDK ID 기반 불일치 감지 */
