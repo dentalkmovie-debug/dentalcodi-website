@@ -35,36 +35,44 @@
     s.textContent = [
       '@keyframes lbFadeIn   { from { opacity:0 }                     to { opacity:1 } }',
       '@keyframes lbSlideUp  { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }',
+      /* 임웹 테마 override: !important 강제 적용 */
       '#lb-overlay {',
-      '  position:fixed; inset:0; z-index:2147483647;',
-      '  background:rgba(15,23,42,0.85);',
-      '  display:flex; align-items:center; justify-content:center;',
-      '  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;',
+      '  position:fixed !important; top:0 !important; left:0 !important;',
+      '  right:0 !important; bottom:0 !important;',
+      '  width:100% !important; height:100% !important;',
+      '  z-index:2147483647 !important;',
+      '  background:rgba(15,23,42,0.85) !important;',
+      '  display:flex !important; align-items:center !important; justify-content:center !important;',
+      '  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;',
       '  animation:lbFadeIn .25s ease;',
+      '  margin:0 !important; padding:0 !important;',
+      '  transform:none !important;',
       '}',
       '#lb-box {',
-      '  background:#fff; border-radius:20px; padding:40px 28px 32px;',
-      '  max-width:360px; width:calc(100% - 40px); text-align:center;',
-      '  box-shadow:0 24px 64px rgba(0,0,0,.38);',
+      '  background:#fff !important; border-radius:20px !important; padding:40px 28px 32px !important;',
+      '  max-width:360px !important; width:calc(100% - 40px) !important; text-align:center !important;',
+      '  box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
       '  animation:lbSlideUp .3s ease;',
+      '  position:relative !important; z-index:1 !important;',
       '}',
       '#lb-icon {',
-      '  width:64px; height:64px; background:#fee2e2; border-radius:50%;',
-      '  display:flex; align-items:center; justify-content:center;',
-      '  margin:0 auto 20px; font-size:30px;',
+      '  width:64px !important; height:64px !important; background:#fee2e2 !important; border-radius:50% !important;',
+      '  display:flex !important; align-items:center !important; justify-content:center !important;',
+      '  margin:0 auto 20px !important; font-size:30px !important;',
       '}',
-      '#lb-title  { font-size:18px; font-weight:700; color:#111827; margin:0 0 10px; }',
-      '#lb-desc   { font-size:14px; color:#6b7280; margin:0 0 28px; line-height:1.7; }',
+      '#lb-title  { font-size:18px !important; font-weight:700 !important; color:#111827 !important; margin:0 0 10px !important; }',
+      '#lb-desc   { font-size:14px !important; color:#6b7280 !important; margin:0 0 28px !important; line-height:1.7 !important; }',
       '#lb-btn {',
-      '  width:100%; padding:14px;',
-      '  background:#2563eb; color:#fff;',
-      '  border:none; border-radius:12px;',
-      '  font-size:15px; font-weight:600; cursor:pointer;',
-      '  transition:background .15s;',
-      '  font-family:inherit;',
+      '  width:100% !important; padding:14px !important;',
+      '  background:#2563eb !important; color:#fff !important;',
+      '  border:none !important; border-radius:12px !important;',
+      '  font-size:15px !important; font-weight:600 !important; cursor:pointer !important;',
+      '  transition:background .15s !important;',
+      '  font-family:inherit !important;',
+      '  display:block !important;',
       '}',
-      '#lb-btn:hover { background:#1d4ed8; }',
-      '#lb-ver { font-size:11px; color:#d1d5db; margin:14px 0 0; }',
+      '#lb-btn:hover { background:#1d4ed8 !important; }',
+      '#lb-ver { font-size:11px !important; color:#d1d5db !important; margin:14px 0 0 !important; }',
     ].join('\n');
     document.head.appendChild(s);
   })();
@@ -255,21 +263,57 @@
 
   /* ── 차단 모달 ─────────────────────────────────────────── */
   function showBlockModal(msg) {
-    if (document.getElementById('lb-overlay')) return;
+    // 기존 모달 제거 후 재생성 (중복 방지)
+    var existing = document.getElementById('lb-overlay');
+    if (existing) existing.remove();
 
     var overlay = document.createElement('div');
     overlay.id = 'lb-overlay';
+
+    // inline style !important 이중 적용 (임웹 테마 CSS 충돌 방지)
+    overlay.setAttribute('style',
+      'position:fixed !important;' +
+      'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+      'width:100% !important;height:100% !important;' +
+      'z-index:2147483647 !important;' +
+      'background:rgba(15,23,42,0.85) !important;' +
+      'display:flex !important;' +
+      'align-items:center !important;' +
+      'justify-content:center !important;' +
+      'font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;' +
+      'margin:0 !important;padding:0 !important;' +
+      'box-sizing:border-box !important;' +
+      'transform:none !important;'
+    );
+
     overlay.innerHTML = [
-      '<div id="lb-box">',
-        '<div id="lb-icon">🔒</div>',
-        '<h2 id="lb-title">세션이 종료되었습니다</h2>',
-        '<p id="lb-desc">' + (msg || '다른 기기에서 로그인하여<br>현재 세션이 종료되었습니다.') + '</p>',
-        '<button id="lb-btn">🔑 다시 로그인</button>',
-        '<p id="lb-ver">' + VERSION + '</p>',
+      '<div id="lb-box" style="background:#fff !important;border-radius:20px !important;',
+        'padding:40px 28px 32px !important;max-width:360px !important;',
+        'width:calc(100% - 40px) !important;text-align:center !important;',
+        'box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
+        'position:relative !important;z-index:1 !important;">',
+        '<div style="width:64px !important;height:64px !important;',
+          'background:#fee2e2 !important;border-radius:50% !important;',
+          'display:flex !important;align-items:center !important;justify-content:center !important;',
+          'margin:0 auto 20px !important;font-size:30px !important;">🔒</div>',
+        '<h2 style="font-size:18px !important;font-weight:700 !important;',
+          'color:#111827 !important;margin:0 0 10px !important;">세션이 종료되었습니다</h2>',
+        '<p style="font-size:14px !important;color:#6b7280 !important;',
+          'margin:0 0 28px !important;line-height:1.7 !important;">',
+          (msg || '다른 기기에서 로그인하여<br>현재 세션이 종료되었습니다.') + '</p>',
+        '<button id="lb-btn" style="width:100% !important;padding:14px !important;',
+          'background:#2563eb !important;color:#fff !important;',
+          'border:none !important;border-radius:12px !important;',
+          'font-size:15px !important;font-weight:600 !important;cursor:pointer !important;',
+          'display:block !important;font-family:inherit !important;',
+          'box-sizing:border-box !important;">🔑 다시 로그인</button>',
+        '<p style="font-size:11px !important;color:#d1d5db !important;',
+          'margin:14px 0 0 !important;">' + VERSION + '</p>',
       '</div>',
     ].join('');
 
-    document.body.appendChild(overlay);
+    // body > html 순으로 붙임 (body 없는 경우 대비)
+    (document.body || document.documentElement).appendChild(overlay);
 
     document.getElementById('lb-btn').onclick = function () {
       clearToken();
@@ -326,26 +370,66 @@
 
   /* ── 다른 기기 점유 모달 (force 선택) ─────────────────── */
   function showOccupiedModal(userId, deviceId) {
-    if (document.getElementById('lb-overlay')) return;
+    var existing = document.getElementById('lb-overlay');
+    if (existing) existing.remove();
 
     var overlay = document.createElement('div');
     overlay.id = 'lb-overlay';
+
+    overlay.setAttribute('style',
+      'position:fixed !important;' +
+      'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
+      'width:100% !important;height:100% !important;' +
+      'z-index:2147483647 !important;' +
+      'background:rgba(15,23,42,0.85) !important;' +
+      'display:flex !important;' +
+      'align-items:center !important;' +
+      'justify-content:center !important;' +
+      'font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;' +
+      'margin:0 !important;padding:0 !important;' +
+      'box-sizing:border-box !important;' +
+      'transform:none !important;'
+    );
+
     overlay.innerHTML = [
-      '<div id="lb-box">',
-        '<div id="lb-icon">⚠️</div>',
-        '<h2 id="lb-title">다른 기기에서 사용 중</h2>',
-        '<p id="lb-desc">현재 다른 기기에서 로그인 중입니다.<br>이 기기로 강제 로그인 하시겠습니까?<br><span style="font-size:12px;color:#9ca3af">(기존 기기는 자동으로 로그아웃됩니다)</span></p>',
-        '<button id="lb-btn" style="margin-bottom:10px">📲 이 기기로 강제 로그인</button>',
-        '<button id="lb-btn-cancel" style="width:100%;padding:10px;background:#f3f4f6;color:#374151;border:none;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit">취소</button>',
-        '<p id="lb-ver">' + VERSION + '</p>',
+      '<div id="lb-box" style="background:#fff !important;border-radius:20px !important;',
+        'padding:40px 28px 32px !important;max-width:360px !important;',
+        'width:calc(100% - 40px) !important;text-align:center !important;',
+        'box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
+        'position:relative !important;z-index:1 !important;">',
+        '<div style="width:64px !important;height:64px !important;',
+          'background:#fff3cd !important;border-radius:50% !important;',
+          'display:flex !important;align-items:center !important;justify-content:center !important;',
+          'margin:0 auto 20px !important;font-size:30px !important;">⚠️</div>',
+        '<h2 style="font-size:18px !important;font-weight:700 !important;',
+          'color:#111827 !important;margin:0 0 10px !important;">다른 기기에서 사용 중</h2>',
+        '<p style="font-size:14px !important;color:#6b7280 !important;',
+          'margin:0 0 20px !important;line-height:1.7 !important;">',
+          '현재 다른 기기에서 로그인 중입니다.<br>이 기기로 강제 로그인 하시겠습니까?<br>',
+          '<span style="font-size:12px !important;color:#9ca3af !important;">',
+          '(기존 기기는 자동으로 로그아웃됩니다)</span></p>',
+        '<button id="lb-btn" style="width:100% !important;padding:14px !important;',
+          'background:#2563eb !important;color:#fff !important;',
+          'border:none !important;border-radius:12px !important;',
+          'font-size:15px !important;font-weight:600 !important;cursor:pointer !important;',
+          'display:block !important;font-family:inherit !important;',
+          'box-sizing:border-box !important;margin-bottom:10px !important;">📲 이 기기로 강제 로그인</button>',
+        '<button id="lb-btn-cancel" style="width:100% !important;padding:12px !important;',
+          'background:#f3f4f6 !important;color:#374151 !important;',
+          'border:none !important;border-radius:12px !important;',
+          'font-size:14px !important;cursor:pointer !important;',
+          'display:block !important;font-family:inherit !important;',
+          'box-sizing:border-box !important;">취소</button>',
+        '<p style="font-size:11px !important;color:#d1d5db !important;',
+          'margin:14px 0 0 !important;">' + VERSION + '</p>',
       '</div>',
     ].join('');
 
-    document.body.appendChild(overlay);
+    (document.body || document.documentElement).appendChild(overlay);
 
     document.getElementById('lb-btn').onclick = function () {
       hideBlockModal();
-      registerLogin(userId, deviceId, true);  // force=true
+      registerLogin(userId, deviceId, true);
     };
     document.getElementById('lb-btn-cancel').onclick = function () {
       hideBlockModal();
