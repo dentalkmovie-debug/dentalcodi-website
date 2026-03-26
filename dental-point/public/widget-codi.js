@@ -253,13 +253,28 @@
   }
 
   /* ===== localStorage API 캐시 복원/저장 ===== */
+  /* ★ v5.10.20: imweb-members는 항상 실시간 조회 - localStorage 캐시에서 제외 */
+  var _CACHE_VER = 'v5.10.21'; /* 버전 변경 시 기존 캐시 전체 무효화 */
+  var _NO_PERSIST_KEYS = ['/codi/admin/imweb-members', '/imweb/members'];
+  function _isNoPersist(k) {
+    return _NO_PERSIST_KEYS.some(function(p) { return k.indexOf(p) !== -1; });
+  }
   function _restoreApiCache() {
     try {
+      /* ★ 캐시 버전 체크: 버전이 다르면 기존 캐시 전체 삭제 (imweb-members 20개 캐시 강제 제거) */
+      var storedVer = localStorage.getItem('codi_cache_ver');
+      if (storedVer !== _CACHE_VER) {
+        localStorage.removeItem('codi_api_cache');
+        localStorage.setItem('codi_cache_ver', _CACHE_VER);
+        dlog('캐시 버전 변경(' + storedVer + '→' + _CACHE_VER + ') - 기존 캐시 초기화');
+        return;
+      }
       var raw = localStorage.getItem('codi_api_cache');
       if (!raw) return;
       var saved = JSON.parse(raw);
       if (saved && typeof saved === 'object') {
         Object.keys(saved).forEach(function(k) {
+          if (_isNoPersist(k)) return; /* imweb-members는 캐시 복원 제외 */
           _apiCache[k] = { data: saved[k], ts: Date.now() }; /* 복원된 데이터는 fresh로 취급 */
         });
         dlog('API캐시 복원: ' + Object.keys(saved).length + '개');
@@ -270,9 +285,11 @@
     try {
       var toSave = {};
       Object.keys(_apiCache).forEach(function(k) {
+        if (_isNoPersist(k)) return; /* imweb-members는 캐시 저장 제외 */
         if (_apiCache[k] && _apiCache[k].data) toSave[k] = _apiCache[k].data;
       });
       localStorage.setItem('codi_api_cache', JSON.stringify(toSave));
+      localStorage.setItem('codi_cache_ver', _CACHE_VER);
     } catch(e) {}
   }
 
@@ -288,14 +305,37 @@
   function tryAuth() {
     try{authToken=localStorage.getItem('dpt_admin_token')||'';authMember=JSON.parse(localStorage.getItem('dpt_admin_member')||'null');var clinics=JSON.parse(localStorage.getItem('dpt_admin_clinics')||'[]');var saved=localStorage.getItem('dpt_admin_current_clinic');currentClinic=saved?JSON.parse(saved):(clinics[0]||null);}catch(e){}
     if(authToken&&authMember&&currentClinic){
-      /* ★ v5.10.14: SDK가 즉시 응답하면 member_id 비교로 계정 불일치 차단 */
-      /* SDK가 아직 안 로드됐을 수 있으므로 즉시 렌더 후 _bgReauth에서 최종 검증 */
+      /* ★ v5.10.17: 이메일 비교 강화 - cachedEmail 없어도 curEmail 있으면 항상 검증 */
+      /* __bs_imweb 쿠키는 SDK보다 먼저 읽힘 → 이메일로 신뢰도 높은 비교 가능 */
+      var curEmail=getLoginEmail();
+      var cachedEmail=(authMember&&authMember.email)||'';
+      /* cachedEmail이 없는 오래된 캐시: curEmail이 있으면 무조건 _bgReauth에서 재검증 */
+      if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
+        dlog('계정 불일치(이메일) - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
+        _clearAuthCache();
+      }
+      /* cachedEmail 없는 구버전 캐시: imweb_member_id로 한번 더 검증 */
+      if(authToken&&authMember&&!cachedEmail&&curEmail){
+        var curMidCheck=getMemberId();
+        var storedId=localStorage.getItem('dpt_imweb_id')||'';
+        /* storedId가 있고 curMid와 다르면 다른 계정 → 캐시 무효화 */
+        if(storedId&&curMidCheck&&!curMidCheck.startsWith('site_')&&storedId!==curMidCheck){
+          dlog('계정 불일치(구캐시+ID) - 캐시 무효화: stored='+storedId+' cur='+curMidCheck);
+          _clearAuthCache();
+        } else if(!storedId){
+          /* storedId도 없는 아주 오래된 캐시 → 안전하게 캐시 삭제 후 재인증 */
+          dlog('구버전 캐시(email/id 없음) - 캐시 무효화 후 재인증');
+          _clearAuthCache();
+        }
+      }
+    }
+    if(authToken&&authMember&&currentClinic){
+      /* member_id 비교 (SDK 로드됐을 때 추가 검증) */
       var curMidImmediate=getMemberId();
       var cachedMid=(authMember&&authMember.imweb_member_id)||localStorage.getItem('dpt_imweb_id')||'';
       if(curMidImmediate&&!curMidImmediate.startsWith('site_')&&cachedMid&&cachedMid!==curMidImmediate){
-        dlog('계정 불일치(즉시감지) - 캐시 무효화: cached='+cachedMid+' cur='+curMidImmediate);
+        dlog('계정 불일치(ID) - 캐시 무효화: cached='+cachedMid+' cur='+curMidImmediate);
         _clearAuthCache();
-        /* 캐시 무효화 후 아래 SDK 폴링 흐름으로 진행 */
       }
     }
     if(authToken&&authMember&&currentClinic){
@@ -315,27 +355,68 @@
   /* ===== 백그라운드 재인증 (즉시렌더 후 토큰 갱신) ===== */
   function _bgReauth() {
     var mid = getMemberId();
-    /* ★ v5.10.14: SDK에서 member_id를 즉시 읽을 수 있으면 캐시 계정과 비교 */
+    var curEmail = getLoginEmail();
+    /* ★ v5.10.18: 이메일 불일치 또는 구버전 캐시 → 항상 현재 계정으로 재인증 */
+    var cachedEmail=(authMember&&authMember.email)||'';
+    /* 케이스1: cachedEmail 있고 현재 이메일과 다름 → 확실한 계정 불일치 */
+    if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
+      dlog('_bgReauth: 이메일 불일치 - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
+      _clearAuthCache();
+      var ln=getLoginName();
+      if(!mid||mid.startsWith('site_'))mid='';
+      doMatch(mid,ln);
+      return;
+    }
+    /* 케이스2: cachedEmail 없는 구버전 캐시 + 현재 이메일 있음 → 재인증으로 검증 */
+    if(curEmail&&!cachedEmail&&authMember){
+      dlog('_bgReauth: 구캐시(email없음) - 이메일로 재검증: '+curEmail);
+      _clearAuthCache();
+      var ln2=getLoginName();
+      if(!mid||mid.startsWith('site_'))mid='';
+      doMatch(mid,ln2);
+      return;
+    }
+    /* ★ v5.10.18 핵심: mid가 있어도 curEmail이 있으면 서버에 이메일도 함께 전송
+       → 서버가 imweb_member_id + email 두 정보로 올바른 계정 특정 가능 */
+    /* SDK ID 기반 불일치 감지 */
     if(mid&&!mid.startsWith('site_')){
       var cachedMid=(authMember&&authMember.imweb_member_id)||'';
       if(cachedMid&&cachedMid!==mid){
-        dlog('_bgReauth: 계정 불일치 - 캐시 무효화 후 신규 매칭: cached='+cachedMid+' sdk='+mid);
+        dlog('_bgReauth: ID 불일치 - 캐시 무효화 후 신규 매칭: cached='+cachedMid+' sdk='+mid);
         _clearAuthCache();
-        /* 현재 계정으로 즉시 doMatch 진행 */
         var ln=getLoginName();
         doMatch(mid,ln);
         return;
       }
     }
-    if (!mid) { try { mid = localStorage.getItem('dpt_imweb_id') || ''; } catch(e) {} }
-    if (!mid) return; /* SDK 없으면 스킵 - 캐시된 세션으로 유지 */
+    /* ★ v5.10.16: SDK 미로드 시 localStorage 이전 ID 재사용 금지 */
+    /* mid가 빈값이면 현재 로그인 이메일로만 재인증 */
+    if (!mid) {
+      if(curEmail){
+        dlog('_bgReauth: SDK 미로드, 이메일로 재인증: '+curEmail);
+        var ln=getLoginName()||'';
+        var body={imweb_member_id:'',imweb_name:ln,imweb_email:curEmail,imweb_group:getLoginGroup()||'',imweb_phone:'',imweb_clinic_name:'',imweb_clinic_phone:'',imweb_clinic_addr:''};
+        fetch(API+'/api/auth/imweb-match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.matched&&d.token){
+            var prevId=authMember&&authMember.id;var prevCid=currentClinic&&currentClinic.id;
+            authToken=d.token;if(d.member)authMember=d.member;var cls=d.clinics||[];if(cls.length)currentClinic=cls[0];
+            try{localStorage.setItem('dpt_admin_token',d.token);localStorage.setItem('dpt_admin_member',JSON.stringify(authMember));localStorage.setItem('dpt_admin_clinics',JSON.stringify(cls));if(currentClinic)localStorage.setItem('dpt_admin_current_clinic',JSON.stringify(currentClinic));}catch(e){}
+            if((authMember&&authMember.id)!==prevId||(currentClinic&&currentClinic.id)!==prevCid){dlog('이메일 재인증 성공 - renderApp 재호출');renderApp();}
+          }
+        }).catch(function(e){dlog('이메일재인증오류:'+e.message);});
+        return;
+      }
+      return; /* 이메일도 없으면 스킵 */
+    }
     var ln = getLoginName() || (authMember && authMember.name) || '';
     var le = getLoginEmail() || '';
     var lg = getLoginGroup() || '';
     var cn='',cp='';
     try{var te=document.querySelector('title');if(te){var tr=te.textContent.split('|')[0].split('-')[0].trim();if(!isSysWord(tr))cn=tr;}var tls=document.querySelectorAll('a[href^="tel:"]');if(tls.length)cp=(tls[0].getAttribute('href')||'').replace('tel:','');}catch(e){}
     var body={imweb_member_id:mid,imweb_name:ln,imweb_email:le,imweb_group:lg,imweb_phone:'',imweb_clinic_name:cn,imweb_clinic_phone:cp,imweb_clinic_addr:''};
-    dlog('백그라운드 auth 시작');
+    dlog('백그라운드 auth 시작: id='+mid+' email='+le);
     fetch(API+'/api/auth/imweb-match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json();})
     .then(function(d){
@@ -343,16 +424,18 @@
         dlog('백그라운드 auth 성공 - 토큰 갱신');
         var prevMemberId=authMember&&authMember.id;
         var prevClinicId=currentClinic&&currentClinic.id;
+        var prevName=authMember&&authMember.name;
         authToken=d.token;
         if(d.member)authMember=d.member;
         var clinics=d.clinics||[];
         if(clinics.length)currentClinic=clinics[0];
         try{localStorage.setItem('dpt_admin_token',d.token);localStorage.setItem('dpt_admin_member',JSON.stringify(authMember));localStorage.setItem('dpt_admin_clinics',JSON.stringify(clinics));if(currentClinic)localStorage.setItem('dpt_admin_current_clinic',JSON.stringify(currentClinic));}catch(e){}
-        /* ★ v5.10.14: 계정/클리닉 변경된 경우 renderApp() 재호출 */
+        /* ★ v5.10.18: 계정/클리닉/이름 중 하나라도 변경되면 renderApp 재호출 */
         var newMemberId=d.member&&d.member.id;
         var newClinicId=currentClinic&&currentClinic.id;
-        if(prevMemberId!==newMemberId||prevClinicId!==newClinicId){
-          dlog('백그라운드 auth: 계정/클리닉 변경 감지 → renderApp 재호출');
+        var newName=d.member&&d.member.name;
+        if(prevMemberId!==newMemberId||prevClinicId!==newClinicId||prevName!==newName){
+          dlog('백그라운드 auth: 변경 감지(id:'+prevMemberId+'→'+newMemberId+' name:'+prevName+'→'+newName+') → renderApp 재호출');
           renderApp();
         }
       } else if(d.need_name || !d.matched) {
@@ -402,7 +485,7 @@
       /* super_admin이면 관리 탭 API도 프리페치 */
       if (authMember && authMember.role === 'super_admin') {
         _prefetchList.push(callAPI('/codi/admin/clinics').catch(function(){}));
-        _prefetchList.push(callAPI('/codi/admin/imweb-members').catch(function(){}));
+        /* ★ v5.10.20: imweb-members는 항상 실시간 조회이므로 프리페치에서 제외 */
       }
       /* 프리페치 완료 후 API 캐시를 localStorage에 저장 (다음 진입 시 즉시 렌더용) */
       Promise.all(_prefetchList).then(function(){ _persistApiCache(); }).catch(function(){});
@@ -1227,10 +1310,10 @@
       /* 클리닉 + 아임웹 회원을 병렬로 로드
          ★ /api/imweb/members: 아임웹 API 실시간 조회 (아임웹 API 연동 시 17명 등 최신 목록)
          ★ fallback: /api/codi/admin/imweb-members (DB 기반) */
-      if (!_getStale('/codi/admin/clinics') || !_getStale('/imweb/members')) body.innerHTML = SPIN;
+      if (!_getStale('/codi/admin/clinics')) body.innerHTML = SPIN;
       Promise.all([
         adminClinics ? Promise.resolve(null) : callAPI('/codi/admin/clinics'),
-        callAPI('/imweb/members').catch(function() { return callAPI('/codi/admin/imweb-members'); })
+        callAPI('/imweb/members', {noCache:true}).catch(function() { return callAPI('/codi/admin/imweb-members', {noCache:true}); }) /* ★ v5.10.20: 항상 실시간 조회 */
       ]).then(function(res) {
         if (res[0]) {
           adminClinics = res[0].clinics || [];
@@ -1240,7 +1323,12 @@
           adminDirectMembers = res[0].direct_members || [];
         }
         var imMembers = (res[1] && res[1].members) || [];
-        dlog('imweb members loaded: ' + imMembers.length + ' (source:' + (res[1] && res[1].source || 'unknown') + ')');
+        /* ★ v5.10.21: 위젯 레벨 필터 - 실제 아임웹 ID(m202...)만 표시, 테스트 계정 제외 */
+        imMembers = imMembers.filter(function(m) {
+          var mid = m.imweb_member_id || m.member_code || '';
+          return mid && String(mid).indexOf('m202') === 0;
+        });
+        dlog('imweb members loaded: ' + imMembers.length + ' (source:' + (res[1] && res[1].source || 'unknown') + ') [filtered to real m202* accounts]');
         renderPushUI(body, imMembers);
       }).catch(function(err) {
         dlog('admin push load error: ' + err.message);
@@ -1651,11 +1739,16 @@
       body.innerHTML = SPIN;
       Promise.all([
         callAPI('/codi/admin/all-templates', {noCache:true}),
-        callAPI('/codi/admin/imweb-members')
+        callAPI('/codi/admin/imweb-members', {noCache:true}) /* ★ v5.10.20: 항상 실시간 조회 */
       ]).then(function(results) {
         var tpls = (results[0] && results[0].templates) || [];
         var imMembers = (results[1] && results[1].members) || [];
-        dlog('adminAll: templates=' + tpls.length + ', imMembers=' + imMembers.length);
+        /* ★ v5.10.21: 위젯 레벨 필터 - 실제 아임웹 ID(m202...)만 표시, 테스트 계정 제외 */
+        imMembers = imMembers.filter(function(m) {
+          var mid = m.imweb_member_id || m.member_code || '';
+          return mid && String(mid).indexOf('m202') === 0;
+        });
+        dlog('adminAll: templates=' + tpls.length + ', imMembers=' + imMembers.length + ' [filtered to real m202* accounts]');
 
         /* 공용 제외, clinic_id별 + clinic_name별 링크 맵 */
         var linkMap = {};

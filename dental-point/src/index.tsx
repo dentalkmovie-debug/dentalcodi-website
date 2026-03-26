@@ -103,7 +103,7 @@ app.use('/api/sync/*', authMiddleware)
 
 // ==================== Health ====================
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', version: '4.6.0', timestamp: new Date().toISOString() })
+  return c.json({ status: 'ok', version: '5.10.20', timestamp: new Date().toISOString() })
 })
 
 // ==================== DB Init ====================
