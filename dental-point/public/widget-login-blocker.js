@@ -1,623 +1,528 @@
 /* ============================================================
-   아임웹 동시접속 차단 스크립트 v24.12
-   ============================================================
-   변경 이력:
-   v24.12 - 서버 dental-point.pages.dev 통합 (imweb-login-blocker.pages.dev 폐기 대응)
-            M20 패턴 캡처 확장
-            member_id 감지 로직 강화 (4가지 방법)
-            네트워크 오류시 차단하지 않음 (서비스 연속성)
-   v24.6  - deviceId 처리 강화
-   v24.2  - JWT 파싱 개선 (sub / member_code / mc 필드 지원)
-   v24.1  - sessionStorage + localStorage 이중 저장
-   v24    - 초기 배포
+   아임웹 동시접속 차단 위젯 v24.13
+   dental-point.pages.dev 통합
    ============================================================ */
 (function () {
   'use strict';
 
-  /* ── 중복 실행 방지 ─────────────────────────────────────── */
-  if (window.__imwebLoginBlockerLoaded) return;
-  window.__imwebLoginBlockerLoaded = true;
+  if (window.__lbLoaded) return;
+  window.__lbLoaded = true;
 
-  /* ── 설정 ─────────────────────────────────────────────── */
-  var VERSION = 'v24.12';
-  var SERVER  = 'https://dental-point.pages.dev';   // ★ 서버 주소 (여기만 바꾸면 됨)
-  var LOGIN_PAGE = 'https://impiantpoint.imweb.me/login';
-  var CHECK_INTERVAL = 3000;   // 3초마다 세션 확인 (보안 강화)
-  var RETRY_LIMIT    = 3;
-  var MEMBER_WAIT_MS = 10000;  // member_id 최대 대기 10초
+  var VER        = 'v24.13';
+  var SERVER     = 'https://dental-point.pages.dev';
+  var LOGIN_URL  = 'https://impiantpoint.imweb.me/login';
+  var INTERVAL   = 5000;   // 5초마다 체크
+  var MAX_WAIT   = 15000;  // member_id 최대 15초 대기
+  var RETRY      = 3;
 
-  console.log('[LB] ' + VERSION + ' loading...');
+  console.log('[LB] ' + VER + ' start');
 
-  /* ── CSS 인젝션 ────────────────────────────────────────── */
-  (function injectCSS() {
-    var s = document.createElement('style');
-    s.id = 'lb-styles';
-    s.textContent = [
-      '@keyframes lbFadeIn   { from { opacity:0 }                     to { opacity:1 } }',
-      '@keyframes lbSlideUp  { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }',
-      /* 임웹 테마 override: !important 강제 적용 */
-      '#lb-overlay {',
-      '  position:fixed !important; top:0 !important; left:0 !important;',
-      '  right:0 !important; bottom:0 !important;',
-      '  width:100% !important; height:100% !important;',
-      '  z-index:2147483647 !important;',
-      '  background:rgba(15,23,42,0.85) !important;',
-      '  display:flex !important; align-items:center !important; justify-content:center !important;',
-      '  font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;',
-      '  animation:lbFadeIn .25s ease;',
-      '  margin:0 !important; padding:0 !important;',
-      '  transform:none !important;',
-      '}',
-      '#lb-box {',
-      '  background:#fff !important; border-radius:20px !important; padding:40px 28px 32px !important;',
-      '  max-width:360px !important; width:calc(100% - 40px) !important; text-align:center !important;',
-      '  box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
-      '  animation:lbSlideUp .3s ease;',
-      '  position:relative !important; z-index:1 !important;',
-      '}',
-      '#lb-icon {',
-      '  width:64px !important; height:64px !important; background:#fee2e2 !important; border-radius:50% !important;',
-      '  display:flex !important; align-items:center !important; justify-content:center !important;',
-      '  margin:0 auto 20px !important; font-size:30px !important;',
-      '}',
-      '#lb-title  { font-size:18px !important; font-weight:700 !important; color:#111827 !important; margin:0 0 10px !important; }',
-      '#lb-desc   { font-size:14px !important; color:#6b7280 !important; margin:0 0 28px !important; line-height:1.7 !important; }',
-      '#lb-btn {',
-      '  width:100% !important; padding:14px !important;',
-      '  background:#2563eb !important; color:#fff !important;',
-      '  border:none !important; border-radius:12px !important;',
-      '  font-size:15px !important; font-weight:600 !important; cursor:pointer !important;',
-      '  transition:background .15s !important;',
-      '  font-family:inherit !important;',
-      '  display:block !important;',
-      '}',
-      '#lb-btn:hover { background:#1d4ed8 !important; }',
-      '#lb-ver { font-size:11px !important; color:#d1d5db !important; margin:14px 0 0 !important; }',
-    ].join('\n');
-    document.head.appendChild(s);
-  })();
+  /* ═══════════════════════════════════════════
+     1. member_id 감지 — 임웹 실제 환경 기준
+     임웹은 로그인한 회원의 정보를 여러 곳에 노출:
+     (a) window.__bs_imweb.sdk_jwt (JWT)
+     (b) window.__bs_imweb.member_no
+     (c) 쿠키 imweb_member_no 또는 mb_code
+     (d) console.log M20 패턴 캡처
+     (e) 임웹 테마 전역 변수
+  ═══════════════════════════════════════════ */
+  var _mid = '';   // 확정된 member_id
+  var _m20 = '';   // 콘솔 캡처값
 
-  /* ── M20 콘솔 캡처 ─────────────────────────────────────── */
-  var _capturedM20 = null;
-  (function patchConsole() {
-    function wrap(orig) {
+  /* ─ 콘솔 M20 캡처 (스크립트 로드 즉시 실행) ─ */
+  (function () {
+    var _wrap = function (orig) {
       return function () {
         try {
-          var str = Array.prototype.slice.call(arguments).join(' ');
-          // M20 패턴: m20 으로 시작하는 6자리 이상 숫자 ID
-          var m = str.match(/\b(m20\d{6,})\b/i) || str.match(/"member_code"\s*:\s*"(m[0-9a-z_]+)"/i);
-          if (m && !_capturedM20) {
-            _capturedM20 = m[1];
-            console.info('[LB] M20 captured:', _capturedM20.slice(0,8) + '...');
+          var s = [].slice.call(arguments).join(' ');
+          /* m20 + 숫자 6자리 이상 패턴 */
+          var m = s.match(/\bm20(\d{6,})\b/i);
+          if (m && !_m20) {
+            _m20 = 'm20' + m[1];
+            console.info('[LB] M20 감지:', _m20.slice(0, 9) + '***');
           }
+          /* "member_code":"xxx" JSON 패턴 */
+          var m2 = s.match(/"member_code"\s*:\s*"([^"]{4,})"/);
+          if (m2 && !_m20) _m20 = m2[1];
         } catch (_) {}
-        return orig.apply(console, arguments);
+        return orig.apply(this, arguments);
       };
-    }
-    try { console.log  = wrap(console.log);  } catch (_) {}
-    try { console.info = wrap(console.info); } catch (_) {}
-    try { console.warn = wrap(console.warn); } catch (_) {}
+    };
+    try { console.log  = _wrap(console.log);  } catch (_) {}
+    try { console.info = _wrap(console.info); } catch (_) {}
+    try { console.warn = _wrap(console.warn); } catch (_) {}
+    try { console.debug = _wrap(console.debug); } catch (_) {}
   })();
 
-  /* ── JWT 파싱 헬퍼 ─────────────────────────────────────── */
-  function parseJwt(token) {
+  /* ─ JWT 파싱 ─ */
+  function _jwt(t) {
     try {
-      var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(b64));
+      return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
     } catch (_) { return null; }
   }
 
-  /* ── deviceId 관리 ─────────────────────────────────────── */
+  /* ─ 쿠키 읽기 ─ */
+  function _cookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|;)\\s*' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  /* ─ member_id 추출 ─ */
+  function getMid() {
+    if (_mid) return _mid;
+
+    /* ① window.__bs_imweb (임웹 공식 SDK) */
+    try {
+      var bs = window.__bs_imweb || {};
+
+      // sdk_jwt 파싱
+      if (bs.sdk_jwt) {
+        var p = _jwt(bs.sdk_jwt);
+        if (p) {
+          var v = p.member_code || p.sub || p.mc || p.id || '';
+          if (v && v !== 'null' && v.length > 2) return v + '';
+        }
+      }
+      // member_no / memberNo
+      var no = bs.member_no || bs.memberNo || (bs.member && bs.member.no) || '';
+      if (no) return no + '';
+
+      // member_code 직접
+      var mc = bs.member_code || bs.memberCode || bs.code || '';
+      if (mc) return mc + '';
+    } catch (_) {}
+
+    /* ② 쿠키 */
+    var ck = _cookie('imweb_member_no') || _cookie('member_no') ||
+             _cookie('mb_code') || _cookie('imweb_mc') || _cookie('member_code');
+    if (ck && ck.length > 2) return ck;
+
+    /* ③ localStorage / sessionStorage */
+    var lsKeys = ['imweb_member_no', 'member_no', 'imweb_member_code',
+                  'member_code', 'mb_code', '__imweb_mc', 'imweb_user'];
+    for (var i = 0; i < lsKeys.length; i++) {
+      try {
+        var raw = localStorage.getItem(lsKeys[i]) || sessionStorage.getItem(lsKeys[i]) || '';
+        if (raw) {
+          // JSON인 경우 파싱
+          try {
+            var obj = JSON.parse(raw);
+            var cv  = obj.member_code || obj.member_no || obj.code || obj.no || obj.id || '';
+            if (cv && cv + '' !== 'null' && (cv + '').length > 2) return cv + '';
+          } catch (_) {}
+          if (raw.length > 2 && raw !== 'null' && raw !== 'undefined') return raw;
+        }
+      } catch (_) {}
+    }
+
+    /* ④ 전역 변수 */
+    var gvars = ['member_data', '__MEMBER__', 'memberData', '_member',
+                 'JEJU_MEMBER', 'user_data', '_imwebMember', 'imwebMember'];
+    for (var g = 0; g < gvars.length; g++) {
+      try {
+        var o = window[gvars[g]];
+        if (o && typeof o === 'object') {
+          var fv = o.member_code || o.member_no || o.code || o.no ||
+                   o.id || o.member_id || o.memberCode || '';
+          if (fv && (fv + '').length > 2) return fv + '';
+        }
+      } catch (_) {}
+    }
+
+    /* ⑤ M20 콘솔 캡처 */
+    if (_m20) return _m20;
+
+    /* ⑥ 임웹 DOM에서 회원 관련 숨긴 필드 탐색 */
+    try {
+      var els = document.querySelectorAll(
+        '[data-member-code],[data-member-no],[data-member-id],[data-mb-code]'
+      );
+      for (var e = 0; e < els.length; e++) {
+        var dv = els[e].getAttribute('data-member-code') ||
+                 els[e].getAttribute('data-member-no')   ||
+                 els[e].getAttribute('data-member-id')   ||
+                 els[e].getAttribute('data-mb-code') || '';
+        if (dv && dv.length > 2) return dv;
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
+  /* ─ 로그인 여부 (느슨하게 판단) ─ */
+  function isLoggedIn() {
+    /* SDK 존재 + 값 있음 */
+    try {
+      var bs = window.__bs_imweb || {};
+      if (bs.member_no || bs.memberNo || bs.sdk_jwt || bs.member_code) return true;
+    } catch (_) {}
+
+    /* 쿠키에 member 관련 키 있음 */
+    if (_cookie('imweb_member_no') || _cookie('member_no') ||
+        _cookie('mb_code') || _cookie('imweb_session')) return true;
+
+    /* member_id 감지 성공 */
+    if (getMid()) return true;
+
+    /* DOM: 로그아웃 버튼 있으면 로그인 상태 */
+    if (document.querySelector(
+      '[data-page="logout"],[data-action="logout"],.imweb-member-logout,[href*="logout"]'
+    )) return true;
+
+    /* DOM: 마이페이지 링크 보이면 로그인 상태 */
+    var my = document.querySelector(
+      '[data-page="mypage"],.imweb-member-mypage,[href*="mypage"]'
+    );
+    if (my && my.offsetParent !== null) return true;
+
+    return false;
+  }
+
+  /* ═══════════════════════════════════════════
+     2. DeviceId / Token / User 저장
+  ═══════════════════════════════════════════ */
+  function _ls(method, key, val) {
+    try { return localStorage[method](key, val); } catch (_) {}
+    try { return sessionStorage[method](key, val); } catch (_) {}
+  }
+
   function getDeviceId() {
-    var KEY = 'lb_device_id';
-    var id = '';
-    try { id = localStorage.getItem(KEY)   || ''; } catch (_) {}
-    if (!id) { try { id = sessionStorage.getItem(KEY) || ''; } catch (_) {} }
+    var KEY = 'lb_did';
+    var id  = _ls('getItem', KEY) || '';
     if (!id) {
-      id = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      id = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      _ls('setItem', KEY, id);
       try { localStorage.setItem(KEY, id);   } catch (_) {}
       try { sessionStorage.setItem(KEY, id); } catch (_) {}
     }
     return id;
   }
 
-  /* ── 서버 토큰 관리 ────────────────────────────────────── */
-  function getSavedToken()   {
-    var t = '';
-    try { t = sessionStorage.getItem('lb_token') || ''; } catch (_) {}
-    if (!t) { try { t = localStorage.getItem('lb_token') || ''; } catch (_) {} }
-    return t;
-  }
-  function saveToken(token) {
-    try { sessionStorage.setItem('lb_token', token); } catch (_) {}
-    try { localStorage.setItem('lb_token',   token); } catch (_) {}
-  }
-  function clearToken() {
-    try { sessionStorage.removeItem('lb_token'); } catch (_) {}
-    try { localStorage.removeItem('lb_token');   } catch (_) {}
-  }
+  function getToken()    { return _ls('getItem', 'lb_tok') || ''; }
+  function saveToken(v)  { _ls('setItem', 'lb_tok', v); try{localStorage.setItem('lb_tok',v);}catch(_){} }
+  function clearToken()  { _ls('removeItem', 'lb_tok'); try{localStorage.removeItem('lb_tok');}catch(_){} }
+  function getUser()     { return _ls('getItem', 'lb_uid') || ''; }
+  function saveUser(v)   { _ls('setItem', 'lb_uid', v); try{localStorage.setItem('lb_uid',v);}catch(_){} }
+  function clearUser()   { _ls('removeItem', 'lb_uid'); try{localStorage.removeItem('lb_uid');}catch(_){} }
 
-  /* ── 저장된 사용자 ID ──────────────────────────────────── */
-  function getSavedUser() {
-    var u = '';
-    try { u = sessionStorage.getItem('lb_user') || ''; } catch (_) {}
-    if (!u) { try { u = localStorage.getItem('lb_user') || ''; } catch (_) {} }
-    return u;
-  }
-  function saveUser(uid) {
-    try { sessionStorage.setItem('lb_user', uid); } catch (_) {}
-    try { localStorage.setItem('lb_user',   uid); } catch (_) {}
-  }
-  function clearUser() {
-    try { sessionStorage.removeItem('lb_user'); } catch (_) {}
-    try { localStorage.removeItem('lb_user');   } catch (_) {}
-  }
-
-  /* ── member_id 감지 (4가지 방법) ──────────────────────── */
-  var _resolvedMemberId = null;
-
-  function getMemberId() {
-    if (_resolvedMemberId) return _resolvedMemberId;
-
-    /* 방법 1: 임웹 공식 SDK (__bs_imweb) */
-    try {
-      var bs = window.__bs_imweb;
-      if (!bs) {
-        // 쿠키에서 __bs_imweb 파싱
-        document.cookie.split(';').forEach(function (c) {
-          var kv = c.trim();
-          if (kv.indexOf('__bs_imweb=') === 0) {
-            try { bs = JSON.parse(decodeURIComponent(kv.slice(11))); } catch (_) {}
-          }
-        });
-      }
-      if (bs) {
-        // member_no (숫자형 ID)
-        var no = bs.member_no || bs.memberNo || (bs.member && bs.member.no);
-        if (no) return String(no);
-        // sdk_jwt 파싱
-        if (bs.sdk_jwt) {
-          var p = parseJwt(bs.sdk_jwt);
-          if (p) {
-            var sub = p.member_code || p.sub || p.id || p.mc || '';
-            if (sub && sub !== 'null') return String(sub);
-          }
-        }
-        // 직접 필드
-        var dc = bs.member_code || bs.memberCode || bs.code;
-        if (dc) return String(dc);
-      }
-    } catch (_) {}
-
-    /* 방법 2: 전역 변수 */
-    var globals = ['member_data', 'JEJU_MEMBER', '__MEMBER__', 'memberData', '_member', 'member', 'user_data', '_imwebMember'];
-    for (var i = 0; i < globals.length; i++) {
-      try {
-        var obj = window[globals[i]];
-        if (obj && typeof obj === 'object') {
-          var mid = obj.member_code || obj.code || obj.id || obj.no || obj.member_id || obj.memberCode || '';
-          if (mid && String(mid).length > 3) return String(mid);
-        }
-      } catch (_) {}
-    }
-
-    /* 방법 3: localStorage / sessionStorage */
-    var lsKeys = ['imweb_member_code', 'member_code', 'mb_code', '__imweb_mc'];
-    for (var j = 0; j < lsKeys.length; j++) {
-      try {
-        var v = localStorage.getItem(lsKeys[j]) || sessionStorage.getItem(lsKeys[j]) || '';
-        if (v) {
-          try { var parsed = JSON.parse(v); v = parsed.member_code || parsed.code || v; } catch (_) {}
-          if (v && String(v).length > 3) return String(v);
-        }
-      } catch (_) {}
-    }
-
-    /* 방법 4: M20 콘솔 캡처 */
-    if (_capturedM20) return _capturedM20;
-
-    return '';
-  }
-
-  /* ── 로그인 여부 판단 ──────────────────────────────────── */
-  function isLoggedIn() {
-    try {
-      var bs = window.__bs_imweb;
-      if (bs && (bs.member_code || bs.memberCode || bs.member_no || bs.sdk_jwt)) return true;
-    } catch (_) {}
-    var myEl = document.querySelector('[data-page="mypage"], .imweb-member-mypage, [href*="mypage"]');
-    if (myEl && myEl.offsetParent !== null) return true;
-    var loginEl = document.querySelector('[data-page="login"], .imweb-member-login, [href*="/login"]');
-    if (loginEl && getComputedStyle(loginEl).display === 'none') return true;
-    return !!getMemberId();
-  }
-
-  /* ── API 호출 (지수 백오프) ────────────────────────────── */
-  function apiFetch(method, path, data, headers, cb, retries) {
-    retries = retries || 0;
+  /* ═══════════════════════════════════════════
+     3. API
+  ═══════════════════════════════════════════ */
+  function api(method, path, data, hdrs, cb, retry) {
+    retry = retry || 0;
     var opts = {
       method: method,
-      headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}),
+      headers: Object.assign({ 'Content-Type': 'application/json' }, hdrs || {}),
     };
     if (method !== 'GET' && data) opts.body = JSON.stringify(data);
     fetch(SERVER + path, opts)
       .then(function (r) {
-        var status = r.status;
-        return r.json().then(function (json) { return { status: status, json: json }; });
+        var st = r.status;
+        return r.json().then(function (j) { return { s: st, j: j }; });
       })
-      .then(function (res) { cb(null, res.json, res.status); })
+      .then(function (res) { cb(null, res.j, res.s); })
       .catch(function (err) {
-        if (retries < RETRY_LIMIT) {
-          setTimeout(function () { apiFetch(method, path, data, headers, cb, retries + 1); },
-            800 * Math.pow(2, retries));
+        if (retry < RETRY) {
+          setTimeout(function () { api(method, path, data, hdrs, cb, retry + 1); },
+            1000 * Math.pow(2, retry));
         } else {
           cb(err, null, 0);
         }
       });
   }
 
-  /* ── 서버 세션 삭제 (로그아웃/페이지 이탈 시) ─────────── */
-  function deleteServerSession(userId, token, deviceId) {
-    apiFetch('POST', '/api/logout', { userId: userId, deviceId: deviceId }, {}, function () {}, 0);
+  function doLogout(uid, tok, did) {
+    api('POST', '/api/logout', { userId: uid, deviceId: did }, {}, function () {});
   }
 
-  /* ── 차단 모달 ─────────────────────────────────────────── */
-  function showBlockModal(msg) {
-    // 기존 모달 제거 후 재생성 (중복 방지)
-    var existing = document.getElementById('lb-overlay');
-    if (existing) existing.remove();
+  /* ═══════════════════════════════════════════
+     4. 모달
+  ═══════════════════════════════════════════ */
+  function _overlay(html) {
+    var old = document.getElementById('__lb_ov');
+    if (old) old.remove();
 
-    var overlay = document.createElement('div');
-    overlay.id = 'lb-overlay';
+    var d = document.createElement('div');
+    d.id = '__lb_ov';
+    /* inline style + !important 이중 적용 */
+    d.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'width:100%', 'height:100%',
+      'z-index:2147483647', 'background:rgba(0,0,0,.75)',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif',
+      'box-sizing:border-box', 'margin:0', 'padding:0',
+    ].join('!important;') + '!important';
 
-    // inline style !important 이중 적용 (임웹 테마 CSS 충돌 방지)
-    overlay.setAttribute('style',
-      'position:fixed !important;' +
-      'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
-      'width:100% !important;height:100% !important;' +
-      'z-index:2147483647 !important;' +
-      'background:rgba(15,23,42,0.85) !important;' +
-      'display:flex !important;' +
-      'align-items:center !important;' +
-      'justify-content:center !important;' +
-      'font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;' +
-      'margin:0 !important;padding:0 !important;' +
-      'box-sizing:border-box !important;' +
-      'transform:none !important;'
+    d.innerHTML = html;
+    (document.body || document.documentElement).appendChild(d);
+    return d;
+  }
+
+  /* 스타일 공통 */
+  var BOX  = 'style="background:#fff;border-radius:18px;padding:36px 24px 28px;' +
+             'max-width:340px;width:calc(100% - 32px);text-align:center;' +
+             'box-shadow:0 20px 60px rgba(0,0,0,.4);position:relative;box-sizing:border-box;"';
+  var BTN  = 'style="width:100%;padding:13px;background:#2563eb;color:#fff;' +
+             'border:none;border-radius:10px;font-size:15px;font-weight:700;' +
+             'cursor:pointer;display:block;box-sizing:border-box;font-family:inherit;"';
+  var BTN2 = 'style="width:100%;padding:11px;background:#f3f4f6;color:#374151;' +
+             'border:none;border-radius:10px;font-size:14px;cursor:pointer;' +
+             'display:block;margin-top:8px;box-sizing:border-box;font-family:inherit;"';
+  var ICN  = 'style="width:60px;height:60px;border-radius:50%;display:flex;' +
+             'align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;"';
+
+  function showKicked(reason) {
+    var ov = _overlay(
+      '<div ' + BOX + '>' +
+        '<div ' + ICN + ' style="background:#fee2e2">🔒</div>' +
+        '<h3 style="font-size:17px;font-weight:700;color:#111;margin:0 0 8px;">세션이 종료되었습니다</h3>' +
+        '<p style="font-size:13px;color:#6b7280;margin:0 0 22px;line-height:1.6;">' +
+          '다른 기기에서 로그인하여<br>현재 세션이 종료되었습니다.' +
+        '</p>' +
+        '<button id="__lb_ok" ' + BTN + '>🔑 다시 로그인</button>' +
+        '<p style="font-size:11px;color:#ccc;margin:10px 0 0;">' + VER + '</p>' +
+      '</div>'
     );
-
-    overlay.innerHTML = [
-      '<div id="lb-box" style="background:#fff !important;border-radius:20px !important;',
-        'padding:40px 28px 32px !important;max-width:360px !important;',
-        'width:calc(100% - 40px) !important;text-align:center !important;',
-        'box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
-        'position:relative !important;z-index:1 !important;">',
-        '<div style="width:64px !important;height:64px !important;',
-          'background:#fee2e2 !important;border-radius:50% !important;',
-          'display:flex !important;align-items:center !important;justify-content:center !important;',
-          'margin:0 auto 20px !important;font-size:30px !important;">🔒</div>',
-        '<h2 style="font-size:18px !important;font-weight:700 !important;',
-          'color:#111827 !important;margin:0 0 10px !important;">세션이 종료되었습니다</h2>',
-        '<p style="font-size:14px !important;color:#6b7280 !important;',
-          'margin:0 0 28px !important;line-height:1.7 !important;">',
-          (msg || '다른 기기에서 로그인하여<br>현재 세션이 종료되었습니다.') + '</p>',
-        '<button id="lb-btn" style="width:100% !important;padding:14px !important;',
-          'background:#2563eb !important;color:#fff !important;',
-          'border:none !important;border-radius:12px !important;',
-          'font-size:15px !important;font-weight:600 !important;cursor:pointer !important;',
-          'display:block !important;font-family:inherit !important;',
-          'box-sizing:border-box !important;">🔑 다시 로그인</button>',
-        '<p style="font-size:11px !important;color:#d1d5db !important;',
-          'margin:14px 0 0 !important;">' + VERSION + '</p>',
-      '</div>',
-    ].join('');
-
-    // body > html 순으로 붙임 (body 없는 경우 대비)
-    (document.body || document.documentElement).appendChild(overlay);
-
-    document.getElementById('lb-btn').onclick = function () {
-      clearToken();
-      clearUser();
-      window.location.href = LOGIN_PAGE + '?from=' + encodeURIComponent(location.pathname);
+    document.getElementById('__lb_ok').onclick = function () {
+      clearToken(); clearUser();
+      location.href = LOGIN_URL + '?from=' + encodeURIComponent(location.pathname);
     };
   }
 
-  function hideBlockModal() {
-    var el = document.getElementById('lb-overlay');
+  function showOccupied(uid, did) {
+    var ov = _overlay(
+      '<div ' + BOX + '>' +
+        '<div ' + ICN + ' style="background:#fef3c7">⚠️</div>' +
+        '<h3 style="font-size:17px;font-weight:700;color:#111;margin:0 0 8px;">다른 기기에서 사용 중</h3>' +
+        '<p style="font-size:13px;color:#6b7280;margin:0 0 20px;line-height:1.6;">' +
+          '현재 다른 기기에서 접속 중입니다.<br>' +
+          '이 기기로 강제 로그인 하시겠습니까?<br>' +
+          '<span style="font-size:11px;color:#9ca3af;">(기존 기기는 자동 로그아웃됩니다)</span>' +
+        '</p>' +
+        '<button id="__lb_force" ' + BTN + '>📲 이 기기로 강제 로그인</button>' +
+        '<button id="__lb_cancel" ' + BTN2 + '>취소</button>' +
+        '<p style="font-size:11px;color:#ccc;margin:10px 0 0;">' + VER + '</p>' +
+      '</div>'
+    );
+    document.getElementById('__lb_force').onclick = function () {
+      hideModal();
+      doLogin(uid, did, true);
+    };
+    document.getElementById('__lb_cancel').onclick = hideModal;
+  }
+
+  function hideModal() {
+    var el = document.getElementById('__lb_ov');
     if (el) el.remove();
   }
 
-  /* ── 세션 상태 변수 ────────────────────────────────────── */
-  var _userId   = '';
-  var _deviceId = '';
-  var _token    = '';
-  var _checkTimer = null;
-  var _logoutRegistered = false;
+  /* ═══════════════════════════════════════════
+     5. 세션 관리
+  ═══════════════════════════════════════════ */
+  var _uid   = '';
+  var _did   = '';
+  var _tok   = '';
+  var _timer = null;
+  var _regOk = false;
 
-  /* ── 서버 세션 등록 (로그인 처리) ─────────────────────── */
-  function registerLogin(userId, deviceId, force) {
-    apiFetch('POST', '/api/login',
-      { userId: userId, deviceId: deviceId, force: !!force, currentToken: getSavedToken() },
+  function doLogin(uid, did, force) {
+    api('POST', '/api/login',
+      { userId: uid, deviceId: did, force: !!force, currentToken: getToken() },
       {},
-      function (err, res, status) {
+      function (err, res, st) {
         if (err) {
-          // 네트워크 오류 → 차단하지 않고 3초 후 재시도
-          console.warn('[LB] login register failed, retry...', err.message);
-          setTimeout(function () { registerLogin(userId, deviceId, force); }, 3000);
+          /* 네트워크 오류 → 3초 후 재시도 (차단 안 함) */
+          console.warn('[LB] login api error, retry in 3s');
+          setTimeout(function () { doLogin(uid, did, force); }, 3000);
           return;
         }
-
         if (!res.success && res.code === 'OCCUPIED') {
-          /* 다른 기기에서 이미 로그인 중 → 점유 모달 표시 */
-          showOccupiedModal(userId, deviceId);
+          showOccupied(uid, did);
           return;
         }
-
         if (res.success && res.token) {
-          _token = res.token;
-          saveToken(_token);
-          saveUser(userId);
-          _userId   = userId;
-          _deviceId = deviceId;
-          console.log('[LB] session registered ✓');
-          hideBlockModal();
-          startProtectedCheck();
-          registerLogoutHandler();
+          _tok = res.token;
+          _uid = uid;
+          _did = did;
+          saveToken(_tok);
+          saveUser(uid);
+          hideModal();
+          startCheck();
+          if (!_regOk) { regLogout(); _regOk = true; }
+          console.log('[LB] 세션 등록 완료 ✓ uid=' + uid.slice(0, 6) + '***');
         }
       }
     );
   }
 
-  /* ── 다른 기기 점유 모달 (force 선택) ─────────────────── */
-  function showOccupiedModal(userId, deviceId) {
-    var existing = document.getElementById('lb-overlay');
-    if (existing) existing.remove();
-
-    var overlay = document.createElement('div');
-    overlay.id = 'lb-overlay';
-
-    overlay.setAttribute('style',
-      'position:fixed !important;' +
-      'top:0 !important;left:0 !important;right:0 !important;bottom:0 !important;' +
-      'width:100% !important;height:100% !important;' +
-      'z-index:2147483647 !important;' +
-      'background:rgba(15,23,42,0.85) !important;' +
-      'display:flex !important;' +
-      'align-items:center !important;' +
-      'justify-content:center !important;' +
-      'font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif !important;' +
-      'margin:0 !important;padding:0 !important;' +
-      'box-sizing:border-box !important;' +
-      'transform:none !important;'
-    );
-
-    overlay.innerHTML = [
-      '<div id="lb-box" style="background:#fff !important;border-radius:20px !important;',
-        'padding:40px 28px 32px !important;max-width:360px !important;',
-        'width:calc(100% - 40px) !important;text-align:center !important;',
-        'box-shadow:0 24px 64px rgba(0,0,0,.38) !important;',
-        'position:relative !important;z-index:1 !important;">',
-        '<div style="width:64px !important;height:64px !important;',
-          'background:#fff3cd !important;border-radius:50% !important;',
-          'display:flex !important;align-items:center !important;justify-content:center !important;',
-          'margin:0 auto 20px !important;font-size:30px !important;">⚠️</div>',
-        '<h2 style="font-size:18px !important;font-weight:700 !important;',
-          'color:#111827 !important;margin:0 0 10px !important;">다른 기기에서 사용 중</h2>',
-        '<p style="font-size:14px !important;color:#6b7280 !important;',
-          'margin:0 0 20px !important;line-height:1.7 !important;">',
-          '현재 다른 기기에서 로그인 중입니다.<br>이 기기로 강제 로그인 하시겠습니까?<br>',
-          '<span style="font-size:12px !important;color:#9ca3af !important;">',
-          '(기존 기기는 자동으로 로그아웃됩니다)</span></p>',
-        '<button id="lb-btn" style="width:100% !important;padding:14px !important;',
-          'background:#2563eb !important;color:#fff !important;',
-          'border:none !important;border-radius:12px !important;',
-          'font-size:15px !important;font-weight:600 !important;cursor:pointer !important;',
-          'display:block !important;font-family:inherit !important;',
-          'box-sizing:border-box !important;margin-bottom:10px !important;">📲 이 기기로 강제 로그인</button>',
-        '<button id="lb-btn-cancel" style="width:100% !important;padding:12px !important;',
-          'background:#f3f4f6 !important;color:#374151 !important;',
-          'border:none !important;border-radius:12px !important;',
-          'font-size:14px !important;cursor:pointer !important;',
-          'display:block !important;font-family:inherit !important;',
-          'box-sizing:border-box !important;">취소</button>',
-        '<p style="font-size:11px !important;color:#d1d5db !important;',
-          'margin:14px 0 0 !important;">' + VERSION + '</p>',
-      '</div>',
-    ].join('');
-
-    (document.body || document.documentElement).appendChild(overlay);
-
-    document.getElementById('lb-btn').onclick = function () {
-      hideBlockModal();
-      registerLogin(userId, deviceId, true);
-    };
-    document.getElementById('lb-btn-cancel').onclick = function () {
-      hideBlockModal();
-    };
+  function startCheck() {
+    if (_timer) clearInterval(_timer);
+    _timer = setInterval(doCheck, INTERVAL);
   }
 
-  /* ── 주기적 세션 확인 (/api/protected-data) ───────────── */
-  function startProtectedCheck() {
-    if (_checkTimer) clearInterval(_checkTimer);
-    _checkTimer = setInterval(doProtectedCheck, CHECK_INTERVAL);
-  }
-
-  function doProtectedCheck() {
-    if (!_token || !_userId) return;
-    apiFetch('GET', '/api/protected-data', null,
-      {
-        'Authorization': 'Bearer ' + _token,
-        'X-User-Id':   _userId,
-        'X-Device-Id': _deviceId,
-      },
-      function (err, res, status) {
-        if (err) {
-          // 네트워크 오류 → 차단하지 않음
-          return;
-        }
-        if (status === 403) {
-          /* KICKED: 다른 기기가 강제 로그인 */
-          if (_checkTimer) { clearInterval(_checkTimer); _checkTimer = null; }
+  function doCheck() {
+    if (!_tok || !_uid) return;
+    api('GET', '/api/protected-data', null,
+      { Authorization: 'Bearer ' + _tok, 'X-User-Id': _uid, 'X-Device-Id': _did },
+      function (err, res, st) {
+        if (err) return; /* 네트워크 오류 → 차단 안 함 */
+        if (st === 403) {
+          clearInterval(_timer); _timer = null;
           clearToken(); clearUser();
-          console.warn('[LB] session kicked (403)');
-          showBlockModal('다른 기기에서 로그인하여<br>현재 세션이 종료되었습니다.');
-        } else if (status === 401) {
-          /* 세션 없음: 재등록 */
-          if (_checkTimer) { clearInterval(_checkTimer); _checkTimer = null; }
-          console.warn('[LB] session expired (401), re-registering...');
-          registerLogin(_userId, _deviceId, false);
+          console.warn('[LB] kicked (403)');
+          showKicked('kicked');
+        } else if (st === 401) {
+          clearInterval(_timer); _timer = null;
+          console.warn('[LB] session expired (401), re-login');
+          doLogin(_uid, _did, false);
         }
-        /* 200: 정상 → 아무것도 안 함 */
+        /* 200 → 정상 */
       }
     );
   }
 
-  /* ── 로그아웃 처리 등록 ────────────────────────────────── */
-  function registerLogoutHandler() {
-    if (_logoutRegistered) return;
-    _logoutRegistered = true;
-
-    // 페이지 이탈 시 서버 세션 삭제
+  function regLogout() {
     window.addEventListener('beforeunload', function () {
-      deleteServerSession(_userId, _token, _deviceId);
+      doLogout(_uid, _tok, _did);
     });
-
-    // 임웹 로그아웃 버튼 클릭 감지
     document.addEventListener('click', function (e) {
       var el = e.target;
-      while (el) {
-        if (el.tagName === 'A' || el.tagName === 'BUTTON') {
-          var href   = el.getAttribute('href') || '';
-          var action = el.getAttribute('data-action') || el.getAttribute('data-page') || '';
-          if (href.indexOf('/logout') !== -1 || action === 'logout') {
-            deleteServerSession(_userId, _token, _deviceId);
-            clearToken(); clearUser();
-          }
+      for (var i = 0; i < 4 && el; i++, el = el.parentElement) {
+        var href   = el.getAttribute && el.getAttribute('href')        || '';
+        var action = el.getAttribute && el.getAttribute('data-action') || '';
+        var page   = el.getAttribute && el.getAttribute('data-page')   || '';
+        if (href.indexOf('logout') > -1 || action === 'logout' || page === 'logout') {
+          doLogout(_uid, _tok, _did);
+          clearToken(); clearUser();
           break;
         }
-        el = el.parentElement;
       }
     }, true);
   }
 
-  /* ── 계정 변경 감지 ────────────────────────────────────── */
-  function checkAccountChange() {
-    var currentId = getMemberId();
-    if (_userId && currentId && currentId !== _userId) {
-      console.log('[LB] account changed, re-registering...');
-      if (_checkTimer) { clearInterval(_checkTimer); _checkTimer = null; }
-      deleteServerSession(_userId, _token, _deviceId);
-      clearToken(); clearUser();
-      _token = ''; _userId = ''; _deviceId = '';
-      _resolvedMemberId = null;
-      setTimeout(main, 500);
-    }
-  }
+  /* ═══════════════════════════════════════════
+     6. 초기화 (폴링 방식, 최대 MAX_WAIT 대기)
+  ═══════════════════════════════════════════ */
+  var _pollN = 0;
+  var _pollMax = Math.ceil(MAX_WAIT / 500);
+  var _started = false;
 
-  /* ── 메인 초기화 ───────────────────────────────────────── */
-  var _memberPollCount = 0;
-  var _memberPollMax   = Math.ceil(MEMBER_WAIT_MS / 500);  // 500ms × N = MEMBER_WAIT_MS
+  function tryStart() {
+    if (_started) return;
 
-  function main() {
-    /* 비로그인 → 아무것도 안 함 */
+    /* 비로그인 → 대기 or 포기 */
     if (!isLoggedIn()) {
-      hideBlockModal();
-      return;
-    }
-
-    /* member_id 감지 */
-    var uid = getMemberId();
-    if (!uid) {
-      _memberPollCount++;
-      if (_memberPollCount < _memberPollMax) {
-        setTimeout(main, 500);
+      _pollN++;
+      if (_pollN < _pollMax) {
+        setTimeout(tryStart, 500);
       } else {
-        console.warn('[LB] member_id not detected after ' + MEMBER_WAIT_MS + 'ms');
+        console.log('[LB] 비로그인 상태 확인 — 차단 비활성');
       }
       return;
     }
 
-    /* 이미 같은 유저로 세션 등록 완료된 경우 → 건너뜀 */
-    if (_userId === uid && _token) {
-      return;
+    var uid = getMid();
+    if (!uid) {
+      _pollN++;
+      if (_pollN < _pollMax) {
+        setTimeout(tryStart, 500);
+      } else {
+        console.warn('[LB] member_id 미감지 (' + MAX_WAIT + 'ms 초과)');
+        /* ── 최후 수단: member_id 없이도 deviceId 기반으로 차단 ── */
+        uid = 'ANON_' + getDeviceId();
+        console.warn('[LB] fallback uid:', uid);
+      }
+      if (!uid) return;
     }
 
-    _resolvedMemberId = uid;
+    _started = true;
+    _mid = uid;
     var did = getDeviceId();
-    console.log('[LB] member:', uid.slice(0, 6) + '...  device:', did.slice(0, 6) + '...');
+    console.log('[LB] 초기화 uid=' + uid.slice(0, 6) + '*** did=' + did.slice(0, 5) + '***');
 
-    /* 저장된 토큰이 있으면 재사용 (새로고침 등) */
-    var savedToken = getSavedToken();
-    var savedUser  = getSavedUser();
-    if (savedToken && savedUser === uid) {
-      _token    = savedToken;
-      _userId   = uid;
-      _deviceId = did;
-      startProtectedCheck();
-      registerLogoutHandler();
+    /* 이미 토큰 있으면 재사용 */
+    var savedTok  = getToken();
+    var savedUser = getUser();
+    if (savedTok && savedUser === uid) {
+      _tok = savedTok; _uid = uid; _did = did;
+      startCheck();
+      if (!_regOk) { regLogout(); _regOk = true; }
       return;
     }
-
-    /* 신규 세션 등록 */
-    registerLogin(uid, did, false);
+    doLogin(uid, did, false);
   }
 
-  /* ── SPA 페이지 이동 감지 ──────────────────────────────── */
+  /* SPA 페이지 이동 감지 */
   var _prevUrl = location.href;
   setInterval(function () {
     if (location.href !== _prevUrl) {
       _prevUrl = location.href;
-      _memberPollCount = 0;
-      _resolvedMemberId = null;
-      setTimeout(main, 800);
+      _pollN   = 0;
+      _started = false;
+      _mid     = '';
+      setTimeout(tryStart, 1000);
     }
     /* 계정 변경 감지 */
-    if (_userId) checkAccountChange();
-  }, 1000);
+    if (_uid) {
+      var cur = getMid();
+      if (cur && cur !== _uid) {
+        console.log('[LB] 계정 변경 감지, 재초기화');
+        if (_timer) clearInterval(_timer);
+        doLogout(_uid, _tok, _did);
+        clearToken(); clearUser();
+        _tok = ''; _uid = ''; _did = ''; _started = false; _mid = ''; _pollN = 0;
+        setTimeout(tryStart, 500);
+      }
+    }
+  }, 1500);
 
-  /* ── DOMContentLoaded or 즉시 실행 ────────────────────── */
+  /* 진입점 */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(main, 800); });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(tryStart, 1000); });
   } else {
-    setTimeout(main, 800);
+    setTimeout(tryStart, 1000);
   }
 
-  /* ── 전역 디버그 API ───────────────────────────────────── */
+  /* ═══════════════════════════════════════════
+     7. 전역 디버그 API
+  ═══════════════════════════════════════════ */
   window._lb = {
-    ver:      VERSION,
-    server:   SERVER,
-    deviceId: getDeviceId,
-    memberId: function () { return _resolvedMemberId || getMemberId(); },
-    token:    function () { return _token; },
-    status:   function () {
+    ver: VER,
+    status: function () {
       console.table({
-        version:  VERSION,
-        server:   SERVER,
-        userId:   _userId   || '(미감지)',
-        deviceId: _deviceId || '(미생성)',
-        token:    _token    ? _token.slice(0,12) + '...' : '(없음)',
-        timer:    _checkTimer ? '✅ 실행중' : '❌ 중지',
+        ver:      VER,
+        uid:      _uid    || '(없음)',
+        did:      _did    || '(없음)',
+        token:    _tok    ? _tok.slice(0, 10) + '...' : '(없음)',
+        timer:    _timer  ? '✅ 실행중' : '❌ 정지',
+        isLogin:  isLoggedIn(),
+        detectedMid: getMid() || '(미감지)',
+        m20cap:   _m20    || '(없음)',
       });
     },
-    check:  function () { doProtectedCheck(); },
-    kick:   function () {
-      if (_checkTimer) { clearInterval(_checkTimer); _checkTimer = null; }
-      showBlockModal('수동 kick 테스트');
-    },
+    mid:    function () { return getMid(); },
+    did:    function () { return getDeviceId(); },
+    tok:    function () { return _tok; },
+    check:  function () { doCheck(); },
+    kick:   function () { if (_timer) clearInterval(_timer); showKicked('test'); },
     reset:  function () {
-      if (_checkTimer) { clearInterval(_checkTimer); _checkTimer = null; }
+      if (_timer) clearInterval(_timer);
       clearToken(); clearUser();
-      _token = ''; _userId = ''; _deviceId = '';
-      _resolvedMemberId = null; _memberPollCount = 0;
-      _logoutRegistered = false;
-      delete window.__imwebLoginBlockerLoaded;
-      console.log('[LB] reset ✓, re-init in 200ms...');
-      setTimeout(function () {
-        window.__imwebLoginBlockerLoaded = true;
-        main();
-      }, 200);
+      _tok = ''; _uid = ''; _did = ''; _mid = ''; _m20 = '';
+      _started = false; _pollN = 0; _regOk = false; _timer = null;
+      delete window.__lbLoaded;
+      console.log('[LB] reset → re-init...');
+      setTimeout(function () { window.__lbLoaded = true; tryStart(); }, 200);
+    },
+    /* 진단: 임웹 SDK 전체 dump */
+    dump: function () {
+      console.log('__bs_imweb:', window.__bs_imweb);
+      console.log('cookies:', document.cookie);
+      console.log('lb_uid:', getUser(), '| lb_tok:', getToken() ? 'exists' : 'none');
+      console.log('getMid():', getMid());
+      console.log('isLoggedIn():', isLoggedIn());
     },
   };
 
-  console.log('[LB] ' + VERSION + ' initialized. debug: window._lb.status()');
+  console.log('[LB] ' + VER + ' ready — 진단: window._lb.dump()');
 })();
