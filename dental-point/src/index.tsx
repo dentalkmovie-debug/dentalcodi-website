@@ -540,6 +540,22 @@ app.get('/api/debug/match-logs', (c) => {
   return c.json({ logs: _matchLogs.slice(-50) })
 })
 
+// ★ D1 영구 로그 조회 (워커 재시작 후에도 확인 가능)
+app.get('/api/debug/db-logs', async (c) => {
+  try {
+    const rows = await c.env.DB.prepare(
+      "SELECT message, created_at FROM error_logs WHERE message LIKE '%MATCH-REQ%' ORDER BY created_at DESC LIMIT 30"
+    ).all()
+    const logs = (rows.results || []).map((r: any) => {
+      try {
+        const data = JSON.parse(r.message.replace('[MATCH-REQ] ', ''))
+        return { ts: r.created_at, id: data.imweb_member_id, email: data.imweb_email, name: data.imweb_name }
+      } catch { return { ts: r.created_at, raw: r.message.slice(0, 120) } }
+    })
+    return c.json({ logs })
+  } catch(e: any) { return c.json({ error: e.message }, 500) }
+})
+
 // ==================== 아임웹 API 연동 ====================
 // 아임웹 access token 캐시 (워커 인스턴스 내)
 let _imwebTokenCache: { token: string; expires: number } | null = null
@@ -715,12 +731,16 @@ app.post('/api/auth/imweb-match', async (c) => {
   let member: any = null
 
   // ★ v5.10.18: ID와 이메일이 동시에 있을 때 계정 불일치 감지
+  // 위젯이 강팀치과 캐시ID + 유피디자인 이메일을 보내는 경우:
+  // → ID로 찾은 계정의 이메일이 전송된 이메일과 다르면 이메일 기준으로 전환
   if (resolved_member_id && imweb_email && imweb_email.includes('@')) {
     const idCheck = await c.env.DB.prepare(
       "SELECT id, name, email, imweb_member_id FROM members WHERE imweb_member_id = ? AND status = 'approved' LIMIT 1"
     ).bind(resolved_member_id).first() as any
     if (idCheck && idCheck.email && idCheck.email !== imweb_email) {
+      // ID가 가리키는 계정의 이메일 ≠ 현재 로그인 이메일 → ID 무효화, 이메일로 재탐색
       _logEntry.steps.push({ step: 'A-id-email-mismatch', id_email: idCheck.email, login_email: imweb_email, switching_to_email: true })
+      // 이메일로 올바른 계정 조회
       const correctByEmail = await c.env.DB.prepare(
         "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.email = ? AND m.status = 'approved' AND m.role IN ('clinic_admin','super_admin') ORDER BY m.created_at ASC LIMIT 1"
       ).bind(imweb_email).first() as any
