@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>임플란트코디치과 - 쿠폰관리</title>
+</head>
+<body style="font-family: sans-serif; margin: 0; padding: 0;">
+
+<!-- Imweb 헤더 시뮬레이션 -->
+<header style="background:#fff; border-bottom:1px solid #e5e7eb; padding:12px 20px; display:flex; justify-content:space-between; align-items:center;">
+  <div style="font-weight:700; font-size:16px; color:#333">임플란트코디치과</div>
+  <nav style="display:flex; align-items:center; gap:16px; font-size:14px; color:#555">
+    <a href="#">치료계획</a>
+    <a href="#">상담</a>
+    <a href="#">쿠폰관리</a>
+    <span>관리자 | <a href="/logout">Logout</a></span>
+  </nav>
+</header>
+
+<!-- 쿠폰관리 컨텐츠 영역 -->
+<main style="padding:20px;">
+  <h2 style="font-size:18px; color:#333; margin-bottom:16px">쿠폰관리</h2>
+  
+  <!-- dpt-widget-root: 위젯이 여기에 렌더링 -->
+  <div id="dpt-widget-root" style="display:block;width:100%;font-family:Noto Sans KR,sans-serif"></div>
+  
+  <!-- Imweb SDK 시뮬레이션 -->
+  <script>
+    // Imweb SDK 시뮬레이션
+    window.__bs_imweb = {
+      member_no: "test_member_admin_001",
+      member_name: "관리자",
+      sdk_jwt: btoa(JSON.stringify({alg:"HS256",typ:"JWT"})) + "." + btoa(JSON.stringify({sub:"test_member_admin_001",member_code:"test_member_admin_001"})) + ".sig"
+    };
+    console.log("SDK 시뮬레이션 완료:", window.__bs_imweb);
+  </script>
+  
+  <!-- 위젯 스크립트 로드 -->
+  <script src="https://dental-point.pages.dev/widget-imweb.js"></script>
+</main>
+</body>
+</html>

@@ -12,6 +12,17 @@ let transitionDuration = 500;
 let tvAdminCode = null;
 let tvAdminEmail = null;
 
+// ★ 광고 스케줄러 (ratio:auto + every:N 조합)
+let _adScheduler = {
+  broadcastAds: [],        // 배포 광고 아이템 목록 (repeat_every_n > 0인 것만)
+  regularItems: [],        // 일반 아이템 (광고 제외)
+  loopCount: 0,            // 플레이리스트 전체 루프 횟수
+  playCountSinceAd: 0,     // 마지막 광고 이후 재생된 일반 영상 수
+  adRoundRobin: 0,         // 라운드 로빈 광고 인덱스
+  isFirstLoop: true,       // 첫 바퀴 여부
+  everyN: 0                // every:N 값 (0이면 비활성)
+};
+
 // 로딩 화면 관리
 let _loadingScreenHidden = false;
 function hideLoadingScreen() {
@@ -391,6 +402,9 @@ function safeRestartPlayback() {
   _watchdogNoProgressCount = 0; // ★ BUG-10 FIX: 워치독 카운터 리셋
   _watchdogRestartCount = 0; // ★ BUG-10 FIX: 재시작 카운터 리셋
   
+  // ★ 전체화면 유지: iframe 파괴 전 전환 플래그 설정
+  markMediaTransitionStart();
+  
   // ★★ 시나리오 6 수정: 플레이어를 destroy 한 후 참조 초기화
   // (이전: pause만 하고 참조 초기화 → destroy 누락으로 이전 이벤트가 계속 발생)
   const oldPlayers = Object.assign({}, players);
@@ -617,6 +631,8 @@ async function loadData(isInitial = false) {
       } else {
         playlist = data.playlist;
       }
+      // ★ 광고 스케줄러 초기화
+      _initAdScheduler(playlist);
     }
     
     // 현재 임시 영상 재생 중이면 playlist 덮어쓰기 방지
@@ -644,6 +660,7 @@ async function loadData(isInitial = false) {
         
         // 새 플레이리스트로 교체
         playlist = data.playlist;
+        _initAdScheduler(playlist);
         
         // 현재 재생 중이던 아이템이 새 플레이리스트에 있는지 확인
         if (currentUrl && newItemCount > 0) {
@@ -1024,6 +1041,9 @@ function initializeAllMedia() {
     currentIndex = 0;
   }
   
+  // ★ 전체화면 유지: iframe 파괴 전 전환 플래그 설정
+  markMediaTransitionStart();
+  
   // ★ 기존 플레이어 먼저 파괴 (메모리 누수 방지)
   // 참조를 별도로 저장한 후 즉시 초기화 (이벤트 콜백 차단)
   const oldPlayers = Object.assign({}, players);
@@ -1160,7 +1180,10 @@ function preloadVimeo(index, callback) {
       preloadCompleted = true;
       preloadedPlayers[index] = player;
       preloadingIndex = -1;
-      if (fromReady) setTimeout(ensureFullscreen, 200);
+      if (fromReady) {
+        markMediaTransitionEnd();
+        setTimeout(ensureFullscreen, 200);
+      }
       if (callback) callback();
     };
     
@@ -1321,6 +1344,7 @@ function createAndPlayVimeoForStart(idx, item) {
       }
       if (currentIndex === idx) {
         console.log('[createVimeoForStart] Ready:', idx, 'session:', thisSession);
+        markMediaTransitionEnd();
         // ★ ready 시점에 로딩 화면 숨기기 (play 전이라도 iframe이 보이므로)
         hideLoadingScreen();
         // ★ 재생 전 muted 상태 확실히 보장 (Chrome autoplay 정책)
@@ -1351,6 +1375,7 @@ function createAndPlayVimeoForStart(idx, item) {
           return;
         }
         console.log('[createVimeoForStart] 10s timeout - player not started, retry', _startRetryCount + 1, '/3');
+        markMediaTransitionStart(); // ★ 전체화면 유지
         try { player.destroy(); } catch(e) {}
         players[idx] = null;
         item._startRetryCount = _startRetryCount + 1;
@@ -1391,6 +1416,7 @@ function setupYouTube(item, index) {
         onReady: () => {
           console.log('YouTube ready:', index);
           itemsReady[index] = true;
+          markMediaTransitionEnd(); // ★ 전체화면 유지
           try {
             players[index].mute();
             players[index].setVolume(0);
@@ -2208,6 +2234,47 @@ function startPlaybackWatchdog() {
   playbackWatchdog = setInterval(ensurePlaybackAlive, 5000);
 }
 
+// ★ 광고 스케줄러 초기화
+function _initAdScheduler(pl) {
+  if (!pl || !pl.items) return;
+  // repeat_every_n > 0인 배포 광고만 추출 (인덱스도 기록)
+  var ads = [];
+  var everyN = 0;
+  pl.items.forEach(function(item, idx) {
+    if (item.is_broadcast && item.repeat_every_n > 0) {
+      ads.push({ item: item, index: idx });
+      if (everyN === 0 || item.repeat_every_n < everyN) everyN = item.repeat_every_n;
+    }
+  });
+  _adScheduler = {
+    broadcastAds: ads,
+    regularItems: [],
+    loopCount: 0,
+    playCountSinceAd: 0,
+    adRoundRobin: 0,
+    isFirstLoop: true,
+    everyN: everyN,
+    _pendingReturnIndex: -1
+  };
+  console.log('[AdScheduler] init: ads=' + ads.length + ', everyN=' + everyN);
+}
+
+// ★ 광고 스케줄러: every:N 모드에서 다음에 광고를 재생해야 하는지 확인
+// 반환: 재생할 광고의 playlist 인덱스, 또는 -1
+function _adSchedulerCheck() {
+  if (!_adScheduler.broadcastAds.length || _adScheduler.everyN < 1) return -1;
+  if (_adScheduler.isFirstLoop) return -1;
+  _adScheduler.playCountSinceAd++;
+  if (_adScheduler.playCountSinceAd >= _adScheduler.everyN) {
+    _adScheduler.playCountSinceAd = 0;
+    var adEntry = _adScheduler.broadcastAds[_adScheduler.adRoundRobin % _adScheduler.broadcastAds.length];
+    _adScheduler.adRoundRobin++;
+    console.log('[AdScheduler] every:' + _adScheduler.everyN + ' trigger → ad index:' + adEntry.index + ' "' + adEntry.item.title + '" (round:' + _adScheduler.adRoundRobin + ')');
+    return adEntry.index;
+  }
+  return -1;
+}
+
 // 다음 아이템으로 전환 (디졸브/크로스페이드)
 function goToNext() {
   // 중복 실행 방지 (transition 중 호출 무시)
@@ -2225,6 +2292,7 @@ function goToNext() {
   }
   isTransitioning = true;
   _transitionStartTime = Date.now(); // ★ 전환 시작 시각 기록
+  markMediaTransitionStart(); // ★ 전체화면 유지: iframe 전환 중 fullscreenchange 무시
   // ★ FIX: 전환 락 duration을 transition + 1000ms로 (최소 1500ms, 최대 3초)
   // 기존 최소 800ms는 너무 짧아서 Vimeo 프레임 렌더링 전에 해제될 수 있음
   const transitionLockDuration = Math.min(Math.max(transitionDuration + 1000 || 1500, 1500), 3000);
@@ -2256,7 +2324,35 @@ function goToNext() {
   hideSubtitle();
   
   const prevIndex = currentIndex;
-  const nextIndex = (currentIndex + 1) % playlist.items.length;
+  let nextIndex = (currentIndex + 1) % playlist.items.length;
+  
+  // ★ 루프 완료 감지 (nextIndex가 0으로 돌아가면)
+  if (nextIndex === 0 && _adScheduler.broadcastAds.length > 0 && _adScheduler.isFirstLoop) {
+    _adScheduler.loopCount++;
+    _adScheduler.isFirstLoop = false;
+    _adScheduler.playCountSinceAd = 0;
+    _adScheduler.adRoundRobin = 0;
+    console.log('[AdScheduler] 1st loop complete → every:' + _adScheduler.everyN + ' mode ON');
+  }
+  
+  // ★ every:N 광고 체크: 현재 아이템이 일반 영상이면 카운트, N에 도달하면 광고 인덱스로 점프
+  const curItem = playlist.items[currentIndex];
+  if (!_adScheduler.isFirstLoop && _adScheduler.everyN > 0 && curItem && !curItem.is_broadcast) {
+    const adIdx = _adSchedulerCheck();
+    if (adIdx >= 0 && adIdx !== nextIndex) {
+      // 광고를 먼저 재생하고, 광고 종료 후 원래 nextIndex로 복귀하기 위해 기록
+      _adScheduler._pendingReturnIndex = nextIndex;
+      nextIndex = adIdx;
+      console.log('[AdScheduler] redirecting to ad at index:' + adIdx + ', will return to:' + _adScheduler._pendingReturnIndex);
+    }
+  }
+  // ★ 광고 재생 후 원래 위치로 복귀
+  if (curItem && curItem.is_broadcast && _adScheduler._pendingReturnIndex >= 0) {
+    nextIndex = _adScheduler._pendingReturnIndex;
+    _adScheduler._pendingReturnIndex = -1;
+    console.log('[AdScheduler] ad finished, returning to index:' + nextIndex);
+  }
+  
   const nextItem = playlist.items[nextIndex];
   
   // 안전 체크: nextItem이 없으면 대기 화면 표시
@@ -2559,6 +2655,7 @@ function createNewVimeoForTransition(prevIndex, nextIndex, item, videoId, thisSe
     const startTransitionIfNeeded = () => {
       if (transitionStarted) return;
       transitionStarted = true;
+      markMediaTransitionEnd(); // ★ 전체화면 유지: 전환 완료 신호
       // ★ 새 영상이 시작되면 부드러운 페이드인 (0.5초)
       newDiv.style.opacity = '1';
       // ★★ 핵심: doTransition보다 페이드인을 먼저 시작
@@ -2766,6 +2863,22 @@ let userHasInteracted = false; // 사용자 상호작용 여부
 let fullscreenRestoreTimer = null; // 전체화면 복원 타이머
 let _lastFullscreenRestoreTime = 0; // 마지막 복원 시도 시각 (디바운스용)
 let _fullscreenLostCount = 0; // 연속 전체화면 이탈 횟수 (빈도 추적용)
+let _isMediaTransitioning = false; // ★ 미디어 전환 중 플래그 (iframe 파괴/생성 시)
+let _mediaTransitionTimer = null; // 전환 타이머
+let _fullscreenLostResetTimer = null; // 이탈 카운터 리셋 타이머
+
+// ★ 미디어 전환 시작 표시 (Vimeo iframe 파괴/생성으로 인한 fullscreenchange 무시용)
+function markMediaTransitionStart() {
+  _isMediaTransitioning = true;
+  if (_mediaTransitionTimer) clearTimeout(_mediaTransitionTimer);
+  _mediaTransitionTimer = setTimeout(() => { _isMediaTransitioning = false; }, 3000);
+}
+
+// ★ 미디어 전환 종료 표시
+function markMediaTransitionEnd() {
+  if (_mediaTransitionTimer) clearTimeout(_mediaTransitionTimer);
+  _mediaTransitionTimer = setTimeout(() => { _isMediaTransitioning = false; }, 500);
+}
 
 function updateFullscreenState() {
   if (document.fullscreenElement) {
@@ -2787,31 +2900,49 @@ function updateFullscreenState() {
     document.body.classList.add('not-fullscreen');
     document.body.classList.remove('mouse-active');
     
-    // ★★ 노트북 안정성 수정: 전체화면 복원을 매우 보수적으로 변경
-    // Vimeo iframe 생성/파괴 시 fullscreenchange 이벤트가 발생하는데,
-    // 이때 즉시 requestFullscreen()을 호출하면 iframe 렌더링 방해 → 멈춤
+    // ★★ 전체화면 복원 로직 (노트북 안정성 개선)
     if (shouldBeFullscreen && userHasInteracted) {
+      
+      // ★★ 미디어 전환 중이면 iframe 파괴/생성으로 인한 이벤트 → 이탈 카운터 증가 안 함
+      if (_isMediaTransitioning) {
+        console.log('[fullscreen] Lost during media transition, restoring...');
+        if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
+        // 전환 중에는 짧은 대기 후 복원 (iframe 안정화 후)
+        fullscreenRestoreTimer = setTimeout(() => {
+          if (!document.fullscreenElement && shouldBeFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }, 800);
+        return;
+      }
+      
       _fullscreenLostCount++;
       
-      // ★★ 디바운스 2초: iframe 조작 중 연쇄 fullscreenchange 무시
+      // ★★ 디바운스 1초: 연쇄 fullscreenchange 무시
       const now = Date.now();
-      if (now - _lastFullscreenRestoreTime < 2000) return;
+      if (now - _lastFullscreenRestoreTime < 1000) return;
       _lastFullscreenRestoreTime = now;
       
-      // ★★ 3회 이상 연속 이탈이면 사용자가 의도적으로 나간 것으로 간주
-      if (_fullscreenLostCount > 3) {
-        console.log('[fullscreen] Lost', _fullscreenLostCount, 'times, user likely exited intentionally');
+      // ★★ 사용자 의도 감지: 2초 내에 3회 이상 ESC를 누르면 의도적 종료로 간주
+      // (미디어 전환 중 이탈은 카운터에 포함되지 않으므로 정확한 감지 가능)
+      if (_fullscreenLostCount >= 3) {
+        console.log('[fullscreen] User exited', _fullscreenLostCount, 'times, respecting user intent');
+        shouldBeFullscreen = false;
         return;
       }
       
       console.log('[fullscreen] Lost, restore attempt #' + _fullscreenLostCount);
+      
+      // ★★ 30초 후 이탈 카운터 리셋 (시간이 지나면 의도적 종료가 아닌 것으로 간주)
+      if (_fullscreenLostResetTimer) clearTimeout(_fullscreenLostResetTimer);
+      _fullscreenLostResetTimer = setTimeout(() => { _fullscreenLostCount = 0; }, 30000);
       
       if (fullscreenRestoreTimer) clearTimeout(fullscreenRestoreTimer);
       // ★★ 1초 대기 후 복원 (iframe 렌더링이 안정된 후)
       fullscreenRestoreTimer = setTimeout(() => {
         if (!document.fullscreenElement && shouldBeFullscreen) {
           document.documentElement.requestFullscreen().catch(() => {
-            // 실패해도 재시도 안 함 - CSS 의사 전체화면이 이미 동작 중
+            // 실패해도 CSS 의사 전체화면이 이미 동작 중
           });
         }
       }, 1000);
@@ -2866,6 +2997,7 @@ function ensureFullscreen() {
 function enterFullscreen() {
   shouldBeFullscreen = true;
   userHasInteracted = true;
+  _fullscreenLostCount = 0; // ★ 사용자가 클릭으로 전체화면 진입 → 카운터 리셋
   // ★ 전체화면 진입 시 힌트 즉시 숨기기
   const hint = document.getElementById('fullscreen-hint');
   if (hint) hint.style.display = '';

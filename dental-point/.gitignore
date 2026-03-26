@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Wrangler local state
+.wrangler/
+
+# Environment
+.env
+.dev.vars
+
+# PM2
+.pm2/
+ecosystem.config.cjs
+
+# Logs
+*.log
+pids/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Bridge logs
+bridge/*.log
+
+# Backup
+*.tar.gz
+*.zip
+*.bak
