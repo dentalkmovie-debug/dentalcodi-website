@@ -667,7 +667,26 @@ app.post('/api/auth/imweb-match', async (c) => {
     ).bind('[MATCH-REQ] ' + JSON.stringify({ imweb_member_id, imweb_name, imweb_email, imweb_clinic_name, imweb_phone, previous_id })).run()
   } catch(e) {}
   
-  if (!imweb_member_id) return c.json({ error: '아임웹 회원 ID가 필요합니다.' }, 400)
+  // ★ v5.10.16: imweb_member_id가 없어도 이메일이 있으면 이메일 전용 매칭 허용
+  // (SDK 미로드 시 이메일만으로 재인증하는 _bgReauth 케이스)
+  if (!imweb_member_id && !imweb_email) return c.json({ error: '아임웹 회원 ID 또는 이메일이 필요합니다.' }, 400)
+  if (!imweb_member_id && imweb_email) {
+    // 이메일 전용 매칭: DB에서 해당 이메일을 가진 승인된 계정 조회
+    const byEmailOnly = await c.env.DB.prepare(
+      "SELECT m.*, ca.clinic_id FROM members m LEFT JOIN clinic_admins ca ON ca.member_id = m.id WHERE m.email = ? AND m.status = 'approved' AND m.role IN ('clinic_admin','super_admin') ORDER BY m.created_at ASC LIMIT 1"
+    ).bind(imweb_email).first() as any
+    if (byEmailOnly) {
+      // 해당 계정에 연결된 클리닉 조회
+      const clinicRow = byEmailOnly.clinic_id ? await c.env.DB.prepare('SELECT * FROM clinics WHERE id = ?').bind(byEmailOnly.clinic_id).first() : null
+      const token = createToken(byEmailOnly)
+      const clinics = clinicRow ? [clinicRow] : []
+      _logEntry.steps.push({ step: 'email-only-match', id: byEmailOnly.id, name: byEmailOnly.name })
+      return c.json({ matched: true, token, member: byEmailOnly, clinics, clinic: clinicRow || null })
+    } else {
+      _logEntry.steps.push({ step: 'email-only-no-match', email: imweb_email })
+      return c.json({ matched: false, need_name: true, error: '등록된 계정을 찾을 수 없습니다.' })
+    }
+  }
 
   // ★★★ v5.10.15: mno_ 접두사(member_no) → 아임웹 API로 실제 member_code 조회 ★★★
   // 위젯에서 sdk_jwt가 없을 때 member_no(숫자)를 'mno_12345' 형태로 전송함

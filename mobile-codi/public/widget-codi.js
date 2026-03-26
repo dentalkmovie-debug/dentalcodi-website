@@ -288,14 +288,22 @@
   function tryAuth() {
     try{authToken=localStorage.getItem('dpt_admin_token')||'';authMember=JSON.parse(localStorage.getItem('dpt_admin_member')||'null');var clinics=JSON.parse(localStorage.getItem('dpt_admin_clinics')||'[]');var saved=localStorage.getItem('dpt_admin_current_clinic');currentClinic=saved?JSON.parse(saved):(clinics[0]||null);}catch(e){}
     if(authToken&&authMember&&currentClinic){
-      /* ★ v5.10.14: SDK가 즉시 응답하면 member_id 비교로 계정 불일치 차단 */
-      /* SDK가 아직 안 로드됐을 수 있으므로 즉시 렌더 후 _bgReauth에서 최종 검증 */
+      /* ★ v5.10.16: 이메일 비교 우선 - SDK 로드 여부 무관하게 계정 불일치 감지 */
+      /* __bs_imweb 쿠키는 SDK보다 먼저 읽힘 → 이메일로 신뢰도 높은 비교 가능 */
+      var curEmail=getLoginEmail();
+      var cachedEmail=(authMember&&authMember.email)||'';
+      if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
+        dlog('계정 불일치(이메일) - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
+        _clearAuthCache();
+      }
+    }
+    if(authToken&&authMember&&currentClinic){
+      /* member_id 비교 (SDK 로드됐을 때 추가 검증) */
       var curMidImmediate=getMemberId();
       var cachedMid=(authMember&&authMember.imweb_member_id)||localStorage.getItem('dpt_imweb_id')||'';
       if(curMidImmediate&&!curMidImmediate.startsWith('site_')&&cachedMid&&cachedMid!==curMidImmediate){
-        dlog('계정 불일치(즉시감지) - 캐시 무효화: cached='+cachedMid+' cur='+curMidImmediate);
+        dlog('계정 불일치(ID) - 캐시 무효화: cached='+cachedMid+' cur='+curMidImmediate);
         _clearAuthCache();
-        /* 캐시 무효화 후 아래 SDK 폴링 흐름으로 진행 */
       }
     }
     if(authToken&&authMember&&currentClinic){
@@ -315,20 +323,50 @@
   /* ===== 백그라운드 재인증 (즉시렌더 후 토큰 갱신) ===== */
   function _bgReauth() {
     var mid = getMemberId();
-    /* ★ v5.10.14: SDK에서 member_id를 즉시 읽을 수 있으면 캐시 계정과 비교 */
+    var curEmail = getLoginEmail();
+    /* ★ v5.10.16: 이메일로 계정 불일치 감지 (SDK 미로드 시에도 작동) */
+    var cachedEmail=(authMember&&authMember.email)||'';
+    if(curEmail&&cachedEmail&&curEmail!==cachedEmail){
+      dlog('_bgReauth: 이메일 불일치 - 캐시 무효화: cached='+cachedEmail+' cur='+curEmail);
+      _clearAuthCache();
+      var ln=getLoginName();
+      /* mid 없으면 이메일만으로 매칭 시도 */
+      if(!mid||mid.startsWith('site_'))mid='';
+      doMatch(mid,ln);
+      return;
+    }
+    /* SDK ID 기반 불일치 감지 */
     if(mid&&!mid.startsWith('site_')){
       var cachedMid=(authMember&&authMember.imweb_member_id)||'';
       if(cachedMid&&cachedMid!==mid){
-        dlog('_bgReauth: 계정 불일치 - 캐시 무효화 후 신규 매칭: cached='+cachedMid+' sdk='+mid);
+        dlog('_bgReauth: ID 불일치 - 캐시 무효화 후 신규 매칭: cached='+cachedMid+' sdk='+mid);
         _clearAuthCache();
-        /* 현재 계정으로 즉시 doMatch 진행 */
         var ln=getLoginName();
         doMatch(mid,ln);
         return;
       }
     }
-    if (!mid) { try { mid = localStorage.getItem('dpt_imweb_id') || ''; } catch(e) {} }
-    if (!mid) return; /* SDK 없으면 스킵 - 캐시된 세션으로 유지 */
+    /* ★ v5.10.16: SDK 미로드 시 localStorage 이전 ID 재사용 금지 */
+    /* mid가 빈값이면 현재 로그인 이메일로만 재인증 */
+    if (!mid) {
+      if(curEmail){
+        dlog('_bgReauth: SDK 미로드, 이메일로 재인증: '+curEmail);
+        var ln=getLoginName()||'';
+        var body={imweb_member_id:'',imweb_name:ln,imweb_email:curEmail,imweb_group:getLoginGroup()||'',imweb_phone:'',imweb_clinic_name:'',imweb_clinic_phone:'',imweb_clinic_addr:''};
+        fetch(API+'/api/auth/imweb-match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d.matched&&d.token){
+            var prevId=authMember&&authMember.id;var prevCid=currentClinic&&currentClinic.id;
+            authToken=d.token;if(d.member)authMember=d.member;var cls=d.clinics||[];if(cls.length)currentClinic=cls[0];
+            try{localStorage.setItem('dpt_admin_token',d.token);localStorage.setItem('dpt_admin_member',JSON.stringify(authMember));localStorage.setItem('dpt_admin_clinics',JSON.stringify(cls));if(currentClinic)localStorage.setItem('dpt_admin_current_clinic',JSON.stringify(currentClinic));}catch(e){}
+            if((authMember&&authMember.id)!==prevId||(currentClinic&&currentClinic.id)!==prevCid){dlog('이메일 재인증 성공 - renderApp 재호출');renderApp();}
+          }
+        }).catch(function(e){dlog('이메일재인증오류:'+e.message);});
+        return;
+      }
+      return; /* 이메일도 없으면 스킵 */
+    }
     var ln = getLoginName() || (authMember && authMember.name) || '';
     var le = getLoginEmail() || '';
     var lg = getLoginGroup() || '';
