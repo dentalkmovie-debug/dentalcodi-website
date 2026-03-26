@@ -103,7 +103,7 @@ app.use('/api/sync/*', authMiddleware)
 
 // ==================== Health ====================
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', version: '5.10.20', timestamp: new Date().toISOString() })
+  return c.json({ status: 'ok', version: '5.10.21', timestamp: new Date().toISOString() })
 })
 
 // ==================== DB Init ====================
@@ -315,6 +315,22 @@ async function ensureSchema(db: D1Database) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`)
   ]).catch(() => {})
+
+  // ★ 동시접속 차단 테이블 (v5.10.21+)
+  // imweb-login-blocker 기능을 dental-point 서버에 통합
+  await db.prepare(`CREATE TABLE IF NOT EXISTS active_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    session_token TEXT NOT NULL UNIQUE,
+    ip_addr TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+  )`).run().catch(() => {})
+  await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_active_sessions_member ON active_sessions(member_id)").run().catch(() => {})
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_active_sessions_token ON active_sessions(session_token)").run().catch(() => {})
 }
 
 // Simple in-memory cache for Worker isolate
@@ -531,6 +547,89 @@ app.post('/api/auth/login', async (c) => {
     member: { id: member.id, name: member.name, phone: member.phone, email: member.email, role: member.role, imweb_member_id: (member as any).imweb_member_id || "" },
     clinics: clinicList
   })
+})
+
+// ==================== 동시접속 차단 API (v5.10.21) ====================
+// 원래 imweb-login-blocker.pages.dev 에서 제공하던 기능을 dental-point에 통합
+// 위젯 v24 시리즈가 이 API를 통해 중복 로그인을 감지하고 차단함
+
+// POST /api/session/register - 로그인 시 세션 등록 (기존 세션 kick)
+app.post('/api/session/register', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { member_id, device_id, session_token, ip_addr, user_agent } = body
+    if (!member_id || !device_id || !session_token) {
+      return c.json({ error: 'member_id, device_id, session_token 필요' }, 400)
+    }
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24시간
+    // 기존 세션 삭제 후 새 세션 등록 (한 계정 = 한 기기만 허용)
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE member_id = ?").bind(member_id).run()
+    await c.env.DB.prepare(
+      "INSERT INTO active_sessions (member_id, device_id, session_token, ip_addr, user_agent, created_at, last_seen, expires_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)"
+    ).bind(member_id, device_id, session_token, ip_addr || '', user_agent || '', expiresAt).run()
+    return c.json({ ok: true, expires_at: expiresAt })
+  } catch(e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// POST /api/session/check - 세션 유효성 확인 (같은 기기인지 확인)
+app.post('/api/session/check', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { member_id, device_id, session_token } = body
+    if (!member_id || !device_id) {
+      return c.json({ valid: false, reason: 'missing_params' })
+    }
+    // 만료된 세션 정리
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE expires_at < datetime('now')").run().catch(() => {})
+    const session = await c.env.DB.prepare(
+      "SELECT * FROM active_sessions WHERE member_id = ?"
+    ).bind(member_id).first() as any
+    if (!session) {
+      return c.json({ valid: false, reason: 'no_session' })
+    }
+    // 동일 기기 확인
+    if (session.device_id !== device_id) {
+      return c.json({ valid: false, reason: 'kicked', kicked_by_device: true, registered_device: session.device_id.slice(0, 8) + '...' })
+    }
+    // session_token 확인 (제공된 경우)
+    if (session_token && session.session_token !== session_token) {
+      return c.json({ valid: false, reason: 'token_mismatch' })
+    }
+    // last_seen 갱신
+    await c.env.DB.prepare("UPDATE active_sessions SET last_seen = datetime('now') WHERE member_id = ?").bind(member_id).run().catch(() => {})
+    return c.json({ valid: true, device_id: session.device_id, last_seen: session.last_seen })
+  } catch(e: any) {
+    return c.json({ error: e.message, valid: true }, 500) // 오류 시 차단하지 않음 (서비스 연속성)
+  }
+})
+
+// POST /api/session/kick - 특정 회원의 세션 강제 종료 (관리자용)
+app.post('/api/session/kick', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { member_id } = body
+    if (!member_id) return c.json({ error: 'member_id 필요' }, 400)
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE member_id = ?").bind(member_id).run()
+    return c.json({ ok: true, kicked: member_id })
+  } catch(e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// GET /api/session/status/:member_id - 세션 현황 조회 (디버그용)
+app.get('/api/session/status/:member_id', async (c) => {
+  try {
+    const member_id = c.req.param('member_id')
+    const session = await c.env.DB.prepare(
+      "SELECT member_id, device_id, created_at, last_seen, expires_at FROM active_sessions WHERE member_id = ?"
+    ).bind(member_id).first()
+    if (!session) return c.json({ active: false })
+    return c.json({ active: true, session })
+  } catch(e: any) {
+    return c.json({ error: e.message }, 500)
+  }
 })
 
 // Imweb match - creates or matches a member from Imweb widget
