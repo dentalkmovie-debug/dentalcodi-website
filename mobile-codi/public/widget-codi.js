@@ -254,12 +254,21 @@
 
   /* ===== localStorage API 캐시 복원/저장 ===== */
   /* ★ v5.10.20: imweb-members는 항상 실시간 조회 - localStorage 캐시에서 제외 */
+  var _CACHE_VER = 'v5.10.20'; /* 버전 변경 시 기존 캐시 전체 무효화 */
   var _NO_PERSIST_KEYS = ['/codi/admin/imweb-members', '/imweb/members'];
   function _isNoPersist(k) {
     return _NO_PERSIST_KEYS.some(function(p) { return k.indexOf(p) !== -1; });
   }
   function _restoreApiCache() {
     try {
+      /* ★ 캐시 버전 체크: 버전이 다르면 기존 캐시 전체 삭제 (imweb-members 20개 캐시 강제 제거) */
+      var storedVer = localStorage.getItem('codi_cache_ver');
+      if (storedVer !== _CACHE_VER) {
+        localStorage.removeItem('codi_api_cache');
+        localStorage.setItem('codi_cache_ver', _CACHE_VER);
+        dlog('캐시 버전 변경(' + storedVer + '→' + _CACHE_VER + ') - 기존 캐시 초기화');
+        return;
+      }
       var raw = localStorage.getItem('codi_api_cache');
       if (!raw) return;
       var saved = JSON.parse(raw);
@@ -280,6 +289,7 @@
         if (_apiCache[k] && _apiCache[k].data) toSave[k] = _apiCache[k].data;
       });
       localStorage.setItem('codi_api_cache', JSON.stringify(toSave));
+      localStorage.setItem('codi_cache_ver', _CACHE_VER);
     } catch(e) {}
   }
 
