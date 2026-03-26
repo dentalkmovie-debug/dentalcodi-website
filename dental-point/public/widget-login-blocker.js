@@ -399,10 +399,20 @@
     doLogin(uid, did, false);
   }
 
-  /* IMWEB_DEPLOY_STRATEGY 이벤트 → 재시도 */
+  /* IMWEB_DEPLOY_STRATEGY 이벤트 → 재시도
+     DVUE가 이 이벤트 발생 후 __bs_imweb 세팅하므로 충분히 기다림 */
   window.addEventListener('IMWEB_DEPLOY_STRATEGY', function () {
-    console.log('[LB] IMWEB_DEPLOY_STRATEGY 감지');
-    if (!_started) { _pollN = 0; setTimeout(tryStart, 300); }
+    console.log('[LB] IMWEB_DEPLOY_STRATEGY 감지 → 2초 후 재시도');
+    if (!_started) {
+      _pollN = 0;
+      /* 500ms, 1s, 2s, 3s, 5s 순서로 여러 번 재시도 */
+      var delays = [500, 1000, 2000, 3000, 5000];
+      for (var di = 0; di < delays.length; di++) {
+        (function (delay) {
+          setTimeout(function () { if (!_started) { tryStart(); } }, delay);
+        }(delays[di]));
+      }
+    }
   });
 
   /* SPA / 계정변경 감지 */
@@ -429,11 +439,16 @@
     }
   }, 1500);
 
-  /* 진입 */
+  /* 진입 — 1.5초, 3초, 6초 세 번 시도 (DVUE 로드 타이밍 커버) */
+  function _initTry(delay) {
+    setTimeout(function () { if (!_started) { tryStart(); } }, delay);
+  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(tryStart, 1500); });
+    document.addEventListener('DOMContentLoaded', function () {
+      _initTry(1500); _initTry(3000); _initTry(6000);
+    });
   } else {
-    setTimeout(tryStart, 1500);
+    _initTry(1500); _initTry(3000); _initTry(6000);
   }
 
   /* ── 디버그 API ── */
