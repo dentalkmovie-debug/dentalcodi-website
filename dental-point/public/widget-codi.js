@@ -254,7 +254,7 @@
 
   /* ===== localStorage API 캐시 복원/저장 ===== */
   /* ★ v5.10.20: imweb-members는 항상 실시간 조회 - localStorage 캐시에서 제외 */
-  var _CACHE_VER = 'v5.10.21'; /* 버전 변경 시 기존 캐시 전체 무효화 */
+  var _CACHE_VER = 'v5.10.22'; /* 버전 변경 시 기존 캐시 전체 무효화 */
   var _NO_PERSIST_KEYS = ['/codi/admin/imweb-members', '/imweb/members'];
   function _isNoPersist(k) {
     return _NO_PERSIST_KEYS.some(function(p) { return k.indexOf(p) !== -1; });
@@ -458,13 +458,20 @@
       +'<div id="codi-nav" style="background:#fff;border-bottom:1px solid #e5e7eb;padding:0 8px;overflow-x:auto;white-space:nowrap"></div>'
       +'<div id="codi-pg" style="background:#f9fafb;padding:16px;border-radius:0 0 12px 12px;min-height:400px;border:1px solid #e5e7eb;border-top:none"></div></div>';
     var tabs=[['patients','오늘 환자'],['links','링크 관리'],['history','전송 기록'],['settings','설정']];
-    if (authMember && authMember.role === 'super_admin') tabs.push(['admin','관리']);
+    if (authMember && authMember.role === 'super_admin') tabs.push(['admin','관리',true]); /* ★ true = 마스터 전용 탭 */
     var nav=document.getElementById('codi-nav');
     tabs.forEach(function(t){
       var b=document.createElement('button');
-      b.className='codi-nb';b.setAttribute('data-p',t[0]);
-      b.style.cssText='display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap';
-      b.textContent=t[1];
+      var isMaster = t[2] === true;
+      b.className='codi-nb';b.setAttribute('data-p',t[0]);if(isMaster)b.setAttribute('data-master','1');
+      if (isMaster) {
+        /* ★ 마스터 탭: 쿠폰 템플릿과 동일한 구분 스타일 - 보라색 M 뱃지 + 보라색 텍스트 */
+        b.style.cssText='display:inline-flex;align-items:center;gap:5px;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#7c3aed;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap';
+        b.innerHTML='<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;background:#7c3aed;color:#fff;border-radius:50%;font-size:10px;font-weight:700;flex-shrink:0">M</span>'+t[1];
+      } else {
+        b.style.cssText='display:inline-block;padding:11px 14px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap';
+        b.textContent=t[1];
+      }
       b.addEventListener('click',function(){currentPage=t[0];renderPage();});
       nav.appendChild(b);
     });
@@ -493,7 +500,7 @@
     renderPage();
   }
 
-  function updNav(){document.querySelectorAll('.codi-nb').forEach(function(b){var a=b.getAttribute('data-p')===currentPage;b.style.color=a?'#2563eb':'#6b7280';b.style.fontWeight=a?'700':'500';b.style.borderBottomColor=a?'#2563eb':'transparent';});}
+  function updNav(){document.querySelectorAll('.codi-nb').forEach(function(b){var a=b.getAttribute('data-p')===currentPage;var isMaster=b.getAttribute('data-master')==='1';if(isMaster){b.style.color=a?'#5b21b6':'#7c3aed';b.style.fontWeight=a?'700':'500';b.style.borderBottomColor=a?'#7c3aed':'transparent';}else{b.style.color=a?'#2563eb':'#6b7280';b.style.fontWeight=a?'700':'500';b.style.borderBottomColor=a?'#2563eb':'transparent';}});}
 
   function renderPage(){updNav();var pg=document.getElementById('codi-pg');if(!pg)return;var prevH=pg.offsetHeight;if(prevH>0)pg.style.minHeight=prevH+'px';({patients:pgPatients,links:pgLinks,history:pgHistory,settings:pgSettings,admin:pgAdmin}[currentPage]||pgPatients)(pg);setTimeout(function(){pg.style.minHeight='400px';},50);}
 
