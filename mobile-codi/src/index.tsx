@@ -549,6 +549,75 @@ app.post('/api/auth/login', async (c) => {
 })
 
 // ==================== 동시접속 차단 API (v5.10.21) ====================
+// 위젯 v24.12 정확한 API 구조 호환:
+//   POST /api/login          { userId, deviceId, force } → { success, token, code:'OCCUPIED' }
+//   GET  /api/protected-data Bearer 토큰 검증            → 200 / 401 / 403
+//   POST /api/logout         { userId, deviceId }        → { success }
+
+app.post('/api/login', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { userId, deviceId, force } = body
+    if (!userId || !deviceId) {
+      return c.json({ success: false, error: 'userId, deviceId 필요' }, 400)
+    }
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE expires_at < datetime('now')").run().catch(() => {})
+    const existing = await c.env.DB.prepare(
+      "SELECT * FROM active_sessions WHERE member_id = ?"
+    ).bind(userId).first() as any
+
+    if (existing && existing.device_id !== deviceId && !force) {
+      return c.json({ success: false, code: 'OCCUPIED', message: '다른 기기에서 이미 로그인 중입니다.' })
+    }
+
+    const token = 'sso_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE member_id = ?").bind(userId).run()
+    await c.env.DB.prepare(
+      "INSERT INTO active_sessions (member_id, device_id, session_token, ip_addr, user_agent, created_at, last_seen, expires_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)"
+    ).bind(userId, deviceId, token, c.req.header('cf-connecting-ip') || '', c.req.header('user-agent') || '', expiresAt).run()
+    return c.json({ success: true, token, message: force ? '강제 로그인 성공' : '로그인 성공' })
+  } catch(e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.get('/api/protected-data', async (c) => {
+  try {
+    const authHeader = c.req.header('authorization') || ''
+    const token = authHeader.replace('Bearer ', '').trim()
+    const userId = c.req.header('x-user-id') || ''
+    const deviceId = c.req.header('x-device-id') || ''
+    if (!token || !userId) return c.json({ error: '인증 필요' }, 401)
+
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE expires_at < datetime('now')").run().catch(() => {})
+    const session = await c.env.DB.prepare(
+      "SELECT * FROM active_sessions WHERE member_id = ?"
+    ).bind(userId).first() as any
+
+    if (!session) return c.json({ error: '세션 없음' }, 401)
+    if (session.session_token !== token) return c.json({ error: 'kicked', code: 'KICKED' }, 403)
+    if (deviceId && session.device_id !== deviceId) return c.json({ error: 'kicked', code: 'KICKED' }, 403)
+
+    await c.env.DB.prepare("UPDATE active_sessions SET last_seen = datetime('now') WHERE member_id = ?").bind(userId).run().catch(() => {})
+    return c.json({ ok: true, userId, last_seen: session.last_seen })
+  } catch(e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+app.post('/api/logout', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const userId = body.userId || c.req.header('x-user-id') || ''
+    if (!userId) return c.json({ success: false, error: 'userId 필요' }, 400)
+    await c.env.DB.prepare("DELETE FROM active_sessions WHERE member_id = ?").bind(userId).run()
+    return c.json({ success: true })
+  } catch(e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
 // POST /api/session/register - 로그인 시 세션 등록 (기존 세션 kick)
 app.post('/api/session/register', async (c) => {
   try {
