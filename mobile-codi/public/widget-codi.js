@@ -254,7 +254,7 @@
 
   /* ===== localStorage API 캐시 복원/저장 ===== */
   /* ★ v5.10.20: imweb-members는 항상 실시간 조회 - localStorage 캐시에서 제외 */
-  var _CACHE_VER = 'v5.10.20'; /* 버전 변경 시 기존 캐시 전체 무효화 */
+  var _CACHE_VER = 'v5.10.21'; /* 버전 변경 시 기존 캐시 전체 무효화 */
   var _NO_PERSIST_KEYS = ['/codi/admin/imweb-members', '/imweb/members'];
   function _isNoPersist(k) {
     return _NO_PERSIST_KEYS.some(function(p) { return k.indexOf(p) !== -1; });
@@ -1323,7 +1323,12 @@
           adminDirectMembers = res[0].direct_members || [];
         }
         var imMembers = (res[1] && res[1].members) || [];
-        dlog('imweb members loaded: ' + imMembers.length + ' (source:' + (res[1] && res[1].source || 'unknown') + ')');
+        /* ★ v5.10.21: 위젯 레벨 필터 - 실제 아임웹 ID(m202...)만 표시, 테스트 계정 제외 */
+        imMembers = imMembers.filter(function(m) {
+          var mid = m.imweb_member_id || m.member_code || '';
+          return mid && String(mid).indexOf('m202') === 0;
+        });
+        dlog('imweb members loaded: ' + imMembers.length + ' (source:' + (res[1] && res[1].source || 'unknown') + ') [filtered to real m202* accounts]');
         renderPushUI(body, imMembers);
       }).catch(function(err) {
         dlog('admin push load error: ' + err.message);
@@ -1738,7 +1743,12 @@
       ]).then(function(results) {
         var tpls = (results[0] && results[0].templates) || [];
         var imMembers = (results[1] && results[1].members) || [];
-        dlog('adminAll: templates=' + tpls.length + ', imMembers=' + imMembers.length);
+        /* ★ v5.10.21: 위젯 레벨 필터 - 실제 아임웹 ID(m202...)만 표시, 테스트 계정 제외 */
+        imMembers = imMembers.filter(function(m) {
+          var mid = m.imweb_member_id || m.member_code || '';
+          return mid && String(mid).indexOf('m202') === 0;
+        });
+        dlog('adminAll: templates=' + tpls.length + ', imMembers=' + imMembers.length + ' [filtered to real m202* accounts]');
 
         /* 공용 제외, clinic_id별 + clinic_name별 링크 맵 */
         var linkMap = {};
