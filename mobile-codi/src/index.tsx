@@ -540,6 +540,22 @@ app.get('/api/debug/match-logs', (c) => {
   return c.json({ logs: _matchLogs.slice(-50) })
 })
 
+// ★ D1 영구 로그 조회 (워커 재시작 후에도 확인 가능)
+app.get('/api/debug/db-logs', async (c) => {
+  try {
+    const rows = await c.env.DB.prepare(
+      "SELECT message, created_at FROM error_logs WHERE message LIKE '%MATCH-REQ%' ORDER BY created_at DESC LIMIT 30"
+    ).all()
+    const logs = (rows.results || []).map((r: any) => {
+      try {
+        const data = JSON.parse(r.message.replace('[MATCH-REQ] ', ''))
+        return { ts: r.created_at, id: data.imweb_member_id, email: data.imweb_email, name: data.imweb_name }
+      } catch { return { ts: r.created_at, raw: r.message.slice(0, 120) } }
+    })
+    return c.json({ logs })
+  } catch(e: any) { return c.json({ error: e.message }, 500) }
+})
+
 // ==================== 아임웹 API 연동 ====================
 // 아임웹 access token 캐시 (워커 인스턴스 내)
 let _imwebTokenCache: { token: string; expires: number } | null = null
@@ -847,8 +863,21 @@ app.post('/api/auth/imweb-match', async (c) => {
             _logEntry.steps.push({ step: 'B-multi-noname-first', id: member.id, name: member.name, count: usableCandidates.length })
           }
         } else {
-          // 닉네임이 있지만 매칭 실패 → 새 치과 계정 생성 필요
-          _logEntry.steps.push({ step: 'B-no-name-match', req_name: imweb_name, existing: candidates.map((c:any) => c.name) })
+          // ★★★ v5.10.19: imweb_member_id로 후보가 정확히 1개뿐이면 이름 불일치여도 그 계정 반환 ★★★
+          // 이유: 아임웹 사이트의 DOM에서 읽히는 이름(예: '강팀치과')이
+          //       회원 닉네임(예: '유피디자인')과 다를 수 있음 (사이트 타이틀 등 혼동)
+          // imweb_member_id가 동일 = 동일 아임웹 계정 → 안전하게 기존 계정 반환
+          if (validCandidates.length === 1) {
+            member = validCandidates[0]
+            _logEntry.steps.push({ step: 'B-single-id-fallback', req_name: imweb_name, matched_name: member.name, id: member.id })
+          } else if (validCandidates.length > 1) {
+            // 여러 후보: 이름 불일치 상태로 새 계정 생성 방지 → 첫 번째 후보 반환
+            member = validCandidates[0]
+            _logEntry.steps.push({ step: 'B-multi-id-fallback', req_name: imweb_name, matched_name: member.name, id: member.id, count: validCandidates.length })
+          } else {
+            // 유효 후보 없고 invalid 후보만 있음 → 새 치과 계정 생성 필요
+            _logEntry.steps.push({ step: 'B-no-name-match', req_name: imweb_name, existing: candidates.map((c:any) => c.name) })
+          }
         }
       }
     }
