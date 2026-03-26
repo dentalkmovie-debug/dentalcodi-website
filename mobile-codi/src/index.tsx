@@ -582,6 +582,7 @@ async function getImwebToken(key: string, secret: string): Promise<string | null
 }
 
 // GET /api/imweb/members - 아임웹 회원 목록 조회 (super_admin 전용)
+// ★ v5.10.20: 아임웹 API 성공 시 아임웹 실계정(17개)만 표시, DB-only 테스트 계정 제외
 app.get('/api/imweb/members', authMiddleware, async (c) => {
   const member = c.get('member')
   if (!member || member.role !== 'super_admin') return c.json({ error: '권한이 없습니다.' }, 403)
@@ -589,80 +590,64 @@ app.get('/api/imweb/members', authMiddleware, async (c) => {
   const key = c.env.IMWEB_KEY || '6e0afc05cea3b4966b5d937be58a97bbec5a157f77'
   const secret = c.env.IMWEB_SECRET || '9d7e63a446bdf2eb16a754'
   
+  // DB에서 등록된 회원 조회 (아임웹 API 실패 시 fallback)
+  const dbRows = await c.env.DB.prepare(
+    `SELECT m.id, m.name, m.email, m.imweb_member_id, m.imweb_group,
+            ca.clinic_id as admin_clinic_id, cl.name as clinic_name
+     FROM members m
+     LEFT JOIN clinic_admins ca ON ca.member_id = m.id
+     LEFT JOIN clinics cl ON cl.id = ca.clinic_id
+     WHERE m.imweb_member_id IS NOT NULL AND m.imweb_member_id != ''
+       AND m.imweb_member_id LIKE 'm202%'
+       AND m.status = 'approved'
+     ORDER BY m.created_at DESC`
+  ).all()
+  const dbMap: Record<string, any> = {}
+  for (const row of (dbRows.results || []) as any[]) {
+    dbMap[(row as any).imweb_member_id] = row
+  }
+
   const token = await getImwebToken(key, secret)
   if (!token) {
-    // 아임웹 API 인증 실패 시 DB에서 알려진 회원만 반환
-    const rows = await c.env.DB.prepare(
-      `SELECT m.id, m.name, m.email, m.imweb_member_id, m.imweb_group,
-              ca.clinic_id as admin_clinic_id, cl.name as clinic_name
-       FROM members m
-       LEFT JOIN clinic_admins ca ON ca.member_id = m.id
-       LEFT JOIN clinics cl ON cl.id = ca.clinic_id
-       WHERE m.imweb_member_id IS NOT NULL AND m.imweb_member_id != ''
-         AND m.status = 'approved'
-       ORDER BY m.created_at DESC`
-    ).all()
-    return c.json({ members: rows.results || [], source: 'db_only', imweb_api: false })
+    // 아임웹 API 인증 실패 시 DB에서 실제 아임웹 ID 계정만 반환 (m202... 형식)
+    return c.json({ members: dbRows.results || [], source: 'db_only', imweb_api: false })
   }
   
   try {
-    // 아임웹 회원 목록 전체 조회 (최대 200명)
+    // ★ 아임웹 API 실시간 조회 (실제 가입 회원 목록)
     const imwebResp = await fetch('https://api.imweb.me/v2/member/members?limit=200&offset=0', {
       headers: { 'access-token': token }
     })
     const imwebData: any = await imwebResp.json()
     const imwebMembers = imwebData.data?.list || []
     
-    // DB 회원과 아임웹 회원 매핑
-    const dbRows = await c.env.DB.prepare(
-      `SELECT m.*, ca.clinic_id as admin_clinic_id, cl.name as clinic_name
-       FROM members m
-       LEFT JOIN clinic_admins ca ON ca.member_id = m.id
-       LEFT JOIN clinics cl ON cl.id = ca.clinic_id
-       WHERE m.imweb_member_id IS NOT NULL AND m.imweb_member_id != ''
-         AND m.status = 'approved'`
-    ).all()
-    const dbMap: Record<string, any> = {}
-    for (const row of (dbRows.results || []) as any[]) {
-      dbMap[row.imweb_member_id] = row
-    }
-    
-    // 아임웹 회원 목록 기반으로 통합 목록 구성
-    const merged = imwebMembers.map((m: any) => {
+    // ★ 아임웹 실계정 기준으로만 목록 구성 (DB-only 테스트 계정 제외)
+    const merged: any[] = []
+    const seenCodes = new Set<string>()
+    for (const m of imwebMembers) {
       const code = m.member_code || m.uid
+      if (!code || seenCodes.has(code)) continue
+      seenCodes.add(code)
       const dbRow = dbMap[code]
-      return {
+      merged.push({
         imweb_member_id: code,
-        name: m.name || m.nick || dbRow?.name || '(미등록)',
+        name: dbRow?.name || m.name || m.nick || '(미등록)',
         email: m.email || dbRow?.email || '',
-        imweb_group: m.member_grade || '',
+        imweb_group: m.member_grade || dbRow?.imweb_group || '',
         admin_clinic_id: dbRow?.admin_clinic_id || null,
         clinic_name: dbRow?.clinic_name || null,
         registered: !!dbRow,
         join_time: m.join_time || '',
-      }
-    })
-    
-    // DB에만 있고 아임웹에 없는 회원도 포함 (삭제된 회원 등)
-    const imwebCodes = new Set(imwebMembers.map((m: any) => m.member_code || m.uid))
-    for (const row of (dbRows.results || []) as any[]) {
-      if (!imwebCodes.has(row.imweb_member_id)) {
-        merged.push({
-          imweb_member_id: row.imweb_member_id,
-          name: row.name,
-          email: row.email || '',
-          imweb_group: row.imweb_group || '',
-          admin_clinic_id: row.admin_clinic_id || null,
-          clinic_name: row.clinic_name || null,
-          registered: true,
-          join_time: '',
-        })
-      }
+      })
     }
+    
+    // ★ DB에만 있고 아임웹에 없는 회원은 포함하지 않음 (테스트/더미 계정 방지)
+    // (아임웹에서 탈퇴한 실계정도 목록에서 제외 - 실시간 동기화)
     
     return c.json({ members: merged, source: 'imweb_api', total: merged.length })
   } catch(e: any) {
-    return c.json({ error: 'imweb API error: ' + e.message }, 500)
+    // 아임웹 API 오류 시 DB fallback (m202... 형식 실계정만)
+    return c.json({ members: dbRows.results || [], source: 'db_fallback', imweb_api: false, error: (e as any).message })
   }
 })
 
@@ -4788,43 +4773,42 @@ app.get('/api/codi/admin/clinics', codiAdminAuth, async (c) => {
 })
 
 app.get('/api/codi/admin/imweb-members', codiAdminAuth, async (c) => {
-  // ★★★ v5.10.11: 아임웹 API 실시간 조회 우선, 실패 시 DB fallback
+  // ★ v5.10.20: 아임웹 API 실시간 조회 우선, 실패 시 DB fallback (m202... 실계정만)
   const key = c.env.IMWEB_KEY || '6e0afc05cea3b4966b5d937be58a97bbec5a157f77'
   const secret = c.env.IMWEB_SECRET || '9d7e63a446bdf2eb16a754'
   const token = await getImwebToken(key, secret)
   
-  // DB에서 등록된 회원 목록 조회 (기본)
+  // DB에서 실제 아임웹 ID(m202...) 계정만 조회 - 테스트 계정 제외
   const dbRows = await c.env.DB.prepare(
     `SELECT m.*, ca.clinic_id as admin_clinic_id, cl.name as clinic_name
      FROM members m
      LEFT JOIN clinic_admins ca ON ca.member_id = m.id
      LEFT JOIN clinics cl ON cl.id = ca.clinic_id
      WHERE m.imweb_member_id IS NOT NULL AND m.imweb_member_id != ''
+       AND m.imweb_member_id LIKE 'm202%'
        AND m.status = 'approved'
      ORDER BY m.name`
   ).all()
   const dbMembers = (dbRows.results || []) as any[]
+  const dbMap: Record<string, any> = {}
+  for (const row of dbMembers) {
+    if (row.imweb_member_id) dbMap[row.imweb_member_id] = row
+  }
   
   if (!token) {
-    // 아임웹 API 연동 불가 시 DB 기반 반환
+    // 아임웹 API 연동 불가 시 DB 기반 반환 (m202... 실계정만)
     return c.json({ members: dbMembers, source: 'db_only' })
   }
   
   try {
-    // 아임웹 API에서 전체 회원 목록 조회
+    // ★ 아임웹 API 실시간 조회
     const imwebResp = await fetch('https://api.imweb.me/v2/member/members?limit=200&offset=0', {
       headers: { 'access-token': token }
     })
     const imwebData: any = await imwebResp.json()
     const imwebMembers = imwebData.data?.list || []
     
-    // DB 회원 맵 (imweb_member_id → db 행)
-    const dbMap: Record<string, any> = {}
-    for (const row of dbMembers) {
-      if (row.imweb_member_id) dbMap[row.imweb_member_id] = row
-    }
-    
-    // 아임웹 회원 목록 기반 통합 (등록 여부 포함)
+    // ★ 아임웹 실계정만 표시 (DB-only 테스트 계정 제외)
     const merged: any[] = []
     const seenIds = new Set<string>()
     for (const m of imwebMembers) {
@@ -4845,28 +4829,13 @@ app.get('/api/codi/admin/imweb-members', codiAdminAuth, async (c) => {
         join_time: m.join_time || '',
       })
     }
-    // DB에만 있는 회원도 포함 (아임웹에서 삭제되었거나 아직 조회 안 된 회원)
-    for (const row of dbMembers) {
-      if (!seenIds.has(row.imweb_member_id)) {
-        merged.push({
-          id: row.id,
-          imweb_member_id: row.imweb_member_id,
-          name: row.name,
-          email: row.email || '',
-          imweb_group: row.imweb_group || '',
-          admin_clinic_id: row.admin_clinic_id || null,
-          clinic_name: row.clinic_name || null,
-          registered: true,
-          role: row.role || 'clinic_admin',
-          join_time: '',
-        })
-      }
-    }
+    // ★ DB에만 있는 계정은 포함하지 않음 (아임웹 실시간 조회 성공 시)
+    // (아임웹에 가입되지 않은 수동 등록 테스트 계정 제외)
     
     return c.json({ members: merged, source: 'imweb_api', total: merged.length })
   } catch(e: any) {
-    // 아임웹 API 오류 시 DB fallback
-    return c.json({ members: dbMembers, source: 'db_fallback', error: e.message })
+    // 아임웹 API 오류 시 DB fallback (m202... 실계정만)
+    return c.json({ members: dbMembers, source: 'db_fallback', error: (e as any).message })
   }
 })
 
