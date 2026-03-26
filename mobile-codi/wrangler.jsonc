@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dental-point",
+  "compatibility_date": "2026-03-14",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dental-point-production",
+      "database_id": "c5ced06c-d12d-4539-8703-37eb558eae9a"
+    }
+  ],
+  "vars": {
+    "IMWEB_KEY": "6e0afc05cea3b4966b5d937be58a97bbec5a157f77",
+    "IMWEB_SECRET": "9d7e63a446bdf2eb16a754"
+  }
+}

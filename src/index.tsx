@@ -1345,6 +1345,278 @@ app.post('/api/master/clinics/:adminCode/extend', async (c) => {
 })
 
 // ============================================
+// 영상 배포(Broadcast) API - 마스터 → 치과
+// ============================================
+
+// 테이블 자동 생성 (마이그레이션 대신 런타임 생성)
+async function ensureBroadcastTables(db: any) {
+  await db.prepare(`CREATE TABLE IF NOT EXISTS broadcasts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL, description TEXT,
+    item_type TEXT NOT NULL, url TEXT NOT NULL, thumbnail_url TEXT, display_time INTEGER DEFAULT 10,
+    target_mode TEXT NOT NULL DEFAULT 'all', target_user_ids TEXT DEFAULT '[]', target_playlist_type TEXT DEFAULT 'all',
+    insert_position TEXT DEFAULT 'end', repeat_every_n INTEGER DEFAULT 0, is_mandatory INTEGER DEFAULT 1, auto_expire_at DATETIME, priority INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active', created_by INTEGER NOT NULL,
+    created_at DATETIME DEFAULT (datetime('now')), updated_at DATETIME DEFAULT (datetime('now'))
+  )`).run()
+  await db.prepare(`CREATE TABLE IF NOT EXISTS broadcast_receipts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    broadcast_id INTEGER NOT NULL, user_id INTEGER NOT NULL, playlist_id INTEGER,
+    priority INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'auto_inserted', inserted_at DATETIME DEFAULT (datetime('now')),
+    UNIQUE(broadcast_id, user_id)
+  )`).run()
+  // 마이그레이션: 기존 테이블에 컬럼 추가
+  try { await db.prepare('ALTER TABLE broadcasts ADD COLUMN repeat_every_n INTEGER DEFAULT 0').run() } catch(e) {}
+  try { await db.prepare('ALTER TABLE broadcast_receipts ADD COLUMN priority INTEGER DEFAULT 0').run() } catch(e) {}
+}
+
+// 배포 목록 조회
+app.get('/api/master/broadcasts', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const broadcasts = await c.env.DB.prepare(`
+    SELECT b.*, 
+      (SELECT COUNT(*) FROM broadcast_receipts WHERE broadcast_id = b.id) as total_sent,
+      (SELECT COUNT(*) FROM broadcast_receipts WHERE broadcast_id = b.id AND status = 'auto_inserted') as total_inserted
+    FROM broadcasts b
+    ORDER BY b.created_at DESC
+  `).all()
+  return c.json({ broadcasts: broadcasts.results })
+})
+
+// 배포 생성 + 즉시 발송
+app.post('/api/master/broadcasts', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const masterUser = await c.env.DB.prepare('SELECT * FROM users WHERE is_master = 1').first()
+  if (!masterUser) return c.json({ error: '마스터 사용자가 없습니다.' }, 404)
+
+  const body = await c.req.json()
+  const { url, title, description, target_mode, target_user_ids, target_playlist_type, insert_position, repeat_every_n, auto_expire_days } = body
+
+  if (!url || !title) return c.json({ error: 'URL과 제목을 입력하세요.' }, 400)
+
+  // 영상 타입 + 썸네일 자동 추출
+  let itemType = 'vimeo'
+  let thumbnailUrl = ''
+  
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    itemType = 'youtube'
+    const ytMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+    if (ytMatch) thumbnailUrl = 'https://img.youtube.com/vi/' + ytMatch[1] + '/maxresdefault.jpg'
+  } else if (url.includes('vimeo.com')) {
+    itemType = 'vimeo'
+    try {
+      const oembedRes = await fetch('https://vimeo.com/api/oembed.json?url=' + encodeURIComponent(url))
+      if (oembedRes.ok) {
+        const oembedData = await oembedRes.json() as any
+        thumbnailUrl = oembedData.thumbnail_url || ''
+      }
+    } catch (e) { /* ignore */ }
+  } else if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url)) {
+    itemType = 'image'
+    thumbnailUrl = url
+  }
+
+  // 만료일 계산
+  let autoExpireAt = null
+  if (auto_expire_days && Number(auto_expire_days) > 0) {
+    const d = new Date()
+    d.setDate(d.getDate() + Number(auto_expire_days))
+    autoExpireAt = d.toISOString().slice(0, 19).replace('T', ' ')
+  }
+
+  // 배포 레코드 생성
+  const result = await c.env.DB.prepare(`
+    INSERT INTO broadcasts (title, description, item_type, url, thumbnail_url, target_mode, target_user_ids, target_playlist_type, insert_position, repeat_every_n, is_mandatory, auto_expire_at, priority, status, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 0, 'active', ?)
+  `).bind(
+    title, description || '', itemType, url, thumbnailUrl,
+    target_mode || 'all', JSON.stringify(target_user_ids || []),
+    target_playlist_type || 'all', insert_position || 'end',
+    Number(repeat_every_n) || 0,
+    autoExpireAt, masterUser.id
+  ).run()
+
+  const broadcastId = result.meta.last_row_id
+
+  // 대상 치과 결정 + 즉시 발송
+  let targetUsers: any[] = []
+  if (target_mode === 'selected' && target_user_ids && target_user_ids.length > 0) {
+    const placeholders = target_user_ids.map(() => '?').join(',')
+    const selected = await c.env.DB.prepare(
+      'SELECT id FROM users WHERE id IN (' + placeholders + ') AND (is_master = 0 OR is_master IS NULL)'
+    ).bind(...target_user_ids).all()
+    targetUsers = selected.results || []
+  } else {
+    // 전체 배포
+    const all = await c.env.DB.prepare(
+      "SELECT id FROM users WHERE (is_master = 0 OR is_master IS NULL) AND admin_code NOT LIKE '%master_admin%'"
+    ).all()
+    targetUsers = all.results || []
+  }
+
+  // broadcast_receipts 일괄 생성 (priority = broadcasts.priority 복사)
+  for (const u of targetUsers) {
+    await c.env.DB.prepare(
+      'INSERT OR IGNORE INTO broadcast_receipts (broadcast_id, user_id, priority, status) VALUES (?, ?, ?, ?)'
+    ).bind(broadcastId, u.id, 0, 'auto_inserted').run()
+  }
+
+  return c.json({ success: true, broadcastId, sentTo: targetUsers.length })
+})
+
+// 배포 순서 변경 (전역 + 모든 치과의 개별 순서도 동기화)
+app.put('/api/master/broadcasts/reorder', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const { orderedIds, userId } = await c.req.json()
+  if (!Array.isArray(orderedIds)) return c.json({ error: 'orderedIds 배열이 필요합니다.' }, 400)
+  
+  if (userId) {
+    // 치과별 개별 순서 변경
+    for (let i = 0; i < orderedIds.length; i++) {
+      const priority = orderedIds.length - i
+      await c.env.DB.prepare('UPDATE broadcast_receipts SET priority = ? WHERE broadcast_id = ? AND user_id = ?')
+        .bind(priority, orderedIds[i], userId).run()
+    }
+  } else {
+    // 전역 순서 변경 → broadcasts.priority + 모든 receipt의 priority도 업데이트
+    for (let i = 0; i < orderedIds.length; i++) {
+      const priority = orderedIds.length - i
+      await c.env.DB.prepare('UPDATE broadcasts SET priority = ?, updated_at = datetime(\'now\') WHERE id = ?')
+        .bind(priority, orderedIds[i]).run()
+      await c.env.DB.prepare('UPDATE broadcast_receipts SET priority = ? WHERE broadcast_id = ?')
+        .bind(priority, orderedIds[i]).run()
+    }
+  }
+  return c.json({ success: true })
+})
+
+// 치과별 배포 현황 (마스터용) — :id 라우트보다 먼저 등록
+app.get('/api/master/broadcasts/clinics', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const activeBroadcasts = await c.env.DB.prepare(`
+    SELECT id, title, thumbnail_url, insert_position, repeat_every_n, target_playlist_type, target_mode
+    FROM broadcasts WHERE status = 'active'
+    ORDER BY priority DESC, created_at DESC
+  `).all()
+  const users = await c.env.DB.prepare(`
+    SELECT id, admin_code, clinic_name FROM users 
+    WHERE admin_code NOT LIKE '%master_admin%' AND is_master != 1
+    ORDER BY clinic_name ASC
+  `).all()
+  // 치과별 수신 현황 (priority 포함)
+  const receipts = await c.env.DB.prepare(`
+    SELECT br.user_id, br.broadcast_id, br.status as receipt_status, br.priority as receipt_priority,
+           b.title as broadcast_title, b.thumbnail_url, b.insert_position, b.repeat_every_n
+    FROM broadcast_receipts br
+    JOIN broadcasts b ON br.broadcast_id = b.id
+    WHERE b.status = 'active'
+    ORDER BY br.priority DESC, b.priority DESC, b.created_at DESC
+  `).all()
+  const playlists = await c.env.DB.prepare(`
+    SELECT id, name, user_id, active_item_ids FROM playlists WHERE user_id IS NOT NULL
+  `).all()
+  const clinicMap: Record<number, any> = {}
+  for (const u of (users.results || [])) {
+    clinicMap[u.id as number] = {
+      id: u.id, admin_code: u.admin_code, clinic_name: u.clinic_name,
+      broadcasts: [] as any[],
+      playlists: (playlists.results || []).filter((p: any) => p.user_id === u.id).map((p: any) => ({
+        id: p.id, name: p.name,
+        item_count: (() => { try { return JSON.parse(p.active_item_ids || '[]').length } catch { return 0 } })()
+      }))
+    }
+  }
+  for (const r of (receipts.results || [])) {
+    const clinic = clinicMap[r.user_id as number]
+    if (clinic) {
+      clinic.broadcasts.push({
+        broadcast_id: r.broadcast_id, title: r.broadcast_title, receipt_status: r.receipt_status,
+        priority: r.receipt_priority || 0, thumbnail_url: r.thumbnail_url,
+        insert_position: r.insert_position, repeat_every_n: r.repeat_every_n
+      })
+    }
+  }
+  // 치과별 broadcasts를 priority 내림차순 정렬
+  for (const clinic of Object.values(clinicMap)) {
+    clinic.broadcasts.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0))
+  }
+  return c.json({ clinics: Object.values(clinicMap), broadcasts: activeBroadcasts.results || [] })
+})
+
+// 배포 상세 + 수신 현황
+app.get('/api/master/broadcasts/:id', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const id = c.req.param('id')
+  const broadcast = await c.env.DB.prepare('SELECT * FROM broadcasts WHERE id = ?').bind(id).first()
+  if (!broadcast) return c.json({ error: '배포를 찾을 수 없습니다.' }, 404)
+
+  const receipts = await c.env.DB.prepare(`
+    SELECT br.*, u.clinic_name, u.admin_code
+    FROM broadcast_receipts br
+    JOIN users u ON br.user_id = u.id
+    WHERE br.broadcast_id = ?
+    ORDER BY br.inserted_at DESC
+  `).bind(id).all()
+
+  return c.json({ broadcast, receipts: receipts.results })
+})
+
+// 배포 취소 (상태만 변경)
+app.delete('/api/master/broadcasts/:id', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const id = c.req.param('id')
+  await c.env.DB.prepare("UPDATE broadcasts SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").bind(id).run()
+  return c.json({ success: true })
+})
+
+// 특정 치과에서 배포 제거 (receipt만 삭제)
+app.delete('/api/master/broadcasts/:id/receipt/:userId', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const broadcastId = c.req.param('id')
+  const userId = c.req.param('userId')
+  await c.env.DB.prepare('DELETE FROM broadcast_receipts WHERE broadcast_id = ? AND user_id = ?')
+    .bind(broadcastId, userId).run()
+  return c.json({ success: true })
+})
+
+// 치과별 배포 순서 변경 (receipt priority 업데이트)
+app.put('/api/master/broadcasts/clinics/:userId/reorder', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const userId = c.req.param('userId')
+  const { orderedBroadcastIds } = await c.req.json() as any
+  if (!Array.isArray(orderedBroadcastIds) || orderedBroadcastIds.length === 0) {
+    return c.json({ error: 'orderedBroadcastIds required' }, 400)
+  }
+  for (let i = 0; i < orderedBroadcastIds.length; i++) {
+    const priority = orderedBroadcastIds.length - i
+    await c.env.DB.prepare(
+      "UPDATE broadcast_receipts SET priority = ? WHERE user_id = ? AND broadcast_id = ?"
+    ).bind(priority, userId, orderedBroadcastIds[i]).run()
+  }
+  return c.json({ success: true })
+})
+
+// 치과가 받은 활성 배포 목록
+app.get('/api/:adminCode/broadcasts', async (c) => {
+  await ensureBroadcastTables(c.env.DB)
+  const adminCode = c.req.param('adminCode')
+  const user = await getOrCreateUser(c.env.DB, adminCode)
+  if (!user) return c.json({ error: '사용자를 찾을 수 없습니다.' }, 404)
+
+  const broadcasts = await c.env.DB.prepare(`
+    SELECT b.*, br.status as receipt_status
+    FROM broadcasts b
+    JOIN broadcast_receipts br ON b.id = br.broadcast_id
+    WHERE br.user_id = ? AND b.status = 'active'
+      AND (b.auto_expire_at IS NULL OR b.auto_expire_at > datetime('now'))
+    ORDER BY b.priority DESC, b.created_at DESC
+  `).bind(user.id).all()
+
+  return c.json({ broadcasts: broadcasts.results })
+})
+
+// ============================================
 // 플레이리스트 API
 // ============================================
 
@@ -1751,10 +2023,52 @@ app.get('/api/:adminCode/playlists/:id', async (c) => {
     }
   }
   
+  // ★★ 배포 영상 포함 (치과 관리자 화면에서 표시용)
+  let broadcastItems: any[] = []
+  try {
+    await ensureBroadcastTables(c.env.DB)
+    const playlistType = playlist.name && (playlist as any).name.includes('체어') ? 'chair' : 'waitingroom'
+    
+    // 마스터 사용자는 모든 활성 배포를 볼 수 있음
+    const isMaster = user.is_master === 1
+    let activeBroadcasts: any
+    if (isMaster) {
+      activeBroadcasts = await c.env.DB.prepare(`
+        SELECT * FROM broadcasts WHERE status = 'active'
+          AND (auto_expire_at IS NULL OR auto_expire_at > datetime('now'))
+          AND (target_playlist_type = 'all' OR target_playlist_type = ?)
+        ORDER BY priority DESC, created_at DESC
+      `).bind(playlistType).all()
+    } else {
+      activeBroadcasts = await c.env.DB.prepare(`
+        SELECT b.*, br.priority as clinic_priority FROM broadcasts b
+        JOIN broadcast_receipts br ON b.id = br.broadcast_id
+        WHERE br.user_id = ? AND b.status = 'active' AND br.status = 'auto_inserted'
+          AND (b.auto_expire_at IS NULL OR b.auto_expire_at > datetime('now'))
+          AND (b.target_playlist_type = 'all' OR b.target_playlist_type = ?)
+        ORDER BY br.priority DESC, b.priority DESC, b.created_at DESC
+      `).bind(user.id, playlistType).all()
+    }
+    broadcastItems = (activeBroadcasts.results || []).map((bc: any) => ({
+      id: 'bc_' + bc.id,
+      item_type: bc.item_type,
+      url: bc.url,
+      title: bc.title,
+      thumbnail_url: bc.thumbnail_url,
+      display_time: bc.display_time || 10,
+      is_master: false,
+      is_broadcast: true,
+      broadcast_id: bc.id,
+      insert_position: bc.insert_position || 'end',
+      repeat_every_n: bc.repeat_every_n || 0
+    }))
+  } catch(e) { /* 배포 테이블 없어도 무시 */ }
+
   return c.json({ 
     playlist: { ...playlist, items: userItems, activeItemIds },
     masterItems: masterItems,
-    masterPlaylistMode: userSettings?.master_playlist_mode || 'before'
+    masterPlaylistMode: userSettings?.master_playlist_mode || 'before',
+    broadcastItems: broadcastItems
   })
 })
 
@@ -2749,6 +3063,73 @@ app.get('/api/tv/:shortCode', async (c) => {
     .filter(id => allItemsMap.has(id))
     .map(id => allItemsMap.get(id))
   
+  // ★★ 배포 영상 병합 (broadcasts 테이블에서 active 배포 가져오기)
+  try {
+    await ensureBroadcastTables(c.env.DB)
+    const playlistType = playlist.name && playlist.name.includes('체어') ? 'chair' : 'waitingroom'
+    const activeBroadcasts = await c.env.DB.prepare(`
+      SELECT b.*, br.priority as clinic_priority FROM broadcasts b
+      JOIN broadcast_receipts br ON b.id = br.broadcast_id
+      WHERE br.user_id = ? AND b.status = 'active' AND br.status = 'auto_inserted'
+        AND (b.auto_expire_at IS NULL OR b.auto_expire_at > datetime('now'))
+        AND (b.target_playlist_type = 'all' OR b.target_playlist_type = ?)
+      ORDER BY br.priority DESC, b.priority DESC, b.created_at DESC
+    `).bind(playlist.user_id, playlistType).all()
+    
+    const broadcastItems = (activeBroadcasts.results || []).map((bc: any) => ({
+      id: 'bc_' + bc.id,
+      item_type: bc.item_type,
+      url: bc.url,
+      title: bc.title,
+      thumbnail_url: bc.thumbnail_url,
+      display_time: bc.display_time || 10,
+      is_master: false,
+      is_broadcast: true,
+      broadcast_id: bc.id,
+      insert_position: bc.insert_position || 'end',
+      repeat_every_n: bc.repeat_every_n || 0
+    }))
+    
+    if (broadcastItems.length > 0) {
+      // insert_position에 따라 배포 영상 삽입
+      const startItems: any[] = []
+      const endItems: any[] = []
+      const ratioItems: any[] = []
+      
+      for (const bcItem of broadcastItems) {
+        if (bcItem.insert_position === 'start') {
+          startItems.push(bcItem)
+        } else if (bcItem.insert_position === 'ratio:auto') {
+          ratioItems.push(bcItem)
+        } else {
+          endItems.push(bcItem)
+        }
+      }
+      
+      // start 아이템은 맨 앞에
+      if (startItems.length > 0) {
+        combinedItems.unshift(...startItems)
+      }
+      // end 아이템은 맨 뒤에
+      if (endItems.length > 0) {
+        combinedItems.push(...endItems)
+      }
+      // ratio:auto 아이템은 균등 분배
+      if (ratioItems.length > 0) {
+        const baseLen = combinedItems.length
+        const gap = Math.max(1, Math.floor(baseLen / (ratioItems.length + 1)))
+        for (let i = ratioItems.length - 1; i >= 0; i--) {
+          const pos = Math.min(gap * (i + 1), combinedItems.length)
+          combinedItems.splice(pos, 0, ratioItems[i])
+        }
+      }
+      console.log('[TV API] broadcast items added:', broadcastItems.length, 'start:', startItems.length, 'end:', endItems.length, 'ratio:', ratioItems.length)
+    }
+  } catch (e) {
+    // 배포 테이블 없어도 기존 재생에 영향 없음
+    console.log('[TV API] broadcast merge skipped:', e)
+  }
+  
   console.log('[TV API] combinedItems:', combinedItems.map((i:any)=> `${i.id}:${i.title}`))
   
   const items = { results: combinedItems }
@@ -2837,7 +3218,7 @@ app.get('/api/widget/init/:memberCode', async (c) => {
   const memberName = c.req.query('name') || ''
 
   c.header('Access-Control-Allow-Origin', '*')
-  c.header('Cache-Control', 'public, max-age=0, s-maxage=5, stale-while-revalidate=10')
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=60')
 
   try {
     // admin_code(imweb_xxx)가 memberCode로 들어온 경우
@@ -4989,12 +5370,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
   const ssrChCount = ssrChairs.length + '개'
   // ── SSR 끝 ──
   
-  // 짧은 캐시 허용 (Cloudflare 엣지에서 즉시 응답, 5초마다 갱신)
-  // s-maxage=5: Cloudflare CDN은 5초간 캐시 (한국 엣지에서 즉시 응답)
-  // max-age=0: 브라우저는 캐시하지 않음 (항상 CDN에 확인)
-  // stale-while-revalidate=10: 캐시 만료 후에도 기존 캐시를 즉시 제공하면서 백그라운드 갱신
-  c.header('Cache-Control', 'public, max-age=0, s-maxage=5, stale-while-revalidate=10')
-  c.header('CDN-Cache-Control', 'public, max-age=5, stale-while-revalidate=10')
+  // CDN 캐시 강화: 30초 캐시 + 60초 stale-while-revalidate
+  // 같은 사용자가 페이지 이동 후 재방문 시 CDN에서 즉시 응답 (~0ms)
+  // 데이터는 최대 30초 지연 가능하지만 admin.js에서 5초마다 API 폴링으로 보완
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=60')
+  c.header('CDN-Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
   
   return c.html(`
 <!DOCTYPE html>
@@ -5444,6 +5824,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
               style="padding:10px 20px;border:1px solid #e5e7eb;border-left:none;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">
               전체 현황
             </button>
+            <button onclick="showAdminSubTab('broadcasts')" id="admin-sub-broadcasts" 
+              style="padding:10px 20px;border:1px solid #e5e7eb;border-left:none;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">
+              <i class="fas fa-bullhorn" style="margin-right:4px;color:#f97316"></i>영상 배포
+            </button>
             <button onclick="showAdminSubTab('subtitles')" id="admin-sub-subtitles" 
               style="padding:10px 20px;border:1px solid #e5e7eb;border-left:none;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border-radius:0 8px 8px 0">
               <i class="fas fa-closed-captioning" style="margin-right:4px;color:#7c3aed"></i>자막 관리
@@ -5559,6 +5943,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     let masterItems = _ID.masterItems || [];
     let cachedMasterItems = masterItems || [];
     let masterItemsCache = masterItems || [];
+    let broadcastItemsCache = [];
     let currentPlaylist = null;
     
     // INITIAL_DATA 안전 접근 헬퍼
@@ -8413,6 +8798,12 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             if (data && data.playlist) {
               playlistCacheById[id] = data.playlist;
             }
+            // 배포 영상 캐시 (2-b단계 선행 로드)
+            if (data && data.broadcastItems && data.broadcastItems.length > 0) {
+              broadcastItemsCache = data.broadcastItems;
+              console.log('[Editor 2-b] Broadcast items pre-loaded:', broadcastItemsCache.length);
+              _renderPlaylistOnly();
+            }
           })
           .catch(() => {});
       }
@@ -8442,6 +8833,11 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
             fullPlaylist = data.playlist;
             playlistCacheById[id] = fullPlaylist;
           }
+          // 배포 영상 캐시 업데이트
+          if (data && data.broadcastItems) {
+            broadcastItemsCache = data.broadcastItems;
+            console.log('[Editor] Broadcast items loaded:', broadcastItemsCache.length);
+          }
         }
 
         if (fullPlaylist) {
@@ -8463,7 +8859,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
 
             // 완전한 데이터로 전체 렌더링
             const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-            if (newSignature !== playlistEditorSignature) {
+            const hasBroadcastChange = (broadcastItemsCache && broadcastItemsCache.length > 0);
+            if (newSignature !== playlistEditorSignature || hasBroadcastChange) {
               playlistEditorSignature = newSignature;
               await renderLibraryAndPlaylist();
               ensureMasterLibraryVisible();
@@ -9157,6 +9554,8 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     function removeFromPlaylist(itemId) {
       if (!currentPlaylist || !Array.isArray(currentPlaylist.activeItemIds)) return;
       const sid = String(itemId);
+      // 배포 영상은 삭제 불가
+      if (sid.startsWith('bc_')) { alert('배포 영상은 삭제할 수 없습니다.'); return; }
       const before = currentPlaylist.activeItemIds.length;
       currentPlaylist.activeItemIds = currentPlaylist.activeItemIds.filter(
         id => String(id) !== sid
@@ -9475,7 +9874,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         .map(id => allItems.find(item => String(item.id) === String(id)))
         .filter(item => item);
       
-      let playlistItems = activeUserItems;
+      // 배포 영상 병합 (insert_position에 따라: start, end, ratio:auto)
+      let playlistItems = [...activeUserItems];
+      if (broadcastItemsCache && broadcastItemsCache.length > 0) {
+        const startBc = broadcastItemsCache.filter(b => b.insert_position === 'start');
+        const endBc = broadcastItemsCache.filter(b => !b.insert_position || b.insert_position === 'end');
+        const ratioBc = broadcastItemsCache.filter(b => b.insert_position === 'ratio:auto');
+        playlistItems = [...startBc, ...playlistItems, ...endBc];
+        if (ratioBc.length > 0) {
+          const baseLen = playlistItems.length;
+          const gap = Math.max(1, Math.floor(baseLen / (ratioBc.length + 1)));
+          for (let ri = ratioBc.length - 1; ri >= 0; ri--) {
+            const pos = Math.min(gap * (ri + 1), playlistItems.length);
+            playlistItems.splice(pos, 0, ratioBc[ri]);
+          }
+        }
+      }
       
       // 플레이리스트 카운트 업데이트
       const countEl = document.getElementById('playlist-count');
@@ -9487,10 +9901,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       }
       
       playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-        <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
-          <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>
-          <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+        <div class="flex items-center gap-2 p-2 \${item.is_broadcast ? 'bg-orange-50 border border-orange-200' : item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}" data-broadcast="\${item.is_broadcast ? 1 : 0}">
+          \${item.is_broadcast ? '<div class="w-5"></div>' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+          <span class="text-sm font-bold \${item.is_broadcast ? 'text-orange-500' : item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
           <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
             \${item.item_type === 'image'
               ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
@@ -9501,9 +9915,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
-            \${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
+            \${item.is_broadcast ? '<p class="text-xs text-orange-500">배포 영상</p>' : item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
           </div>
-          <button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
+          \${item.is_broadcast ? '' : \`<button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>\`}
         </div>
       \`).join('');
       
@@ -9527,7 +9941,22 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         .map(id => allItems.find(item => String(item.id) === String(id)))
         .filter(item => item);
       
-      let playlistItems = activeUserItems;
+      // 배포 영상 병합 (start, end, ratio:auto)
+      let playlistItems = [...activeUserItems];
+      if (broadcastItemsCache && broadcastItemsCache.length > 0) {
+        const startBc = broadcastItemsCache.filter(b => b.insert_position === 'start');
+        const endBc = broadcastItemsCache.filter(b => !b.insert_position || b.insert_position === 'end');
+        const ratioBc = broadcastItemsCache.filter(b => b.insert_position === 'ratio:auto');
+        playlistItems = [...startBc, ...playlistItems, ...endBc];
+        if (ratioBc.length > 0) {
+          const baseLen = playlistItems.length;
+          const gap = Math.max(1, Math.floor(baseLen / (ratioBc.length + 1)));
+          for (let ri = ratioBc.length - 1; ri >= 0; ri--) {
+            const pos = Math.min(gap * (ri + 1), playlistItems.length);
+            playlistItems.splice(pos, 0, ratioBc[ri]);
+          }
+        }
+      }
       
       const countEl = document.getElementById('playlist-count');
       if (countEl) countEl.textContent = playlistItems.length + '개';
@@ -9536,10 +9965,10 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         return;
       }
       playlistContainer.innerHTML = playlistItems.map((item, index) => \`
-        <div class="flex items-center gap-2 p-2 \${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}">
-          <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>
-          <span class="text-sm font-bold \${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
+        <div class="flex items-center gap-2 p-2 \${item.is_broadcast ? 'bg-orange-50 border border-orange-200' : item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+             data-playlist-index="\${index}" data-id="\${item.id}" data-master="\${item.is_master ? 1 : 0}" data-broadcast="\${item.is_broadcast ? 1 : 0}">
+          \${item.is_broadcast ? '<div class="w-5"></div>' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+          <span class="text-sm font-bold \${item.is_broadcast ? 'text-orange-500' : item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">\${index + 1}</span>
           <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
             \${item.item_type === 'image'
               ? \`<img src="\${item.url}" class="w-full h-full object-cover">\`
@@ -9550,9 +9979,9 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-gray-800 truncate">\${item.title || item.url}</p>
-            \${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
+            \${item.is_broadcast ? '<p class="text-xs text-orange-500">배포 영상</p>' : item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
           </div>
-          <button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
+          \${item.is_broadcast ? '' : \`<button onclick="removeFromPlaylist('\${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>\`}
         </div>
       \`).join('');
       initPlaylistItemsSortable();
@@ -9705,12 +10134,15 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
       playlistItemsSortableInstance = new Sortable(container, {
         animation: 150,
         handle: '.drag-handle',
+        filter: '[data-broadcast="1"]',
         onEnd: function(evt) {
           if (evt.oldIndex === evt.newIndex) return;
-          const activeIds = (currentPlaylist.activeItemIds || []).map(id => String(id));
-          const [moved] = activeIds.splice(evt.oldIndex, 1);
-          activeIds.splice(evt.newIndex, 0, moved);
-          currentPlaylist.activeItemIds = activeIds;
+          // 배포 영상을 제외한 실제 activeItemIds만 재정렬
+          const allDivs = Array.from(container.children);
+          const nonBroadcastIds = allDivs
+            .filter(el => el.getAttribute('data-broadcast') !== '1')
+            .map(el => String(el.getAttribute('data-id')));
+          currentPlaylist.activeItemIds = nonBroadcastIds;
           _renderPlaylistOnly();
           saveActiveItems();
         }
@@ -11206,7 +11638,7 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
     // ============================================
     function showAdminSubTab(sub) {
       _adminSubTab = sub;
-      var allSubs = ['push', 'master-videos', 'overview', 'subtitles'];
+      var allSubs = ['push', 'master-videos', 'overview', 'broadcasts', 'subtitles'];
       allSubs.forEach(function(s) {
         var btn = document.getElementById('admin-sub-' + s);
         if (!btn) return;
@@ -11233,9 +11665,309 @@ async function handleAdminPage(c: any, adminCode: string, emailParamIn: string, 
         ]).then(function() {
           renderAdminOverview();
         });
+      } else if (sub === 'broadcasts') {
+        renderAdminBroadcasts();
       } else if (sub === 'subtitles') {
         renderAdminSubtitles();
       }
+    }
+
+    // ============================================
+    // 영상 배포 (아임웹 관리자 페이지용)
+    // ============================================
+    let _bcUsers = [];
+    let _bcList = [];
+
+    async function renderAdminBroadcasts() {
+      var body = document.getElementById('admin-body');
+      if (!body) return;
+
+      // 치과 목록 로드
+      try {
+        const uRes = await fetch('/api/master/users');
+        if (uRes.ok) { const uData = await uRes.json(); _bcUsers = uData.users || []; }
+      } catch(e) {}
+
+      // 배포 목록 로드
+      try {
+        const bRes = await fetch('/api/master/broadcasts');
+        if (bRes.ok) { const bData = await bRes.json(); _bcList = bData.broadcasts || []; }
+      } catch(e) {}
+
+      var userCheckboxes = _bcUsers.map(function(u) {
+        return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer">'
+          + '<input type="checkbox" value="' + u.id + '" class="bc-user-chk" style="accent-color:#f97316">'
+          + '<span>' + (u.clinic_name || u.admin_code) + '</span></label>';
+      }).join('');
+
+      body.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 12px;display:flex;align-items:center;gap:8px">'
+        + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#fff7ed;color:#f97316;font-size:10px"><i class="fas fa-plus-circle"></i></span>'
+        + '\uC0C8 \uC601\uC0C1 \uBC30\uD3EC</h3>'
+        + '<div style="display:grid;gap:10px">'
+        + '<div><label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">YouTube \uB610\uB294 Vimeo URL</label>'
+        + '<input type="text" id="bc-url-imweb" placeholder="https://vimeo.com/..." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>'
+        + '<div><label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">\uBC30\uD3EC \uC81C\uBAA9</label>'
+        + '<input type="text" id="bc-title-imweb" placeholder="\uC608: 3\uC6D4 \uC2E0\uC81C\uD488 \uAD11\uACE0" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+        + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uB300\uC0C1</label>'
+        + '<select id="bc-target-imweb" onchange="document.getElementById(\'bc-users-imweb\').style.display=this.value===\'selected\'?\'block\':\'none\'" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+        + '<option value="all">\uC804\uCCB4 \uCE58\uACFC</option><option value="selected">\uC120\uD0DD \uCE58\uACFC</option></select></div>'
+        + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uC0BD\uC785 \uC704\uCE58</label>'
+        + '<select id="bc-pos-imweb" onchange="var w=document.getElementById(\'bc-every-n-wrap-imweb\');if(w)w.style.display=this.value===\'ratio:auto\'?\'block\':\'none\'" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+        + '<option value="end">\uB9E8 \uB4A4</option><option value="start">\uB9E8 \uC55E</option><option value="ratio:auto">\uADE0\uB4F1 \uBC30\uCE58</option></select></div>'
+        + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uB300\uC0C1 TV</label>'
+        + '<select id="bc-tvtype-imweb" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+        + '<option value="all">\uC804\uCCB4</option><option value="waitingroom">\uB300\uAE30\uC2E4\uB9CC</option><option value="chair">\uCCB4\uC5B4\uB9CC</option></select></div>'
+        + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uC790\uB3D9 \uB9CC\uB8CC (\uC77C)</label>'
+        + '<input type="number" id="bc-expire-imweb" value="0" min="0" placeholder="0=\uBB34\uAE30\uD55C" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;box-sizing:border-box"></div></div>'
+        + '<div id="bc-every-n-wrap-imweb" style="display:none;margin-top:6px"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;cursor:pointer"><input type="checkbox" id="bc-every-n-check-imweb" onchange="var w=document.getElementById(\'bc-every-n-row-imweb\');if(w)w.style.display=this.checked?\'flex\':\'none\'" style="accent-color:#f97316">\uBC18\uBCF5 \uC7AC\uC0DD \uC2DC N\uAC1C \uC601\uC0C1\uB9C8\uB2E4 \uC0BD\uC785</label>'
+        + '<div id="bc-every-n-row-imweb" style="display:none;align-items:center;gap:4px;margin-top:4px"><span style="font-size:11px;color:#9ca3af">\uB9E4</span><input type="number" id="bc-every-n-imweb" value="5" min="2" max="50" style="width:50px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;text-align:center;font-family:inherit"><span style="font-size:11px;color:#9ca3af">\uAC1C \uC601\uC0C1\uB9C8\uB2E4</span></div></div>'
+        + '<div id="bc-users-imweb" style="display:none"><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uCE58\uACFC \uC120\uD0DD</label>'
+        + '<div style="max-height:120px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;background:#fafafa">' + (userCheckboxes || '<span style="color:#9ca3af;font-size:12px">\uCE58\uACFC \uC5C6\uC74C</span>') + '</div></div>'
+        + '<button onclick="submitBroadcastImweb()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
+        + '<i class="fas fa-paper-plane" style="margin-right:6px"></i>\uBC30\uD3EC\uD558\uAE30</button>'
+        + '</div></div>'
+        + '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+        + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">'
+        + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#fff7ed;color:#f97316;font-size:10px"><i class="fas fa-list"></i></span>'
+        + '\uBC30\uD3EC \uD604\uD669</h3>'
+        + '<span style="background:#fff7ed;color:#f97316;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">' + _bcList.length + '\uAC1C</span></div>'
+        + '<div id="bc-list-imweb">' + renderBcListHtml() + '</div></div>'
+        + '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-top:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+        + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">'
+        + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#3b82f6;font-size:10px"><i class="fas fa-hospital"></i></span>'
+        + '\uCE58\uACFC\uBCC4 \uBC30\uD3EC \uD604\uD669</h3>'
+        + '<button onclick="loadClinicBcImweb()" style="font-size:11px;background:none;border:none;color:#3b82f6;cursor:pointer;font-family:inherit"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button></div>'
+        + '<div id="clinic-bc-imweb" style="max-height:60vh;overflow-y:auto"><p style="text-align:center;color:#9ca3af;padding:16px 0;font-size:13px">\uB85C\uB529 \uC911...</p></div></div>';
+      
+      // 드래그 순서 변경 초기화
+      setTimeout(function() { initBcSortableImweb(); loadClinicBcImweb(); }, 50);
+    }
+
+    var _bcSortableImweb = null;
+    
+    function renderBcListHtml() {
+      if (_bcList.length === 0) return '<p style="text-align:center;color:#9ca3af;padding:24px 0;font-size:13px">\uBC30\uD3EC \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4</p>';
+      var activeList = _bcList.filter(function(bc) { return bc.status === 'active'; });
+      var inactiveList = _bcList.filter(function(bc) { return bc.status !== 'active'; });
+      
+      function renderBcItemImweb(bc, idx) {
+        var isActive = bc.status === 'active';
+        var statusColor = isActive ? '#15803d' : '#6b7280';
+        var statusBg = isActive ? '#dcfce7' : '#f3f4f6';
+        var statusText = isActive ? '\uD65C\uC131' : (bc.status === 'cancelled' ? '\uCDE8\uC18C\uB428' : bc.status);
+        var targetText = bc.target_mode === 'all' ? '\uC804\uCCB4' : '\uC120\uD0DD';
+        var tvType = bc.target_playlist_type === 'waitingroom' ? '\uB300\uAE30\uC2E4' : bc.target_playlist_type === 'chair' ? '\uCCB4\uC5B4' : '';
+        var expire = bc.auto_expire_at ? '<span style="font-size:10px;color:#9ca3af">\uB9CC\uB8CC: ' + bc.auto_expire_at.slice(0,10) + '</span>' : '';
+        var posText = bc.insert_position === 'ratio:auto' ? '\uADE0\uB4F1' : bc.insert_position === 'start' ? '\uB9E8\uC55E' : '\uB9E8\uB4A4';
+        var posBg = bc.insert_position === 'ratio:auto' ? '#fff7ed' : '#f3f4f6';
+        var posColor = bc.insert_position === 'ratio:auto' ? '#ea580c' : '#6b7280';
+        var everyNBadge = (bc.repeat_every_n && bc.repeat_every_n > 0) ? '<span style="font-size:10px;color:#ea580c">\uB9E4' + bc.repeat_every_n + '\uAC1C</span>' : '';
+        return '<div data-bc-id="' + bc.id + '" style="display:flex;align-items:center;gap:10px;padding:10px;background:#fafafa;border-radius:8px;margin-bottom:6px">'
+          + (isActive ? '<div class="bc-drag-handle-imweb" style="color:#cbd5e1;cursor:grab;flex-shrink:0;font-size:14px;padding:0 2px"><i class="fas fa-grip-vertical"></i></div>' : '')
+          + (isActive ? '<span style="font-size:11px;font-weight:700;color:#f97316;width:16px;flex-shrink:0;text-align:center">' + (idx + 1) + '</span>' : '')
+          + (bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" style="width:48px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">' : '<div style="width:48px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-video" style="color:#9ca3af;font-size:12px"></i></div>')
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + bc.title + '</div>'
+          + '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;align-items:center">'
+          + '<span style="padding:1px 6px;background:' + statusBg + ';color:' + statusColor + ';border-radius:20px;font-size:10px;font-weight:600">' + statusText + '</span>'
+          + '<span style="padding:1px 6px;background:#dbeafe;color:#1d4ed8;border-radius:20px;font-size:10px;font-weight:600">' + targetText + '</span>'
+          + (tvType ? '<span style="padding:1px 6px;background:#fce7f3;color:#be185d;border-radius:20px;font-size:10px;font-weight:600">' + tvType + '</span>' : '')
+          + '<span style="padding:1px 6px;background:' + posBg + ';color:' + posColor + ';border-radius:20px;font-size:10px;font-weight:600">' + posText + '</span>'
+          + '<span style="font-size:10px;color:#9ca3af">\uC218\uC2E0: ' + (bc.total_inserted || 0) + '/' + (bc.total_sent || 0) + '</span>'
+          + everyNBadge + expire + '</div></div>'
+          + (isActive ? '<button onclick="cancelBcImweb(' + bc.id + ')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:4px" title="\uCDE8\uC18C"><i class="fas fa-times-circle"></i></button>' : '')
+          + '</div>';
+      }
+      
+      var html = '';
+      if (activeList.length > 0) {
+        html += '<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:700;color:#6b7280">\uC7AC\uC0DD \uC21C\uC11C</span><span style="font-size:10px;color:#9ca3af">(\uB4DC\uB798\uADF8\uD558\uC5EC \uC21C\uC11C \uBCC0\uACBD)</span></div>';
+        html += '<div id="bc-sortable-imweb" style="margin-bottom:8px">';
+        html += activeList.map(function(bc, i) { return renderBcItemImweb(bc, i); }).join('');
+        html += '</div>';
+      }
+      if (inactiveList.length > 0) {
+        html += '<div style="margin-top:12px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#9ca3af">\uBE44\uD65C\uC131</span></div>';
+        html += inactiveList.map(function(bc, i) { return renderBcItemImweb(bc, -1); }).join('');
+      }
+      return html;
+    }
+    
+    function initBcSortableImweb() {
+      if (_bcSortableImweb) { try { _bcSortableImweb.destroy(); } catch(e){} _bcSortableImweb = null; }
+      var sortEl = document.getElementById('bc-sortable-imweb');
+      if (!sortEl || sortEl.children.length < 2 || typeof Sortable === 'undefined') return;
+      _bcSortableImweb = new Sortable(sortEl, {
+        handle: '.bc-drag-handle-imweb',
+        animation: 150,
+        ghostClass: 'bc-ghost-imweb',
+        onEnd: async function() {
+          var ids = Array.from(sortEl.querySelectorAll('[data-bc-id]')).map(function(el) { return Number(el.dataset.bcId); });
+          sortEl.querySelectorAll('[data-bc-id]').forEach(function(el, i) {
+            var numEl = el.querySelector('span[style*="color:#f97316"]');
+            if (numEl && numEl.style.width === '16px') numEl.textContent = (i + 1);
+          });
+          try {
+            await fetch('/api/master/broadcasts/reorder', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderedIds: ids })
+            });
+            console.log('[Broadcast] ImWeb reorder saved:', ids);
+          } catch(e) { console.error('Reorder failed:', e); }
+        }
+      });
+    }
+
+    async function submitBroadcastImweb() {
+      var url = document.getElementById('bc-url-imweb').value.trim();
+      var title = document.getElementById('bc-title-imweb').value.trim();
+      if (!url || !title) { alert('URL\uACFC \uC81C\uBAA9\uC744 \uC785\uB825\uD558\uC138\uC694.'); return; }
+      var targetMode = document.getElementById('bc-target-imweb').value;
+      var targetUserIds = [];
+      if (targetMode === 'selected') {
+        targetUserIds = Array.from(document.querySelectorAll('.bc-user-chk:checked')).map(function(cb) { return Number(cb.value); });
+        if (targetUserIds.length === 0) { alert('\uBC30\uD3EC\uD560 \uCE58\uACFC\uB97C \uC120\uD0DD\uD558\uC138\uC694.'); return; }
+      }
+      try {
+        var res = await fetch('/api/master/broadcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url, title: title, target_mode: targetMode, target_user_ids: targetUserIds,
+            target_playlist_type: document.getElementById('bc-tvtype-imweb').value,
+            insert_position: document.getElementById('bc-pos-imweb').value,
+            repeat_every_n: (document.getElementById('bc-pos-imweb').value === 'ratio:auto' && document.getElementById('bc-every-n-check-imweb') && document.getElementById('bc-every-n-check-imweb').checked) ? Number(document.getElementById('bc-every-n-imweb').value) || 0 : 0,
+            auto_expire_days: Number(document.getElementById('bc-expire-imweb').value) || 0
+          })
+        });
+        var data = await res.json();
+        if (data.success) {
+          showToast(data.sentTo + '\uAC1C \uCE58\uACFC\uC5D0 \uBC30\uD3EC \uC644\uB8CC!');
+          document.getElementById('bc-url-imweb').value = '';
+          document.getElementById('bc-title-imweb').value = '';
+          document.getElementById('bc-expire-imweb').value = '0';
+          renderAdminBroadcasts();
+        } else {
+          alert(data.error || '\uBC30\uD3EC \uC2E4\uD328');
+        }
+      } catch(e) { alert('\uBC30\uD3EC \uC2E4\uD328: ' + e.message); }
+    }
+
+    async function cancelBcImweb(id) {
+      if (!confirm('\uC774 \uBC30\uD3EC\uB97C \uCDE8\uC18C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+      try {
+        await fetch('/api/master/broadcasts/' + id, { method: 'DELETE' });
+        showToast('\uBC30\uD3EC\uAC00 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+        renderAdminBroadcasts();
+      } catch(e) { alert('\uCDE8\uC18C \uC2E4\uD328'); }
+    }
+
+    // ============ 치과별 배포 현황 (ImWeb) ============
+    var _clinicBcSortables = {};
+
+    async function loadClinicBcImweb() {
+      var container = document.getElementById('clinic-bc-imweb');
+      if (!container) return;
+      try {
+        var res = await fetch('/api/master/broadcasts/clinics');
+        if (!res.ok) throw new Error('API error');
+        var data = await res.json();
+        var clinics = data.clinics || [];
+        if (clinics.length === 0) {
+          container.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:16px 0;font-size:13px">\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</p>';
+          return;
+        }
+        var html = '';
+        clinics.forEach(function(clinic) {
+          var bcCount = (clinic.broadcasts || []).length;
+          var activeBcs = (clinic.broadcasts || []).filter(function(b) { return b.status === 'active' || b.status === 'auto_inserted'; });
+          var plNames = (clinic.playlists || []).map(function(p) { return p.name + '(' + p.item_count + ')'; }).join(', ') || '-';
+          html += '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:6px">'
+            + '<div onclick="toggleClinicBcImweb(' + clinic.id + ')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;background:#fafafa;user-select:none">'
+            + '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'
+            + '<i class="fas fa-hospital" style="color:#3b82f6;font-size:12px;flex-shrink:0"></i>'
+            + '<span style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (clinic.clinic_name || clinic.admin_code) + '</span>'
+            + '<span style="padding:1px 8px;background:' + (activeBcs.length > 0 ? '#fff7ed' : '#f3f4f6') + ';color:' + (activeBcs.length > 0 ? '#ea580c' : '#9ca3af') + ';border-radius:20px;font-size:10px;font-weight:600;flex-shrink:0">' + activeBcs.length + '\uAC1C \uAD11\uACE0</span>'
+            + '</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+            + '<span style="font-size:10px;color:#9ca3af">' + plNames + '</span>'
+            + '<i class="fas fa-chevron-down clinic-bc-arrow-' + clinic.id + '" style="color:#9ca3af;font-size:10px;transition:transform .2s"></i>'
+            + '</div></div>'
+            + '<div id="clinic-bc-panel-' + clinic.id + '" style="display:none;padding:8px 12px;background:#fff;border-top:1px solid #f3f4f6">';
+
+          if (activeBcs.length === 0) {
+            html += '<p style="text-align:center;color:#d1d5db;padding:8px 0;font-size:12px">\uBC30\uD3EC\uB41C \uAD11\uACE0 \uC5C6\uC74C</p>';
+          } else {
+            html += '<div id="clinic-bc-sort-' + clinic.id + '">';
+            activeBcs.forEach(function(bc, idx) {
+              var posText = bc.insert_position === 'ratio:auto' ? '\uADE0\uB4F1' : bc.insert_position === 'start' ? '\uB9E8\uC55E' : '\uB9E8\uB4A4';
+              html += '<div data-receipt-bc-id="' + bc.broadcast_id + '" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fafafa;border-radius:6px;margin-bottom:4px;group">'
+                + '<div class="clinic-bc-drag-' + clinic.id + '" style="color:#d1d5db;cursor:grab;font-size:12px;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div>'
+                + '<span style="font-size:11px;font-weight:700;color:#f97316;width:14px;flex-shrink:0;text-align:center" class="clinic-bc-num">' + (idx + 1) + '</span>'
+                + (bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" style="width:40px;height:30px;object-fit:cover;border-radius:4px;flex-shrink:0">' : '<div style="width:40px;height:30px;background:#e5e7eb;border-radius:4px;flex-shrink:0"></div>')
+                + '<div style="flex:1;min-width:0">'
+                + '<div style="font-size:12px;font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (bc.title || 'Untitled') + '</div>'
+                + '<span style="font-size:10px;padding:0 4px;background:#f3f4f6;color:#6b7280;border-radius:3px">' + posText + '</span></div>'
+                + '<button onclick="event.stopPropagation();removeClinicBcImweb(' + clinic.id + ',' + bc.broadcast_id + ')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:11px;padding:2px" title="\uC774 \uCE58\uACFC\uC5D0\uC11C \uC81C\uAC70">'
+                + '<i class="fas fa-times"></i></button></div>';
+            });
+            html += '</div>';
+          }
+          html += '</div></div>';
+        });
+        container.innerHTML = html;
+      } catch(e) {
+        container.innerHTML = '<p style="text-align:center;color:#ef4444;padding:16px 0;font-size:12px">\uB85C\uB4DC \uC2E4\uD328: ' + e.message + '</p>';
+      }
+    }
+
+    function toggleClinicBcImweb(clinicId) {
+      var panel = document.getElementById('clinic-bc-panel-' + clinicId);
+      if (!panel) return;
+      var isHidden = panel.style.display === 'none';
+      panel.style.display = isHidden ? 'block' : 'none';
+      var arrow = document.querySelector('.clinic-bc-arrow-' + clinicId);
+      if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : '';
+      if (isHidden) initClinicBcSortImweb(clinicId);
+    }
+
+    function initClinicBcSortImweb(clinicId) {
+      if (_clinicBcSortables[clinicId]) { try { _clinicBcSortables[clinicId].destroy(); } catch(e){} }
+      var sortEl = document.getElementById('clinic-bc-sort-' + clinicId);
+      if (!sortEl || sortEl.children.length < 2 || typeof Sortable === 'undefined') return;
+      _clinicBcSortables[clinicId] = new Sortable(sortEl, {
+        handle: '.clinic-bc-drag-' + clinicId,
+        animation: 150,
+        onEnd: async function() {
+          var ids = Array.from(sortEl.querySelectorAll('[data-receipt-bc-id]')).map(function(el) { return Number(el.dataset.receiptBcId); });
+          sortEl.querySelectorAll('.clinic-bc-num').forEach(function(el, i) { el.textContent = (i + 1); });
+          try {
+            await fetch('/api/master/broadcasts/clinics/' + clinicId + '/reorder', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderedBroadcastIds: ids })
+            });
+            console.log('[Clinic BC] reorder saved for clinic ' + clinicId);
+          } catch(e) { console.error('Clinic reorder failed:', e); }
+        }
+      });
+    }
+
+    async function removeClinicBcImweb(clinicId, broadcastId) {
+      if (!confirm('\uC774 \uCE58\uACFC\uC5D0\uC11C \uD574\uB2F9 \uAD11\uACE0\uB97C \uC81C\uAC70\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+      try {
+        var res = await fetch('/api/master/broadcasts/' + broadcastId + '/receipt/' + clinicId, { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) {
+          showToast('\uCE58\uACFC\uC5D0\uC11C \uAD11\uACE0\uAC00 \uC81C\uAC70\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+          loadClinicBcImweb();
+        } else { alert(data.error || '\uC81C\uAC70 \uC2E4\uD328'); }
+      } catch(e) { alert('\uC81C\uAC70 \uC2E4\uD328: ' + e.message); }
     }
 
     function renderAdminSubtitles() {
@@ -12399,6 +13131,37 @@ app.get('/tv/:shortCode', async (c) => {
     if (useMasterPlaylist) { masterItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item)) }
     userItemsWithFlag.forEach((item: any) => allItemsMap.set(item.id, item))
     const combinedItems = activeItemIds.filter(id => allItemsMap.has(id)).map(id => allItemsMap.get(id))
+    
+    // ★★ SSR: 배포 영상 병합
+    try {
+      await ensureBroadcastTables(c.env.DB)
+      const playlistType = playlist.name && playlist.name.includes('체어') ? 'chair' : 'waitingroom'
+      const activeBroadcasts = await c.env.DB.prepare(`
+        SELECT b.*, br.priority as clinic_priority FROM broadcasts b
+        JOIN broadcast_receipts br ON b.id = br.broadcast_id
+        WHERE br.user_id = ? AND b.status = 'active' AND br.status = 'auto_inserted'
+          AND (b.auto_expire_at IS NULL OR b.auto_expire_at > datetime('now'))
+          AND (b.target_playlist_type = 'all' OR b.target_playlist_type = ?)
+        ORDER BY br.priority DESC, b.priority DESC, b.created_at DESC
+      `).bind(playlist.user_id, playlistType).all()
+      const startBc: any[] = [], endBc: any[] = [], ratioBc: any[] = []
+      for (const bc of (activeBroadcasts.results || []) as any[]) {
+        const bcItem = { id: 'bc_' + bc.id, item_type: bc.item_type, url: bc.url, title: bc.title, thumbnail_url: bc.thumbnail_url, display_time: bc.display_time || 10, is_master: false, is_broadcast: true, broadcast_id: bc.id, insert_position: bc.insert_position || 'end', repeat_every_n: bc.repeat_every_n || 0 }
+        if (bc.insert_position === 'start') startBc.push(bcItem)
+        else if (bc.insert_position === 'ratio:auto') ratioBc.push(bcItem)
+        else endBc.push(bcItem)
+      }
+      if (startBc.length > 0) combinedItems.unshift(...startBc)
+      if (endBc.length > 0) combinedItems.push(...endBc)
+      if (ratioBc.length > 0) {
+        const baseLen = combinedItems.length
+        const gap = Math.max(1, Math.floor(baseLen / (ratioBc.length + 1)))
+        for (let i = ratioBc.length - 1; i >= 0; i--) {
+          const pos = Math.min(gap * (i + 1), combinedItems.length)
+          combinedItems.splice(pos, 0, ratioBc[i])
+        }
+      }
+    } catch(e) { /* 배포 테이블 없어도 무시 */ }
     
     const urgentNotices = (allNotices.results || []).filter((n: any) => n.is_urgent === 1)
     const normalNotices = (allNotices.results || []).filter((n: any) => n.is_urgent !== 1)
@@ -14086,6 +14849,9 @@ app.get('/master', (c) => {
         <button onclick="showTab('imweb-links')" id="tab-imweb-links" class="px-6 py-3 font-bold text-gray-500 hover:text-purple-600">
           <i class="fas fa-link mr-2"></i>아임웹 링크
         </button>
+        <button onclick="showTab('broadcasts')" id="tab-broadcasts" class="px-6 py-3 font-bold text-gray-500 hover:text-purple-600">
+          <i class="fas fa-bullhorn mr-2"></i>영상 배포
+        </button>
       </div>
       
       <!-- 공용 플레이리스트 탭 -->
@@ -14406,6 +15172,93 @@ app.get('/master', (c) => {
         </div>
       </div>
       
+      <!-- 영상 배포 탭 -->
+      <div id="content-broadcasts" class="hidden">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-4">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">
+            <i class="fas fa-bullhorn mr-2 text-orange-500"></i>영상 배포
+          </h2>
+          
+          <!-- 새 배포 -->
+          <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+            <h3 class="font-bold text-sm text-orange-700 mb-3"><i class="fas fa-plus-circle mr-1"></i>새 영상 배포</h3>
+            <div class="space-y-3">
+              <input type="text" id="bc-url" placeholder="YouTube 또는 Vimeo URL" class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500">
+              <input type="text" id="bc-title" placeholder="배포 제목 (예: 3월 신제품 광고)" class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">대상</label>
+                  <select id="bc-target-mode" onchange="toggleBcUserSelect()" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="all">전체 치과</option>
+                    <option value="selected">선택 치과</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">삽입 위치</label>
+                  <select id="bc-position" onchange="toggleBcEveryN()" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="end">맨 뒤</option>
+                    <option value="start">맨 앞</option>
+                    <option value="ratio:auto">균등 배치 (비율 기반)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">대상 TV</label>
+                  <select id="bc-playlist-type" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="all">전체 (대기실+체어)</option>
+                    <option value="waitingroom">대기실만</option>
+                    <option value="chair">체어만</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">자동 만료 (일)</label>
+                  <input type="number" id="bc-expire-days" placeholder="0=무기한" value="0" min="0" class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+              </div>
+              <div id="bc-every-n-wrap" class="hidden mt-2">
+                <label class="flex items-center gap-2 text-xs font-medium text-gray-600 mb-1">
+                  <input type="checkbox" id="bc-every-n-check" onchange="toggleBcEveryNInput()" class="accent-orange-500">
+                  반복 재생 시 N개 영상마다 삽입
+                </label>
+                <div id="bc-every-n-input-wrap" class="hidden flex items-center gap-2 mt-1">
+                  <span class="text-xs text-gray-500">매</span>
+                  <input type="number" id="bc-every-n" value="5" min="2" max="50" class="w-16 border rounded-lg px-2 py-1 text-sm text-center">
+                  <span class="text-xs text-gray-500">개 영상마다</span>
+                </div>
+              </div>
+              <div id="bc-user-select" class="hidden">
+                <label class="block text-xs font-medium text-gray-600 mb-1">치과 선택</label>
+                <div id="bc-user-checkboxes" class="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-1 bg-white"></div>
+              </div>
+              <button onclick="createBroadcast()" class="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 font-bold">
+                <i class="fas fa-paper-plane mr-2"></i>배포하기
+              </button>
+            </div>
+          </div>
+        </div>
+          
+          <!-- 배포 현황 (드래그 순서) -->
+          <div class="bg-white rounded-xl shadow-sm border p-4 mb-4">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-sm font-bold text-gray-700"><i class="fas fa-sort-amount-down mr-1 text-orange-500"></i>배포 현황 / 재생 순서</h3>
+              <span id="broadcast-count" class="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold">0개</span>
+            </div>
+            <div id="broadcast-list" class="space-y-2">
+              <p class="text-gray-400 text-center py-6 text-sm">배포 내역이 없습니다</p>
+            </div>
+          </div>
+          
+          <!-- 치과별 배포 현황 -->
+          <div class="bg-white rounded-xl shadow-sm border p-4">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-sm font-bold text-gray-700"><i class="fas fa-hospital mr-1 text-blue-500"></i>치과별 배포 현황</h3>
+              <button onclick="loadClinicBroadcasts()" class="text-xs text-blue-500 hover:text-blue-700"><i class="fas fa-sync-alt mr-1"></i>새로고침</button>
+            </div>
+            <div id="clinic-broadcast-view" class="space-y-2">
+              <p class="text-gray-400 text-center py-6 text-sm">로딩 중...</p>
+            </div>
+          </div>
+      </div>
+      
       <!-- 새 치과 등록 모달 -->
       <div id="add-clinic-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
@@ -14650,16 +15503,19 @@ app.get('/master', (c) => {
       document.getElementById('content-subtitles').classList.add('hidden');
       document.getElementById('content-users').classList.add('hidden');
       document.getElementById('content-imweb-links').classList.add('hidden');
+      document.getElementById('content-broadcasts').classList.add('hidden');
       
       // 모든 탭 비활성화
       document.getElementById('tab-playlist').classList.remove('tab-active', 'border-b-2', 'border-purple-500', 'text-purple-600');
       document.getElementById('tab-subtitles').classList.remove('tab-active', 'border-b-2', 'border-purple-500', 'text-purple-600');
       document.getElementById('tab-users').classList.remove('tab-active', 'border-b-2', 'border-purple-500', 'text-purple-600');
       document.getElementById('tab-imweb-links').classList.remove('tab-active', 'border-b-2', 'border-purple-500', 'text-purple-600');
+      document.getElementById('tab-broadcasts').classList.remove('tab-active', 'border-b-2', 'border-purple-500', 'text-purple-600');
       document.getElementById('tab-playlist').classList.add('text-gray-500');
       document.getElementById('tab-subtitles').classList.add('text-gray-500');
       document.getElementById('tab-users').classList.add('text-gray-500');
       document.getElementById('tab-imweb-links').classList.add('text-gray-500');
+      document.getElementById('tab-broadcasts').classList.add('text-gray-500');
       
       // 선택된 탭 활성화
       document.getElementById('content-' + tab).classList.remove('hidden');
@@ -14680,6 +15536,11 @@ app.get('/master', (c) => {
           passwordInput.value = masterPassword;
         }
         await autoSyncImwebMembers(false);
+      }
+      if (tab === 'broadcasts') {
+        loadBroadcasts();
+        loadBroadcastUsers();
+        loadClinicBroadcasts();
       }
     }
     
@@ -16042,6 +16903,311 @@ app.get('/master', (c) => {
         console.error(e);
         alert('등록 실패');
       }
+    }
+    
+    // ============================================
+    // 영상 배포 기능
+    // ============================================
+    
+    let broadcastUsers = [];
+    
+    async function loadBroadcastUsers() {
+      try {
+        const res = await fetch(API_BASE + '/users');
+        const data = await res.json();
+        broadcastUsers = data.users || [];
+        const container = document.getElementById('bc-user-checkboxes');
+        if (container) {
+          container.innerHTML = broadcastUsers.map(u => 
+            '<label class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded">' +
+            '<input type="checkbox" value="' + u.id + '" class="bc-user-cb rounded">' +
+            '<span>' + (u.clinic_name || u.admin_code) + '</span>' +
+            '</label>'
+          ).join('');
+        }
+      } catch(e) {}
+    }
+    
+    function toggleBcUserSelect() {
+      const mode = document.getElementById('bc-target-mode').value;
+      document.getElementById('bc-user-select').classList.toggle('hidden', mode !== 'selected');
+    }
+    
+    function toggleBcEveryN() {
+      const pos = document.getElementById('bc-position').value;
+      document.getElementById('bc-every-n-wrap').classList.toggle('hidden', pos !== 'ratio:auto');
+      if (pos !== 'ratio:auto') {
+        document.getElementById('bc-every-n-check').checked = false;
+        document.getElementById('bc-every-n-input-wrap').classList.add('hidden');
+      }
+    }
+    
+    function toggleBcEveryNInput() {
+      const checked = document.getElementById('bc-every-n-check').checked;
+      document.getElementById('bc-every-n-input-wrap').classList.toggle('hidden', !checked);
+    }
+    
+    let bcSortableInstance = null;
+    
+    async function loadBroadcasts() {
+      try {
+        const res = await fetch(API_BASE + '/broadcasts');
+        const data = await res.json();
+        const list = data.broadcasts || [];
+        const activeList = list.filter(bc => bc.status === 'active');
+        const inactiveList = list.filter(bc => bc.status !== 'active');
+        document.getElementById('broadcast-count').textContent = list.length + '개';
+        
+        if (list.length === 0) {
+          document.getElementById('broadcast-list').innerHTML = '<p class="text-gray-400 text-center py-8">배포 내역이 없습니다</p>';
+          return;
+        }
+        
+        function renderBcItem(bc, idx) {
+          const isActive = bc.status === 'active';
+          const statusBadge = isActive 
+            ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">활성</span>'
+            : '<span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">' + (bc.status === 'cancelled' ? '취소됨' : bc.status) + '</span>';
+          const targetBadge = bc.target_mode === 'all' 
+            ? '<span class="bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full text-xs">전체</span>'
+            : '<span class="bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full text-xs">선택</span>';
+          const typeBadge = bc.target_playlist_type === 'all' ? '' 
+            : bc.target_playlist_type === 'waitingroom' ? '<span class="bg-teal-100 text-teal-600 px-2 py-0.5 rounded-full text-xs">대기실</span>' 
+            : '<span class="bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full text-xs">체어</span>';
+          const expireText = bc.auto_expire_at ? '<span class="text-xs text-gray-400">만료: ' + bc.auto_expire_at.slice(0,10) + '</span>' : '';
+          const posBadge = bc.insert_position === 'ratio:auto' 
+            ? '<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full text-xs">균등</span>' 
+            : bc.insert_position === 'start' 
+              ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs">맨앞</span>' 
+              : '<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">맨뒤</span>';
+          const everyNText = (bc.repeat_every_n && bc.repeat_every_n > 0) ? '<span class="text-xs text-orange-500">매' + bc.repeat_every_n + '개</span>' : '';
+          
+          return '<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg" data-bc-id="' + bc.id + '">' +
+            (isActive ? '<div class="bc-drag-handle text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"><i class="fas fa-grip-vertical"></i></div>' : '') +
+            (isActive ? '<span class="text-xs font-bold text-orange-500 w-5 flex-shrink-0">' + (idx + 1) + '</span>' : '') +
+            (bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" class="w-14 h-10 object-cover rounded flex-shrink-0">' : '<div class="w-14 h-10 bg-gray-200 rounded flex items-center justify-center flex-shrink-0"><i class="fas fa-video text-gray-400 text-xs"></i></div>') +
+            '<div class="flex-1 min-w-0">' +
+              '<div class="font-medium text-sm truncate">' + bc.title + '</div>' +
+              '<div class="flex items-center gap-1 mt-1 flex-wrap">' + statusBadge + targetBadge + typeBadge + posBadge + '</div>' +
+              '<div class="flex items-center gap-2 mt-1"><span class="text-xs text-gray-400">수신: ' + bc.total_inserted + '/' + bc.total_sent + '</span>' + everyNText + expireText + '</div>' +
+            '</div>' +
+            (isActive ? '<button onclick="cancelBroadcast(' + bc.id + ')" class="text-red-400 hover:text-red-600 flex-shrink-0" title="취소"><i class="fas fa-times-circle text-sm"></i></button>' : '') +
+          '</div>';
+        }
+        
+        let html = '';
+        if (activeList.length > 0) {
+          html += '<div class="mb-2 flex items-center gap-2"><span class="text-xs font-bold text-gray-500">재생 순서</span><span class="text-xs text-gray-400">(드래그하여 순서 변경)</span></div>';
+          html += '<div id="bc-sortable-list" class="space-y-2">';
+          html += activeList.map((bc, i) => renderBcItem(bc, i)).join('');
+          html += '</div>';
+        }
+        if (inactiveList.length > 0) {
+          html += '<div class="mt-4 mb-2"><span class="text-xs font-bold text-gray-400">비활성</span></div>';
+          html += inactiveList.map((bc, i) => renderBcItem(bc, -1)).join('');
+        }
+        document.getElementById('broadcast-list').innerHTML = html;
+        
+        // Sortable 초기화
+        if (bcSortableInstance) { try { bcSortableInstance.destroy(); } catch(e){} bcSortableInstance = null; }
+        const sortEl = document.getElementById('bc-sortable-list');
+        if (sortEl && activeList.length > 1 && typeof Sortable !== 'undefined') {
+          bcSortableInstance = new Sortable(sortEl, {
+            handle: '.bc-drag-handle',
+            animation: 150,
+            ghostClass: 'bg-orange-100',
+            onEnd: async function() {
+              const ids = Array.from(sortEl.querySelectorAll('[data-bc-id]')).map(el => Number(el.dataset.bcId));
+              // 번호 업데이트
+              sortEl.querySelectorAll('[data-bc-id]').forEach((el, i) => {
+                const numEl = el.querySelector('.text-orange-500.w-5');
+                if (numEl) numEl.textContent = (i + 1);
+              });
+              try {
+                await fetch(API_BASE + '/broadcasts/reorder', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ orderedIds: ids })
+                });
+                console.log('[Broadcast] Reorder saved:', ids);
+              } catch(e) { console.error('Reorder failed:', e); }
+            }
+          });
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    }
+    
+    async function createBroadcast() {
+      const url = document.getElementById('bc-url').value.trim();
+      const title = document.getElementById('bc-title').value.trim();
+      if (!url || !title) { alert('URL과 제목을 입력하세요.'); return; }
+      
+      const targetMode = document.getElementById('bc-target-mode').value;
+      let targetUserIds = [];
+      if (targetMode === 'selected') {
+        targetUserIds = Array.from(document.querySelectorAll('.bc-user-cb:checked')).map(cb => Number(cb.value));
+        if (targetUserIds.length === 0) { alert('배포할 치과를 선택하세요.'); return; }
+      }
+      
+      const body = {
+        url: url,
+        title: title,
+        target_mode: targetMode,
+        target_user_ids: targetUserIds,
+        target_playlist_type: document.getElementById('bc-playlist-type').value,
+        insert_position: document.getElementById('bc-position').value,
+        repeat_every_n: (document.getElementById('bc-position').value === 'ratio:auto' && document.getElementById('bc-every-n-check').checked) ? Number(document.getElementById('bc-every-n').value) || 0 : 0,
+        auto_expire_days: Number(document.getElementById('bc-expire-days').value) || 0
+      };
+      
+      try {
+        const res = await fetch(API_BASE + '/broadcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(data.sentTo + '개 치과에 배포 완료!');
+          document.getElementById('bc-url').value = '';
+          document.getElementById('bc-title').value = '';
+          document.getElementById('bc-expire-days').value = '0';
+          loadBroadcasts();
+          loadClinicBroadcasts();
+        } else {
+          alert(data.error || '배포 실패');
+        }
+      } catch(e) {
+        alert('배포 실패: ' + e.message);
+      }
+    }
+    
+    async function cancelBroadcast(id) {
+      if (!confirm('이 배포를 취소하시겠습니까? 모든 치과의 재생목록에서 제거됩니다.')) return;
+      try {
+        await fetch(API_BASE + '/broadcasts/' + id, { method: 'DELETE' });
+        loadBroadcasts();
+        loadClinicBroadcasts();
+      } catch(e) { alert('취소 실패'); }
+    }
+    
+    let _clinicSortables = {};
+    
+    async function loadClinicBroadcasts() {
+      const container = document.getElementById('clinic-broadcast-view');
+      if (!container) return;
+      try {
+        const res = await fetch(API_BASE + '/broadcasts/clinics');
+        const data = await res.json();
+        const clinics = data.clinics || [];
+        
+        if (clinics.length === 0) {
+          container.innerHTML = '<p class="text-gray-400 text-center py-6 text-sm">등록된 치과가 없습니다</p>';
+          return;
+        }
+        
+        let html = '';
+        for (const clinic of clinics) {
+          const bcCount = clinic.broadcasts.length;
+          const plInfo = clinic.playlists.map(p => p.name + '(' + p.item_count + '개)').join(', ') || '';
+          const clinicId = clinic.id;
+          
+          html += '<div class="border rounded-lg overflow-hidden bg-white mb-2">';
+          // 헤더 (클릭하면 펼침)
+          html += '<div class="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-gray-50 select-none" onclick="toggleClinicPanel(' + clinicId + ')">';
+          html += '<div class="flex items-center gap-2 min-w-0">';
+          html += '<i class="fas fa-chevron-right text-gray-300 text-xs transition-transform" id="clinic-arrow-' + clinicId + '"></i>';
+          html += '<i class="fas fa-hospital text-blue-400 text-xs"></i>';
+          html += '<span class="font-bold text-sm text-gray-800 truncate">' + (clinic.clinic_name || clinic.admin_code) + '</span>';
+          if (plInfo) html += '<span class="text-xs text-gray-400 hidden sm:inline truncate">' + plInfo + '</span>';
+          html += '</div>';
+          html += '<span class="flex items-center gap-1 text-xs font-bold flex-shrink-0 ' + (bcCount > 0 ? 'text-orange-500' : 'text-gray-300') + '"><i class="fas fa-bullhorn" style="font-size:9px"></i>' + bcCount + '</span>';
+          html += '</div>';
+          
+          // 펼침 패널
+          html += '<div id="clinic-panel-' + clinicId + '" class="hidden border-t">';
+          if (bcCount > 0) {
+            html += '<div class="px-3 py-1.5 bg-gray-50 flex items-center gap-2">';
+            html += '<span class="text-xs text-gray-500 font-bold">재생 순서</span>';
+            html += '<span class="text-xs text-gray-400">(드래그로 이 치과의 순서 변경)</span>';
+            html += '</div>';
+            html += '<div id="clinic-bc-list-' + clinicId + '" class="px-2 py-1.5 space-y-1" data-clinic-id="' + clinicId + '">';
+            clinic.broadcasts.forEach(function(bc, idx) {
+              const posText = bc.insert_position === 'ratio:auto' ? '균등' : bc.insert_position === 'start' ? '맨앞' : '맨뒤';
+              html += '<div class="flex items-center gap-2 px-2 py-1.5 bg-gray-50 rounded group" data-bc-id="' + bc.broadcast_id + '">';
+              html += '<div class="clinic-bc-handle text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical text-xs"></i></div>';
+              html += '<span class="text-xs font-bold text-orange-500 w-4 text-center">' + (idx + 1) + '</span>';
+              html += bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" class="w-10 h-7 object-cover rounded flex-shrink-0">' : '<div class="w-10 h-7 bg-gray-200 rounded flex-shrink-0"></div>';
+              html += '<span class="text-xs text-gray-700 truncate flex-1">' + bc.title + '</span>';
+              html += '<span class="px-1.5 py-0.5 rounded text-xs bg-orange-50 text-orange-500">' + posText + '</span>';
+              html += '<button onclick="event.stopPropagation();removeClinicBroadcast(' + clinicId + ',' + bc.broadcast_id + ')" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="이 치과에서 제거"><i class="fas fa-times text-xs"></i></button>';
+              html += '</div>';
+            });
+            html += '</div>';
+          } else {
+            html += '<div class="px-3 py-4 text-center text-xs text-gray-300">이 치과에 배포된 광고가 없습니다</div>';
+          }
+          html += '</div>';
+          html += '</div>';
+        }
+        
+        container.innerHTML = html;
+        // 기존 sortable 정리
+        Object.values(_clinicSortables).forEach(function(s) { try { s.destroy(); } catch(e){} });
+        _clinicSortables = {};
+      } catch(e) {
+        container.innerHTML = '<p class="text-red-400 text-center py-6 text-sm">로딩 실패</p>';
+        console.error(e);
+      }
+    }
+    
+    function toggleClinicPanel(clinicId) {
+      const panel = document.getElementById('clinic-panel-' + clinicId);
+      const arrow = document.getElementById('clinic-arrow-' + clinicId);
+      if (!panel) return;
+      const isHidden = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden');
+      if (arrow) arrow.style.transform = isHidden ? 'rotate(90deg)' : '';
+      // 펼칠 때 sortable 초기화
+      if (isHidden) initClinicSortable(clinicId);
+    }
+    
+    function initClinicSortable(clinicId) {
+      if (_clinicSortables[clinicId]) { try { _clinicSortables[clinicId].destroy(); } catch(e){} }
+      const listEl = document.getElementById('clinic-bc-list-' + clinicId);
+      if (!listEl || listEl.children.length < 2 || typeof Sortable === 'undefined') return;
+      _clinicSortables[clinicId] = new Sortable(listEl, {
+        handle: '.clinic-bc-handle',
+        animation: 150,
+        ghostClass: 'bg-orange-50',
+        onEnd: async function() {
+          const ids = Array.from(listEl.querySelectorAll('[data-bc-id]')).map(el => Number(el.dataset.bcId));
+          // 번호 갱신
+          listEl.querySelectorAll('[data-bc-id]').forEach(function(el, i) {
+            const numEl = el.querySelector('.text-orange-500.w-4');
+            if (numEl) numEl.textContent = (i + 1);
+          });
+          try {
+            await fetch(API_BASE + '/broadcasts/reorder', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderedIds: ids, userId: clinicId })
+            });
+            console.log('[Clinic ' + clinicId + '] Reorder:', ids);
+          } catch(e) { console.error('Clinic reorder failed:', e); }
+        }
+      });
+    }
+    
+    async function removeClinicBroadcast(clinicId, broadcastId) {
+      if (!confirm('이 치과에서 해당 광고를 제거하시겠습니까?')) return;
+      try {
+        await fetch(API_BASE + '/broadcasts/' + broadcastId + '/receipt/' + clinicId, { method: 'DELETE' });
+        loadClinicBroadcasts();
+        loadBroadcasts(); // 수신 카운트 갱신
+      } catch(e) { alert('제거 실패'); }
     }
   </script>
 </body>

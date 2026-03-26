@@ -91,6 +91,7 @@ let notices = _ID.notices || [];
 let masterItems = _ID.masterItems || [];
 let cachedMasterItems = masterItems || [];
 let masterItemsCache = masterItems || [];
+let broadcastItemsCache = [];
 let currentPlaylist = null;
 
 // INITIAL_DATA 안전 접근 헬퍼
@@ -2945,6 +2946,12 @@ async function openPlaylistEditor(id) {
         if (data && data.playlist) {
           playlistCacheById[id] = data.playlist;
         }
+        // 배포 영상 캐시 (2-b단계 선행 로드)
+        if (data && data.broadcastItems && data.broadcastItems.length > 0) {
+          broadcastItemsCache = data.broadcastItems;
+          console.log('[Editor 2-b] Broadcast items pre-loaded:', broadcastItemsCache.length);
+          _renderPlaylistOnly();
+        }
       })
       .catch(() => {});
   }
@@ -2974,6 +2981,11 @@ async function openPlaylistEditor(id) {
         fullPlaylist = data.playlist;
         playlistCacheById[id] = fullPlaylist;
       }
+      // 배포 영상 캐시 업데이트
+      if (data && data.broadcastItems) {
+        broadcastItemsCache = data.broadcastItems;
+        console.log('[Editor] Broadcast items loaded:', broadcastItemsCache.length);
+      }
     }
 
     if (fullPlaylist) {
@@ -2995,7 +3007,8 @@ async function openPlaylistEditor(id) {
 
         // 완전한 데이터로 전체 렌더링
         const newSignature = getPlaylistEditorSignature(masterItemsCache || [], currentPlaylist);
-        if (newSignature !== playlistEditorSignature) {
+        const hasBroadcastChange = (broadcastItemsCache && broadcastItemsCache.length > 0);
+        if (newSignature !== playlistEditorSignature || hasBroadcastChange) {
           playlistEditorSignature = newSignature;
           await renderLibraryAndPlaylist();
           ensureMasterLibraryVisible();
@@ -3689,6 +3702,8 @@ function addToPlaylistFromLibrary(itemId) {
 function removeFromPlaylist(itemId) {
   if (!currentPlaylist || !Array.isArray(currentPlaylist.activeItemIds)) return;
   const sid = String(itemId);
+  // 배포 영상은 삭제 불가
+  if (sid.startsWith('bc_')) { alert('배포 영상은 삭제할 수 없습니다.'); return; }
   const before = currentPlaylist.activeItemIds.length;
   currentPlaylist.activeItemIds = currentPlaylist.activeItemIds.filter(
     id => String(id) !== sid
@@ -4007,7 +4022,22 @@ async function renderLibraryAndPlaylist() {
     .map(id => allItems.find(item => String(item.id) === String(id)))
     .filter(item => item);
   
-  let playlistItems = activeUserItems;
+  // 배포 영상 병합 (insert_position에 따라: start, end, ratio:auto)
+  let playlistItems = [...activeUserItems];
+  if (broadcastItemsCache && broadcastItemsCache.length > 0) {
+    const startBc = broadcastItemsCache.filter(b => b.insert_position === 'start');
+    const endBc = broadcastItemsCache.filter(b => !b.insert_position || b.insert_position === 'end');
+    const ratioBc = broadcastItemsCache.filter(b => b.insert_position === 'ratio:auto');
+    playlistItems = [...startBc, ...playlistItems, ...endBc];
+    if (ratioBc.length > 0) {
+      const baseLen = playlistItems.length;
+      const gap = Math.max(1, Math.floor(baseLen / (ratioBc.length + 1)));
+      for (let ri = ratioBc.length - 1; ri >= 0; ri--) {
+        const pos = Math.min(gap * (ri + 1), playlistItems.length);
+        playlistItems.splice(pos, 0, ratioBc[ri]);
+      }
+    }
+  }
   
   // 플레이리스트 카운트 업데이트
   const countEl = document.getElementById('playlist-count');
@@ -4019,10 +4049,10 @@ async function renderLibraryAndPlaylist() {
   }
   
   playlistContainer.innerHTML = playlistItems.map((item, index) => `
-    <div class="flex items-center gap-2 p-2 ${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}">
-      <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>
-      <span class="text-sm font-bold ${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
+    <div class="flex items-center gap-2 p-2 ${item.is_broadcast ? 'bg-orange-50 border border-orange-200' : item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}" data-broadcast="${item.is_broadcast ? 1 : 0}">
+      ${item.is_broadcast ? '<div class="w-5"></div>' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+      <span class="text-sm font-bold ${item.is_broadcast ? 'text-orange-500' : item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
       <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
         ${item.item_type === 'image'
           ? `<img src="${item.url}" class="w-full h-full object-cover">`
@@ -4033,9 +4063,9 @@ async function renderLibraryAndPlaylist() {
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
-        ${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
+        ${item.is_broadcast ? '<p class="text-xs text-orange-500">배포 영상</p>' : item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
       </div>
-      <button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
+      ${item.is_broadcast ? '' : `<button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>`}
     </div>
   `).join('');
   
@@ -4059,7 +4089,22 @@ function _renderPlaylistOnly() {
     .map(id => allItems.find(item => String(item.id) === String(id)))
     .filter(item => item);
   
-  let playlistItems = activeUserItems;
+  // 배포 영상 병합 (start, end, ratio:auto)
+  let playlistItems = [...activeUserItems];
+  if (broadcastItemsCache && broadcastItemsCache.length > 0) {
+    const startBc = broadcastItemsCache.filter(b => b.insert_position === 'start');
+    const endBc = broadcastItemsCache.filter(b => !b.insert_position || b.insert_position === 'end');
+    const ratioBc = broadcastItemsCache.filter(b => b.insert_position === 'ratio:auto');
+    playlistItems = [...startBc, ...playlistItems, ...endBc];
+    if (ratioBc.length > 0) {
+      const baseLen = playlistItems.length;
+      const gap = Math.max(1, Math.floor(baseLen / (ratioBc.length + 1)));
+      for (let ri = ratioBc.length - 1; ri >= 0; ri--) {
+        const pos = Math.min(gap * (ri + 1), playlistItems.length);
+        playlistItems.splice(pos, 0, ratioBc[ri]);
+      }
+    }
+  }
   
   const countEl = document.getElementById('playlist-count');
   if (countEl) countEl.textContent = playlistItems.length + '개';
@@ -4068,10 +4113,10 @@ function _renderPlaylistOnly() {
     return;
   }
   playlistContainer.innerHTML = playlistItems.map((item, index) => `
-    <div class="flex items-center gap-2 p-2 ${item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
-         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}">
-      <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>
-      <span class="text-sm font-bold ${item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
+    <div class="flex items-center gap-2 p-2 ${item.is_broadcast ? 'bg-orange-50 border border-orange-200' : item.is_master ? 'bg-purple-50 border border-purple-200' : 'bg-green-50 border border-green-200'} rounded group"
+         data-playlist-index="${index}" data-id="${item.id}" data-master="${item.is_master ? 1 : 0}" data-broadcast="${item.is_broadcast ? 1 : 0}">
+      ${item.is_broadcast ? '<div class="w-5"></div>' : '<div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"><i class="fas fa-grip-vertical"></i></div>'}
+      <span class="text-sm font-bold ${item.is_broadcast ? 'text-orange-500' : item.is_master ? 'text-purple-500' : 'text-green-600'} w-6">${index + 1}</span>
       <div class="w-14 h-9 bg-gray-200 rounded overflow-hidden flex-shrink-0">
         ${item.item_type === 'image'
           ? `<img src="${item.url}" class="w-full h-full object-cover">`
@@ -4082,9 +4127,9 @@ function _renderPlaylistOnly() {
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-xs font-medium text-gray-800 truncate">${item.title || item.url}</p>
-        ${item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
+        ${item.is_broadcast ? '<p class="text-xs text-orange-500">배포 영상</p>' : item.is_master ? '<p class="text-xs text-purple-500">' + getMasterTargetBadge(item) + '</p>' : ''}
       </div>
-      <button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>
+      ${item.is_broadcast ? '' : `<button onclick="removeFromPlaylist('${item.id}')" class="text-red-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100"><i class="fas fa-times"></i></button>`}
     </div>
   `).join('');
   initPlaylistItemsSortable();
@@ -4237,12 +4282,15 @@ function initPlaylistItemsSortable() {
   playlistItemsSortableInstance = new Sortable(container, {
     animation: 150,
     handle: '.drag-handle',
+    filter: '[data-broadcast="1"]',
     onEnd: function(evt) {
       if (evt.oldIndex === evt.newIndex) return;
-      const activeIds = (currentPlaylist.activeItemIds || []).map(id => String(id));
-      const [moved] = activeIds.splice(evt.oldIndex, 1);
-      activeIds.splice(evt.newIndex, 0, moved);
-      currentPlaylist.activeItemIds = activeIds;
+      // 배포 영상을 제외한 실제 activeItemIds만 재정렬
+      const allDivs = Array.from(container.children);
+      const nonBroadcastIds = allDivs
+        .filter(el => el.getAttribute('data-broadcast') !== '1')
+        .map(el => String(el.getAttribute('data-id')));
+      currentPlaylist.activeItemIds = nonBroadcastIds;
       _renderPlaylistOnly();
       saveActiveItems();
     }
@@ -5738,7 +5786,7 @@ function saveClinicNameFromSettings() {
 // ============================================
 function showAdminSubTab(sub) {
   _adminSubTab = sub;
-  var allSubs = ['push', 'master-videos', 'overview', 'subtitles'];
+  var allSubs = ['push', 'master-videos', 'overview', 'broadcasts', 'subtitles'];
   allSubs.forEach(function(s) {
     var btn = document.getElementById('admin-sub-' + s);
     if (!btn) return;
@@ -5765,9 +5813,309 @@ function showAdminSubTab(sub) {
     ]).then(function() {
       renderAdminOverview();
     });
+  } else if (sub === 'broadcasts') {
+    renderAdminBroadcasts();
   } else if (sub === 'subtitles') {
     renderAdminSubtitles();
   }
+}
+
+// ============================================
+// 영상 배포 (아임웹 관리자 페이지용)
+// ============================================
+let _bcUsers = [];
+let _bcList = [];
+
+async function renderAdminBroadcasts() {
+  var body = document.getElementById('admin-body');
+  if (!body) return;
+
+  // 치과 목록 로드
+  try {
+    const uRes = await fetch('/api/master/users');
+    if (uRes.ok) { const uData = await uRes.json(); _bcUsers = uData.users || []; }
+  } catch(e) {}
+
+  // 배포 목록 로드
+  try {
+    const bRes = await fetch('/api/master/broadcasts');
+    if (bRes.ok) { const bData = await bRes.json(); _bcList = bData.broadcasts || []; }
+  } catch(e) {}
+
+  var userCheckboxes = _bcUsers.map(function(u) {
+    return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer">'
+      + '<input type="checkbox" value="' + u.id + '" class="bc-user-chk" style="accent-color:#f97316">'
+      + '<span>' + (u.clinic_name || u.admin_code) + '</span></label>';
+  }).join('');
+
+  body.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 12px;display:flex;align-items:center;gap:8px">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#fff7ed;color:#f97316;font-size:10px"><i class="fas fa-plus-circle"></i></span>'
+    + '\uC0C8 \uC601\uC0C1 \uBC30\uD3EC</h3>'
+    + '<div style="display:grid;gap:10px">'
+    + '<div><label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">YouTube \uB610\uB294 Vimeo URL</label>'
+    + '<input type="text" id="bc-url-imweb" placeholder="https://vimeo.com/..." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>'
+    + '<div><label style="display:block;font-size:12px;color:#6b7280;margin-bottom:4px">\uBC30\uD3EC \uC81C\uBAA9</label>'
+    + '<input type="text" id="bc-title-imweb" placeholder="\uC608: 3\uC6D4 \uC2E0\uC81C\uD488 \uAD11\uACE0" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uB300\uC0C1</label>'
+    + '<select id="bc-target-imweb" onchange="document.getElementById(\'bc-users-imweb\').style.display=this.value===\'selected\'?\'block\':\'none\'" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+    + '<option value="all">\uC804\uCCB4 \uCE58\uACFC</option><option value="selected">\uC120\uD0DD \uCE58\uACFC</option></select></div>'
+    + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uC0BD\uC785 \uC704\uCE58</label>'
+    + '<select id="bc-pos-imweb" onchange="var w=document.getElementById(\'bc-every-n-wrap-imweb\');if(w)w.style.display=this.value===\'ratio:auto\'?\'block\':\'none\'" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+    + '<option value="end">\uB9E8 \uB4A4</option><option value="start">\uB9E8 \uC55E</option><option value="ratio:auto">\uADE0\uB4F1 \uBC30\uCE58</option></select></div>'
+    + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uB300\uC0C1 TV</label>'
+    + '<select id="bc-tvtype-imweb" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit">'
+    + '<option value="all">\uC804\uCCB4</option><option value="waitingroom">\uB300\uAE30\uC2E4\uB9CC</option><option value="chair">\uCCB4\uC5B4\uB9CC</option></select></div>'
+    + '<div><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uC790\uB3D9 \uB9CC\uB8CC (\uC77C)</label>'
+    + '<input type="number" id="bc-expire-imweb" value="0" min="0" placeholder="0=\uBB34\uAE30\uD55C" style="width:100%;padding:7px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;box-sizing:border-box"></div></div>'
+    + '<div id="bc-every-n-wrap-imweb" style="display:none;margin-top:6px"><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;cursor:pointer"><input type="checkbox" id="bc-every-n-check-imweb" onchange="var w=document.getElementById(\'bc-every-n-row-imweb\');if(w)w.style.display=this.checked?\'flex\':\'none\'" style="accent-color:#f97316">\uBC18\uBCF5 \uC7AC\uC0DD \uC2DC N\uAC1C \uC601\uC0C1\uB9C8\uB2E4 \uC0BD\uC785</label>'
+    + '<div id="bc-every-n-row-imweb" style="display:none;align-items:center;gap:4px;margin-top:4px"><span style="font-size:11px;color:#9ca3af">\uB9E4</span><input type="number" id="bc-every-n-imweb" value="5" min="2" max="50" style="width:50px;padding:4px 6px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;text-align:center;font-family:inherit"><span style="font-size:11px;color:#9ca3af">\uAC1C \uC601\uC0C1\uB9C8\uB2E4</span></div></div>'
+    + '<div id="bc-users-imweb" style="display:none"><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:3px">\uCE58\uACFC \uC120\uD0DD</label>'
+    + '<div style="max-height:120px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;background:#fafafa">' + (userCheckboxes || '<span style="color:#9ca3af;font-size:12px">\uCE58\uACFC \uC5C6\uC74C</span>') + '</div></div>'
+    + '<button onclick="submitBroadcastImweb()" style="width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '<i class="fas fa-paper-plane" style="margin-right:6px"></i>\uBC30\uD3EC\uD558\uAE30</button>'
+    + '</div></div>'
+    + '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#fff7ed;color:#f97316;font-size:10px"><i class="fas fa-list"></i></span>'
+    + '\uBC30\uD3EC \uD604\uD669</h3>'
+    + '<span style="background:#fff7ed;color:#f97316;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600">' + _bcList.length + '\uAC1C</span></div>'
+    + '<div id="bc-list-imweb">' + renderBcListHtml() + '</div></div>'
+    + '<div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px;margin-top:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<h3 style="font-size:13px;font-weight:700;color:#374151;margin:0;display:flex;align-items:center;gap:8px">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#eff6ff;color:#3b82f6;font-size:10px"><i class="fas fa-hospital"></i></span>'
+    + '\uCE58\uACFC\uBCC4 \uBC30\uD3EC \uD604\uD669</h3>'
+    + '<button onclick="loadClinicBcImweb()" style="font-size:11px;background:none;border:none;color:#3b82f6;cursor:pointer;font-family:inherit"><i class="fas fa-sync-alt" style="margin-right:4px"></i>\uC0C8\uB85C\uACE0\uCE68</button></div>'
+    + '<div id="clinic-bc-imweb" style="max-height:60vh;overflow-y:auto"><p style="text-align:center;color:#9ca3af;padding:16px 0;font-size:13px">\uB85C\uB529 \uC911...</p></div></div>';
+  
+  // 드래그 순서 변경 초기화
+  setTimeout(function() { initBcSortableImweb(); loadClinicBcImweb(); }, 50);
+}
+
+var _bcSortableImweb = null;
+
+function renderBcListHtml() {
+  if (_bcList.length === 0) return '<p style="text-align:center;color:#9ca3af;padding:24px 0;font-size:13px">\uBC30\uD3EC \uB0B4\uC5ED\uC774 \uC5C6\uC2B5\uB2C8\uB2E4</p>';
+  var activeList = _bcList.filter(function(bc) { return bc.status === 'active'; });
+  var inactiveList = _bcList.filter(function(bc) { return bc.status !== 'active'; });
+  
+  function renderBcItemImweb(bc, idx) {
+    var isActive = bc.status === 'active';
+    var statusColor = isActive ? '#15803d' : '#6b7280';
+    var statusBg = isActive ? '#dcfce7' : '#f3f4f6';
+    var statusText = isActive ? '\uD65C\uC131' : (bc.status === 'cancelled' ? '\uCDE8\uC18C\uB428' : bc.status);
+    var targetText = bc.target_mode === 'all' ? '\uC804\uCCB4' : '\uC120\uD0DD';
+    var tvType = bc.target_playlist_type === 'waitingroom' ? '\uB300\uAE30\uC2E4' : bc.target_playlist_type === 'chair' ? '\uCCB4\uC5B4' : '';
+    var expire = bc.auto_expire_at ? '<span style="font-size:10px;color:#9ca3af">\uB9CC\uB8CC: ' + bc.auto_expire_at.slice(0,10) + '</span>' : '';
+    var posText = bc.insert_position === 'ratio:auto' ? '\uADE0\uB4F1' : bc.insert_position === 'start' ? '\uB9E8\uC55E' : '\uB9E8\uB4A4';
+    var posBg = bc.insert_position === 'ratio:auto' ? '#fff7ed' : '#f3f4f6';
+    var posColor = bc.insert_position === 'ratio:auto' ? '#ea580c' : '#6b7280';
+    var everyNBadge = (bc.repeat_every_n && bc.repeat_every_n > 0) ? '<span style="font-size:10px;color:#ea580c">\uB9E4' + bc.repeat_every_n + '\uAC1C</span>' : '';
+    return '<div data-bc-id="' + bc.id + '" style="display:flex;align-items:center;gap:10px;padding:10px;background:#fafafa;border-radius:8px;margin-bottom:6px">'
+      + (isActive ? '<div class="bc-drag-handle-imweb" style="color:#cbd5e1;cursor:grab;flex-shrink:0;font-size:14px;padding:0 2px"><i class="fas fa-grip-vertical"></i></div>' : '')
+      + (isActive ? '<span style="font-size:11px;font-weight:700;color:#f97316;width:16px;flex-shrink:0;text-align:center">' + (idx + 1) + '</span>' : '')
+      + (bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" style="width:48px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">' : '<div style="width:48px;height:36px;background:#e5e7eb;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-video" style="color:#9ca3af;font-size:12px"></i></div>')
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + bc.title + '</div>'
+      + '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;align-items:center">'
+      + '<span style="padding:1px 6px;background:' + statusBg + ';color:' + statusColor + ';border-radius:20px;font-size:10px;font-weight:600">' + statusText + '</span>'
+      + '<span style="padding:1px 6px;background:#dbeafe;color:#1d4ed8;border-radius:20px;font-size:10px;font-weight:600">' + targetText + '</span>'
+      + (tvType ? '<span style="padding:1px 6px;background:#fce7f3;color:#be185d;border-radius:20px;font-size:10px;font-weight:600">' + tvType + '</span>' : '')
+      + '<span style="padding:1px 6px;background:' + posBg + ';color:' + posColor + ';border-radius:20px;font-size:10px;font-weight:600">' + posText + '</span>'
+      + '<span style="font-size:10px;color:#9ca3af">\uC218\uC2E0: ' + (bc.total_inserted || 0) + '/' + (bc.total_sent || 0) + '</span>'
+      + everyNBadge + expire + '</div></div>'
+      + (isActive ? '<button onclick="cancelBcImweb(' + bc.id + ')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:14px;padding:4px" title="\uCDE8\uC18C"><i class="fas fa-times-circle"></i></button>' : '')
+      + '</div>';
+  }
+  
+  var html = '';
+  if (activeList.length > 0) {
+    html += '<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px"><span style="font-size:11px;font-weight:700;color:#6b7280">\uC7AC\uC0DD \uC21C\uC11C</span><span style="font-size:10px;color:#9ca3af">(\uB4DC\uB798\uADF8\uD558\uC5EC \uC21C\uC11C \uBCC0\uACBD)</span></div>';
+    html += '<div id="bc-sortable-imweb" style="margin-bottom:8px">';
+    html += activeList.map(function(bc, i) { return renderBcItemImweb(bc, i); }).join('');
+    html += '</div>';
+  }
+  if (inactiveList.length > 0) {
+    html += '<div style="margin-top:12px;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#9ca3af">\uBE44\uD65C\uC131</span></div>';
+    html += inactiveList.map(function(bc, i) { return renderBcItemImweb(bc, -1); }).join('');
+  }
+  return html;
+}
+
+function initBcSortableImweb() {
+  if (_bcSortableImweb) { try { _bcSortableImweb.destroy(); } catch(e){} _bcSortableImweb = null; }
+  var sortEl = document.getElementById('bc-sortable-imweb');
+  if (!sortEl || sortEl.children.length < 2 || typeof Sortable === 'undefined') return;
+  _bcSortableImweb = new Sortable(sortEl, {
+    handle: '.bc-drag-handle-imweb',
+    animation: 150,
+    ghostClass: 'bc-ghost-imweb',
+    onEnd: async function() {
+      var ids = Array.from(sortEl.querySelectorAll('[data-bc-id]')).map(function(el) { return Number(el.dataset.bcId); });
+      sortEl.querySelectorAll('[data-bc-id]').forEach(function(el, i) {
+        var numEl = el.querySelector('span[style*="color:#f97316"]');
+        if (numEl && numEl.style.width === '16px') numEl.textContent = (i + 1);
+      });
+      try {
+        await fetch('/api/master/broadcasts/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderedIds: ids })
+        });
+        console.log('[Broadcast] ImWeb reorder saved:', ids);
+      } catch(e) { console.error('Reorder failed:', e); }
+    }
+  });
+}
+
+async function submitBroadcastImweb() {
+  var url = document.getElementById('bc-url-imweb').value.trim();
+  var title = document.getElementById('bc-title-imweb').value.trim();
+  if (!url || !title) { alert('URL\uACFC \uC81C\uBAA9\uC744 \uC785\uB825\uD558\uC138\uC694.'); return; }
+  var targetMode = document.getElementById('bc-target-imweb').value;
+  var targetUserIds = [];
+  if (targetMode === 'selected') {
+    targetUserIds = Array.from(document.querySelectorAll('.bc-user-chk:checked')).map(function(cb) { return Number(cb.value); });
+    if (targetUserIds.length === 0) { alert('\uBC30\uD3EC\uD560 \uCE58\uACFC\uB97C \uC120\uD0DD\uD558\uC138\uC694.'); return; }
+  }
+  try {
+    var res = await fetch('/api/master/broadcasts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url, title: title, target_mode: targetMode, target_user_ids: targetUserIds,
+        target_playlist_type: document.getElementById('bc-tvtype-imweb').value,
+        insert_position: document.getElementById('bc-pos-imweb').value,
+        repeat_every_n: (document.getElementById('bc-pos-imweb').value === 'ratio:auto' && document.getElementById('bc-every-n-check-imweb') && document.getElementById('bc-every-n-check-imweb').checked) ? Number(document.getElementById('bc-every-n-imweb').value) || 0 : 0,
+        auto_expire_days: Number(document.getElementById('bc-expire-imweb').value) || 0
+      })
+    });
+    var data = await res.json();
+    if (data.success) {
+      showToast(data.sentTo + '\uAC1C \uCE58\uACFC\uC5D0 \uBC30\uD3EC \uC644\uB8CC!');
+      document.getElementById('bc-url-imweb').value = '';
+      document.getElementById('bc-title-imweb').value = '';
+      document.getElementById('bc-expire-imweb').value = '0';
+      renderAdminBroadcasts();
+    } else {
+      alert(data.error || '\uBC30\uD3EC \uC2E4\uD328');
+    }
+  } catch(e) { alert('\uBC30\uD3EC \uC2E4\uD328: ' + e.message); }
+}
+
+async function cancelBcImweb(id) {
+  if (!confirm('\uC774 \uBC30\uD3EC\uB97C \uCDE8\uC18C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+  try {
+    await fetch('/api/master/broadcasts/' + id, { method: 'DELETE' });
+    showToast('\uBC30\uD3EC\uAC00 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+    renderAdminBroadcasts();
+  } catch(e) { alert('\uCDE8\uC18C \uC2E4\uD328'); }
+}
+
+// ============ 치과별 배포 현황 (ImWeb) ============
+var _clinicBcSortables = {};
+
+async function loadClinicBcImweb() {
+  var container = document.getElementById('clinic-bc-imweb');
+  if (!container) return;
+  try {
+    var res = await fetch('/api/master/broadcasts/clinics');
+    if (!res.ok) throw new Error('API error');
+    var data = await res.json();
+    var clinics = data.clinics || [];
+    if (clinics.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:16px 0;font-size:13px">\uB4F1\uB85D\uB41C \uCE58\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4</p>';
+      return;
+    }
+    var html = '';
+    clinics.forEach(function(clinic) {
+      var bcCount = (clinic.broadcasts || []).length;
+      var activeBcs = (clinic.broadcasts || []).filter(function(b) { return b.status === 'active' || b.status === 'auto_inserted'; });
+      var plNames = (clinic.playlists || []).map(function(p) { return p.name + '(' + p.item_count + ')'; }).join(', ') || '-';
+      html += '<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:6px">'
+        + '<div onclick="toggleClinicBcImweb(' + clinic.id + ')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;background:#fafafa;user-select:none">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">'
+        + '<i class="fas fa-hospital" style="color:#3b82f6;font-size:12px;flex-shrink:0"></i>'
+        + '<span style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (clinic.clinic_name || clinic.admin_code) + '</span>'
+        + '<span style="padding:1px 8px;background:' + (activeBcs.length > 0 ? '#fff7ed' : '#f3f4f6') + ';color:' + (activeBcs.length > 0 ? '#ea580c' : '#9ca3af') + ';border-radius:20px;font-size:10px;font-weight:600;flex-shrink:0">' + activeBcs.length + '\uAC1C \uAD11\uACE0</span>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+        + '<span style="font-size:10px;color:#9ca3af">' + plNames + '</span>'
+        + '<i class="fas fa-chevron-down clinic-bc-arrow-' + clinic.id + '" style="color:#9ca3af;font-size:10px;transition:transform .2s"></i>'
+        + '</div></div>'
+        + '<div id="clinic-bc-panel-' + clinic.id + '" style="display:none;padding:8px 12px;background:#fff;border-top:1px solid #f3f4f6">';
+
+      if (activeBcs.length === 0) {
+        html += '<p style="text-align:center;color:#d1d5db;padding:8px 0;font-size:12px">\uBC30\uD3EC\uB41C \uAD11\uACE0 \uC5C6\uC74C</p>';
+      } else {
+        html += '<div id="clinic-bc-sort-' + clinic.id + '">';
+        activeBcs.forEach(function(bc, idx) {
+          var posText = bc.insert_position === 'ratio:auto' ? '\uADE0\uB4F1' : bc.insert_position === 'start' ? '\uB9E8\uC55E' : '\uB9E8\uB4A4';
+          html += '<div data-receipt-bc-id="' + bc.broadcast_id + '" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fafafa;border-radius:6px;margin-bottom:4px;group">'
+            + '<div class="clinic-bc-drag-' + clinic.id + '" style="color:#d1d5db;cursor:grab;font-size:12px;flex-shrink:0"><i class="fas fa-grip-vertical"></i></div>'
+            + '<span style="font-size:11px;font-weight:700;color:#f97316;width:14px;flex-shrink:0;text-align:center" class="clinic-bc-num">' + (idx + 1) + '</span>'
+            + (bc.thumbnail_url ? '<img src="' + bc.thumbnail_url + '" style="width:40px;height:30px;object-fit:cover;border-radius:4px;flex-shrink:0">' : '<div style="width:40px;height:30px;background:#e5e7eb;border-radius:4px;flex-shrink:0"></div>')
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:12px;font-weight:600;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (bc.title || 'Untitled') + '</div>'
+            + '<span style="font-size:10px;padding:0 4px;background:#f3f4f6;color:#6b7280;border-radius:3px">' + posText + '</span></div>'
+            + '<button onclick="event.stopPropagation();removeClinicBcImweb(' + clinic.id + ',' + bc.broadcast_id + ')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:11px;padding:2px" title="\uC774 \uCE58\uACFC\uC5D0\uC11C \uC81C\uAC70">'
+            + '<i class="fas fa-times"></i></button></div>';
+        });
+        html += '</div>';
+      }
+      html += '</div></div>';
+    });
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<p style="text-align:center;color:#ef4444;padding:16px 0;font-size:12px">\uB85C\uB4DC \uC2E4\uD328: ' + e.message + '</p>';
+  }
+}
+
+function toggleClinicBcImweb(clinicId) {
+  var panel = document.getElementById('clinic-bc-panel-' + clinicId);
+  if (!panel) return;
+  var isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  var arrow = document.querySelector('.clinic-bc-arrow-' + clinicId);
+  if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : '';
+  if (isHidden) initClinicBcSortImweb(clinicId);
+}
+
+function initClinicBcSortImweb(clinicId) {
+  if (_clinicBcSortables[clinicId]) { try { _clinicBcSortables[clinicId].destroy(); } catch(e){} }
+  var sortEl = document.getElementById('clinic-bc-sort-' + clinicId);
+  if (!sortEl || sortEl.children.length < 2 || typeof Sortable === 'undefined') return;
+  _clinicBcSortables[clinicId] = new Sortable(sortEl, {
+    handle: '.clinic-bc-drag-' + clinicId,
+    animation: 150,
+    onEnd: async function() {
+      var ids = Array.from(sortEl.querySelectorAll('[data-receipt-bc-id]')).map(function(el) { return Number(el.dataset.receiptBcId); });
+      sortEl.querySelectorAll('.clinic-bc-num').forEach(function(el, i) { el.textContent = (i + 1); });
+      try {
+        await fetch('/api/master/broadcasts/clinics/' + clinicId + '/reorder', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderedBroadcastIds: ids })
+        });
+        console.log('[Clinic BC] reorder saved for clinic ' + clinicId);
+      } catch(e) { console.error('Clinic reorder failed:', e); }
+    }
+  });
+}
+
+async function removeClinicBcImweb(clinicId, broadcastId) {
+  if (!confirm('\uC774 \uCE58\uACFC\uC5D0\uC11C \uD574\uB2F9 \uAD11\uACE0\uB97C \uC81C\uAC70\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?')) return;
+  try {
+    var res = await fetch('/api/master/broadcasts/' + broadcastId + '/receipt/' + clinicId, { method: 'DELETE' });
+    var data = await res.json();
+    if (data.success) {
+      showToast('\uCE58\uACFC\uC5D0\uC11C \uAD11\uACE0\uAC00 \uC81C\uAC70\uB418\uC5C8\uC2B5\uB2C8\uB2E4.');
+      loadClinicBcImweb();
+    } else { alert(data.error || '\uC81C\uAC70 \uC2E4\uD328'); }
+  } catch(e) { alert('\uC81C\uAC70 \uC2E4\uD328: ' + e.message); }
 }
 
 function renderAdminSubtitles() {
