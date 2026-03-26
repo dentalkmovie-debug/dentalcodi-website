@@ -1,5 +1,5 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/static/*", "/widget-codi.js", "/widget-imweb.js", "/widget-imweb-d573c21.js", "/widget-cafe24.js", "/widget-codi-admin.js", "/widget-imweb2.js", "/widget-sixshop.js", "/widget-v510.js", "/widget-woocommerce.js", "/favicon.ico"]
+  "exclude": ["/static/*", "/widget-codi.js", "/widget-imweb.js", "/widget-imweb-d573c21.js", "/widget-cafe24.js", "/widget-codi-admin.js", "/widget-imweb2.js", "/widget-sixshop.js", "/widget-v510.js", "/widget-woocommerce.js", "/widget-login-blocker.js", "/favicon.ico"]
 }
