@@ -1,0 +1,1243 @@
+<!-- ====== 아임웹 임플란트 상담 위젯 (마스터 브랜드 통합 버전) ====== -->
+<!-- v2.2.0 - CSS 격리 강화 (아임웹 스타일 충돌 방지) -->
+<!-- API: dental-estimate-api.dentalkmovie.workers.dev -->
+<!-- 기존 mobilecodi 위젯 기능 보존 + 마스터 브랜드 드롭다운/콘텐츠 팝업 추가 -->
+
+<style>
+/* ====== CSS 격리: 모든 셀렉터를 #dentalWidgetRoot 하위로 스코프 ====== */
+/* 아임웹 스타일과 충돌 방지를 위해 !important 사용 */
+
+/* 루트 격리 */
+#dentalWidgetRoot { all:initial!important; display:block!important; visibility:visible!important; opacity:1!important; max-width:100%!important; margin:0 auto!important; padding:12px!important; background:#f8f9fa!important; font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important; font-size:14px!important; line-height:1.5!important; color:#1f2937!important; -webkit-text-size-adjust:100%!important; box-sizing:border-box!important; }
+#dentalWidgetRoot *, #dentalWidgetRoot *::before, #dentalWidgetRoot *::after { margin:0; padding:0; box-sizing:border-box!important; font-family:inherit; line-height:inherit; }
+#dentalWidgetRoot div, #dentalWidgetRoot span, #dentalWidgetRoot p, #dentalWidgetRoot h2, #dentalWidgetRoot h3, #dentalWidgetRoot label, #dentalWidgetRoot button, #dentalWidgetRoot input, #dentalWidgetRoot select, #dentalWidgetRoot option, #dentalWidgetRoot optgroup { display:revert; visibility:visible!important; opacity:1!important; float:none; position:static; transform:none; letter-spacing:normal; text-transform:none; text-indent:0; text-decoration:none; list-style:none; }
+#dentalWidgetRoot h2 { font-size:18px!important; font-weight:700!important; margin:0 0 2px 0!important; }
+#dentalWidgetRoot p { font-size:13px!important; margin:0!important; }
+#dentalWidgetRoot button { cursor:pointer; border:none; background:transparent; font-family:inherit; font-size:inherit; }
+#dentalWidgetRoot input, #dentalWidgetRoot select { font-family:inherit; font-size:14px; color:#1f2937; }
+
+/* ====== 로딩 ====== */
+#dentalWidgetRoot .dental-loading { display:flex!important; flex-direction:column!important; align-items:center!important; justify-content:center!important; padding:60px 20px!important; }
+#dentalWidgetRoot .dental-spinner { width:40px!important; height:40px!important; border:3px solid #e5e7eb!important; border-top-color:#667eea!important; border-radius:50%!important; animation:dental-spin .8s linear infinite!important; }
+@keyframes dental-spin { to { transform:rotate(360deg); } }
+#dentalWidgetRoot .dental-loading-text { margin-top:12px!important; font-size:13px!important; color:#6b7280!important; }
+
+/* ====== 카드 ====== */
+#dentalWidgetRoot .dental-card { display:block!important; visibility:visible!important; background:#fff!important; border-radius:16px!important; box-shadow:0 2px 12px rgba(0,0,0,.06)!important; padding:20px!important; margin-bottom:16px!important; }
+#dentalWidgetRoot .dental-card-header { display:block!important; visibility:visible!important; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important; color:#fff!important; padding:20px!important; border-radius:16px!important; margin-bottom:16px!important; text-align:center!important; }
+#dentalWidgetRoot .dental-card-header h2 { font-size:18px!important; font-weight:700!important; margin-bottom:2px!important; color:#fff!important; }
+#dentalWidgetRoot .dental-card-header p { font-size:13px!important; opacity:.85!important; color:#fff!important; }
+#dentalWidgetRoot .dental-card-header-icon { width:48px!important; height:48px!important; background:rgba(255,255,255,.2)!important; border-radius:12px!important; display:flex!important; align-items:center!important; justify-content:center!important; margin:0 auto 10px!important; font-size:22px!important; }
+
+/* ====== 섹션 제목 ====== */
+#dentalWidgetRoot .dental-section-title { display:flex!important; visibility:visible!important; align-items:center!important; gap:8px!important; font-size:15px!important; font-weight:700!important; color:#1f2937!important; margin-bottom:14px!important; }
+#dentalWidgetRoot .dental-section-title i { color:#667eea!important; }
+
+/* ====== 폼 ====== */
+#dentalWidgetRoot .dental-form-group { display:block!important; visibility:visible!important; margin-bottom:14px!important; }
+#dentalWidgetRoot .dental-label { display:block!important; font-size:12px!important; font-weight:600!important; color:#4b5563!important; margin-bottom:5px!important; }
+#dentalWidgetRoot .dental-label .required { color:#ef4444!important; margin-left:2px!important; }
+#dentalWidgetRoot .dental-input, #dentalWidgetRoot .dental-select { display:block!important; width:100%!important; padding:11px 14px!important; border:1px solid #e5e7eb!important; border-radius:10px!important; font-size:14px!important; transition:all .2s!important; outline:none!important; background:#fff!important; color:#1f2937!important; height:auto!important; appearance:auto!important; }
+#dentalWidgetRoot .dental-input:focus, #dentalWidgetRoot .dental-select:focus { border-color:#667eea!important; box-shadow:0 0 0 3px rgba(102,126,234,.12)!important; }
+#dentalWidgetRoot .dental-input::placeholder { color:#9ca3af!important; }
+#dentalWidgetRoot .dental-input.error { border-color:#ef4444!important; }
+
+/* ====== 버튼 ====== */
+#dentalWidgetRoot .dental-btn { display:inline-flex!important; visibility:visible!important; align-items:center!important; justify-content:center!important; gap:6px!important; padding:11px 18px!important; border:none!important; border-radius:10px!important; font-size:14px!important; font-weight:600!important; cursor:pointer!important; transition:all .2s!important; }
+#dentalWidgetRoot .dental-btn-primary { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)!important; color:#fff!important; width:100%!important; }
+#dentalWidgetRoot .dental-btn-primary:hover { transform:translateY(-1px)!important; box-shadow:0 4px 12px rgba(102,126,234,.35)!important; }
+#dentalWidgetRoot .dental-btn-secondary { background:#f3f4f6!important; color:#374151!important; border:1px solid #e5e7eb!important; }
+#dentalWidgetRoot .dental-btn-sm { padding:6px 12px!important; font-size:12px!important; border-radius:8px!important; }
+#dentalWidgetRoot .dental-btn-outline { background:transparent!important; border:1px solid #667eea!important; color:#667eea!important; }
+#dentalWidgetRoot .dental-btn-outline:hover { background:#667eea!important; color:#fff!important; }
+
+/* ====== 브랜드 선택 ====== */
+#dentalWidgetRoot .dental-brand-tabs { display:flex!important; gap:6px!important; margin-bottom:12px!important; }
+#dentalWidgetRoot .dental-brand-tab { flex:1!important; padding:8px 4px!important; border:1px solid #e5e7eb!important; border-radius:8px!important; font-size:12px!important; font-weight:600!important; text-align:center!important; cursor:pointer!important; background:#fff!important; color:#6b7280!important; display:flex!important; align-items:center!important; justify-content:center!important; gap:4px!important; }
+#dentalWidgetRoot .dental-brand-tab.active { border-color:#667eea!important; background:#667eea!important; color:#fff!important; }
+#dentalWidgetRoot .dental-brand-dropdown-wrap { position:relative!important; display:block!important; }
+#dentalWidgetRoot .dental-brand-dropdown-wrap .dental-select { padding-right:36px!important; }
+#dentalWidgetRoot .dental-brand-info-btn { position:absolute!important; right:10px!important; top:50%!important; transform:translateY(-50%)!important; width:24px!important; height:24px!important; border:none!important; border-radius:50%!important; background:#667eea!important; color:#fff!important; font-size:11px!important; cursor:pointer!important; display:flex!important; align-items:center!important; justify-content:center!important; }
+#dentalWidgetRoot .dental-brand-info-btn.hidden { display:none!important; }
+#dentalWidgetRoot .dental-brand-category { display:inline-flex!important; align-items:center!important; gap:4px!important; padding:3px 8px!important; border-radius:12px!important; font-size:11px!important; font-weight:600!important; }
+#dentalWidgetRoot .dental-brand-category.domestic { background:#dbeafe!important; color:#1d4ed8!important; }
+#dentalWidgetRoot .dental-brand-category.foreign { background:#fef3c7!important; color:#92400e!important; }
+
+/* ====== 모달 ====== */
+.dental-modal-overlay { display:none!important; position:fixed!important; top:0!important; left:0!important; right:0!important; bottom:0!important; background:rgba(0,0,0,.5)!important; z-index:10000!important; align-items:center!important; justify-content:center!important; padding:16px!important; }
+.dental-modal-overlay.active { display:flex!important; }
+.dental-modal { background:#fff!important; border-radius:20px!important; width:100%!important; max-width:480px!important; max-height:85vh!important; overflow:hidden!important; display:flex!important; flex-direction:column!important; font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important; }
+@keyframes dental-modal-in { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.dental-modal-header { display:flex!important; align-items:center!important; justify-content:space-between!important; padding:18px 20px!important; border-bottom:1px solid #f3f4f6!important; }
+.dental-modal-header h3 { font-size:16px!important; font-weight:700!important; color:#1f2937!important; }
+.dental-modal-close { width:32px!important; height:32px!important; border:none!important; border-radius:8px!important; background:#f3f4f6!important; color:#6b7280!important; font-size:16px!important; cursor:pointer!important; display:flex!important; align-items:center!important; justify-content:center!important; }
+.dental-modal-body { flex:1!important; overflow-y:auto!important; padding:20px!important; }
+.dental-modal-footer { padding:14px 20px!important; border-top:1px solid #f3f4f6!important; }
+.dental-content-section { margin-bottom:16px!important; }
+.dental-content-section-title { font-size:13px!important; font-weight:700!important; color:#374151!important; margin-bottom:8px!important; padding:6px 10px!important; background:#f9fafb!important; border-radius:8px!important; display:flex!important; align-items:center!important; gap:6px!important; }
+.dental-content-item { padding:10px 12px!important; background:#fff!important; border:1px solid #f3f4f6!important; border-radius:8px!important; margin-bottom:6px!important; font-size:13px!important; color:#374151!important; line-height:1.6!important; }
+.dental-content-empty { text-align:center!important; padding:30px 20px!important; color:#9ca3af!important; font-size:13px!important; }
+
+/* ====== 치아 선택 ====== */
+#dentalWidgetRoot .dental-tooth-section { display:block!important; visibility:visible!important; margin-bottom:16px!important; }
+#dentalWidgetRoot .dental-tooth-grid { display:grid!important; visibility:visible!important; grid-template-columns:repeat(8,1fr)!important; gap:3px!important; margin-bottom:6px!important; }
+#dentalWidgetRoot .dental-tooth-btn { display:flex!important; visibility:visible!important; align-items:center!important; justify-content:center!important; padding:6px 2px!important; border:1px solid #e5e7eb!important; border-radius:6px!important; font-size:11px!important; font-weight:600!important; cursor:pointer!important; background:#fff!important; color:#374151!important; min-height:28px!important; }
+#dentalWidgetRoot .dental-tooth-btn.selected { border-color:#667eea!important; background:#667eea!important; color:#fff!important; }
+#dentalWidgetRoot .dental-tooth-divider { display:block!important; text-align:center!important; font-size:10px!important; color:#9ca3af!important; padding:4px 0!important; border-top:1px dashed #e5e7eb!important; border-bottom:1px dashed #e5e7eb!important; margin:4px 0!important; }
+#dentalWidgetRoot .dental-tooth-selected-list { display:flex!important; flex-wrap:wrap!important; gap:4px!important; margin-top:8px!important; }
+#dentalWidgetRoot .dental-tooth-tag { display:inline-flex!important; align-items:center!important; gap:4px!important; padding:4px 8px!important; background:#ede9fe!important; color:#7c3aed!important; border-radius:12px!important; font-size:11px!important; font-weight:500!important; }
+
+/* ====== 수량 ====== */
+#dentalWidgetRoot .dental-qty-group { display:flex!important; align-items:center!important; gap:8px!important; }
+#dentalWidgetRoot .dental-qty-btn { width:32px!important; height:32px!important; border:1px solid #e5e7eb!important; border-radius:8px!important; background:#fff!important; font-size:16px!important; font-weight:700!important; cursor:pointer!important; display:flex!important; align-items:center!important; justify-content:center!important; color:#374151!important; }
+#dentalWidgetRoot .dental-qty-value { font-size:16px!important; font-weight:700!important; color:#1f2937!important; min-width:24px!important; text-align:center!important; }
+#dentalWidgetRoot .dental-price-input { width:120px!important; text-align:right!important; }
+
+/* ====== 치료 항목 ====== */
+#dentalWidgetRoot .dental-treatment-item { display:block!important; visibility:visible!important; padding:14px!important; background:#f9fafb!important; border-radius:12px!important; margin-bottom:10px!important; border:1px solid #f3f4f6!important; }
+#dentalWidgetRoot .dental-treatment-item-header { display:flex!important; align-items:center!important; justify-content:space-between!important; margin-bottom:8px!important; }
+#dentalWidgetRoot .dental-treatment-item-name { font-size:14px!important; font-weight:600!important; color:#1f2937!important; }
+#dentalWidgetRoot .dental-treatment-item-price { font-size:13px!important; color:#667eea!important; font-weight:600!important; }
+#dentalWidgetRoot .dental-treatment-row { display:flex!important; align-items:center!important; justify-content:space-between!important; gap:8px!important; }
+
+/* ====== 견적 요약 ====== */
+#dentalWidgetRoot .dental-estimate-summary { display:block!important; visibility:visible!important; padding:16px!important; background:linear-gradient(135deg,#f0f4ff 0%,#faf0ff 100%)!important; border:1px solid #e0e7ff!important; border-radius:12px!important; }
+#dentalWidgetRoot .dental-estimate-row { display:flex!important; align-items:center!important; justify-content:space-between!important; padding:6px 0!important; }
+#dentalWidgetRoot .dental-estimate-row.total { border-top:2px solid #c7d2fe!important; margin-top:8px!important; padding-top:10px!important; }
+#dentalWidgetRoot .dental-estimate-label { font-size:13px!important; color:#4b5563!important; }
+#dentalWidgetRoot .dental-estimate-value { font-size:14px!important; font-weight:600!important; color:#1f2937!important; }
+#dentalWidgetRoot .dental-estimate-row.total .dental-estimate-label { font-size:15px!important; font-weight:700!important; color:#1f2937!important; }
+#dentalWidgetRoot .dental-estimate-row.total .dental-estimate-value { font-size:18px!important; font-weight:800!important; color:#667eea!important; }
+
+/* ====== 설정 ====== */
+#dentalWidgetRoot .dental-settings-section { display:block!important; visibility:visible!important; margin-top:16px!important; }
+#dentalWidgetRoot .dental-settings-toggle { display:flex!important; align-items:center!important; justify-content:space-between!important; padding:12px!important; background:#f9fafb!important; border-radius:10px!important; cursor:pointer!important; margin-bottom:8px!important; }
+#dentalWidgetRoot .dental-settings-toggle span { font-size:13px!important; color:#374151!important; font-weight:500!important; }
+#dentalWidgetRoot .dental-settings-body { display:none!important; padding:12px!important; background:#f9fafb!important; border-radius:10px!important; }
+#dentalWidgetRoot .dental-settings-body.open { display:block!important; }
+
+/* ====== 커스텀 항목 ====== */
+#dentalWidgetRoot .dental-custom-item { display:flex!important; align-items:center!important; gap:8px!important; padding:8px!important; background:#fff!important; border:1px solid #e5e7eb!important; border-radius:8px!important; margin-bottom:6px!important; }
+#dentalWidgetRoot .dental-custom-item-remove { width:28px!important; height:28px!important; border:none!important; border-radius:6px!important; background:#fee2e2!important; color:#dc2626!important; font-size:12px!important; cursor:pointer!important; display:flex!important; align-items:center!important; justify-content:center!important; }
+
+/* ====== 토스트 ====== */
+.dental-toast { position:fixed!important; top:16px!important; right:16px!important; z-index:99999!important; padding:12px 20px!important; border-radius:10px!important; color:#fff!important; font-size:13px!important; font-weight:500!important; box-shadow:0 4px 12px rgba(0,0,0,.15)!important; }
+.dental-toast.success { background:#22c55e!important; }
+.dental-toast.error { background:#ef4444!important; }
+.dental-toast.info { background:#667eea!important; }
+
+/* ====== 인쇄 ====== */
+@media print {
+  #dentalWidgetRoot { padding:0!important; background:#fff!important; }
+  #dentalWidgetRoot .dental-card { box-shadow:none!important; border:1px solid #e5e7eb!important; }
+  #dentalWidgetRoot .dental-btn, #dentalWidgetRoot .dental-settings-section, #dentalWidgetRoot .dental-tooth-section { display:none!important; }
+}
+
+/* ====== 반응형 ====== */
+@media (max-width: 480px) {
+  #dentalWidgetRoot { padding:8px!important; }
+  #dentalWidgetRoot .dental-card { padding:16px!important; }
+  #dentalWidgetRoot .dental-tooth-grid { grid-template-columns:repeat(8,1fr)!important; gap:2px!important; }
+  #dentalWidgetRoot .dental-tooth-btn { padding:5px 1px!important; font-size:10px!important; }
+}
+</style>
+
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+
+<div id="dentalWidgetRoot">
+  <!-- 로딩 화면 -->
+  <div class="dental-loading" id="dentalLoading">
+    <div class="dental-spinner"></div>
+    <div class="dental-loading-text">위젯을 초기화하는 중...</div>
+  </div>
+
+  <!-- 메인 콘텐츠 (초기 숨김) -->
+  <div id="dentalMainContent" style="display:none">
+
+    <!-- 헤더 -->
+    <div class="dental-card-header">
+      <div class="dental-card-header-icon"><i class="fas fa-tooth"></i></div>
+      <h2>임플란트 상담 견적</h2>
+      <p id="dentalHeaderClinic">치과 이름</p>
+    </div>
+
+    <!-- 1. 브랜드 선택 섹션 -->
+    <div class="dental-card">
+      <div class="dental-section-title">
+        <i class="fas fa-tags"></i> 임플란트 브랜드 선택
+      </div>
+
+      <!-- 브랜드 선택 모드 탭 -->
+      <div class="dental-brand-tabs">
+        <div class="dental-brand-tab active" data-tab="master" onclick="dentalSwitchBrandTab('master')">
+          <i class="fas fa-list"></i> 브랜드 목록
+        </div>
+        <div class="dental-brand-tab" data-tab="custom" onclick="dentalSwitchBrandTab('custom')">
+          <i class="fas fa-pen"></i> 직접 입력
+        </div>
+      </div>
+
+      <!-- 마스터 브랜드 드롭다운 (기본 활성) -->
+      <div id="dentalBrandMasterPanel">
+        <!-- 카테고리 필터 -->
+        <div class="dental-form-group" style="margin-bottom:8px">
+          <div style="display:flex;gap:6px;">
+            <button class="dental-btn dental-btn-sm dental-brand-filter active" data-filter="all" onclick="dentalFilterBrands('all')">전체</button>
+            <button class="dental-btn dental-btn-sm dental-brand-filter" data-filter="domestic" onclick="dentalFilterBrands('domestic')">🇰🇷 국산</button>
+            <button class="dental-btn dental-btn-sm dental-brand-filter" data-filter="foreign" onclick="dentalFilterBrands('foreign')">🌍 외산</button>
+          </div>
+        </div>
+
+        <div class="dental-form-group">
+          <div class="dental-brand-dropdown-wrap">
+            <select class="dental-select" id="dentalBrandSelect" onchange="dentalOnBrandSelect()">
+              <option value="">브랜드를 선택하세요</option>
+            </select>
+            <button class="dental-brand-info-btn hidden" id="dentalBrandInfoBtn" onclick="dentalShowBrandContent()" title="브랜드 상세 정보">
+              <i class="fas fa-info"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 선택된 브랜드 정보 미리보기 -->
+        <div id="dentalBrandPreview" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px;background:#f0f4ff;border-radius:10px;border:1px solid #e0e7ff;">
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:#1f2937;" id="dentalBrandPreviewName"></div>
+              <div style="font-size:12px;color:#6b7280;margin-top:2px;" id="dentalBrandPreviewCategory"></div>
+            </div>
+            <button class="dental-btn dental-btn-sm dental-btn-outline" onclick="dentalShowBrandContent()">
+              <i class="fas fa-info-circle"></i> 상세
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 자유 입력 (기본 숨김) -->
+      <div id="dentalBrandCustomPanel" style="display:none">
+        <div class="dental-form-group">
+          <label class="dental-label">브랜드명 직접 입력</label>
+          <input type="text" class="dental-input" id="dentalBrandCustomInput" placeholder="예: 오스템임플란트 TS III">
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 임플란트 치료 섹션 -->
+    <div class="dental-card">
+      <div class="dental-section-title">
+        <i class="fas fa-tooth"></i> 임플란트
+      </div>
+
+      <!-- 치아 선택 -->
+      <div class="dental-tooth-section">
+        <div class="dental-label">치아 위치 선택 (클릭)</div>
+        <!-- 상악 -->
+        <div class="dental-tooth-grid" id="dentalTeethUpper">
+          <div class="dental-tooth-btn" data-tooth="18" onclick="dentalToggleTooth(this)">18</div>
+          <div class="dental-tooth-btn" data-tooth="17" onclick="dentalToggleTooth(this)">17</div>
+          <div class="dental-tooth-btn" data-tooth="16" onclick="dentalToggleTooth(this)">16</div>
+          <div class="dental-tooth-btn" data-tooth="15" onclick="dentalToggleTooth(this)">15</div>
+          <div class="dental-tooth-btn" data-tooth="14" onclick="dentalToggleTooth(this)">14</div>
+          <div class="dental-tooth-btn" data-tooth="13" onclick="dentalToggleTooth(this)">13</div>
+          <div class="dental-tooth-btn" data-tooth="12" onclick="dentalToggleTooth(this)">12</div>
+          <div class="dental-tooth-btn" data-tooth="11" onclick="dentalToggleTooth(this)">11</div>
+          <div class="dental-tooth-btn" data-tooth="21" onclick="dentalToggleTooth(this)">21</div>
+          <div class="dental-tooth-btn" data-tooth="22" onclick="dentalToggleTooth(this)">22</div>
+          <div class="dental-tooth-btn" data-tooth="23" onclick="dentalToggleTooth(this)">23</div>
+          <div class="dental-tooth-btn" data-tooth="24" onclick="dentalToggleTooth(this)">24</div>
+          <div class="dental-tooth-btn" data-tooth="25" onclick="dentalToggleTooth(this)">25</div>
+          <div class="dental-tooth-btn" data-tooth="26" onclick="dentalToggleTooth(this)">26</div>
+          <div class="dental-tooth-btn" data-tooth="27" onclick="dentalToggleTooth(this)">27</div>
+          <div class="dental-tooth-btn" data-tooth="28" onclick="dentalToggleTooth(this)">28</div>
+        </div>
+        <div class="dental-tooth-divider">상악 ↑ · ↓ 하악</div>
+        <!-- 하악 -->
+        <div class="dental-tooth-grid" id="dentalTeethLower">
+          <div class="dental-tooth-btn" data-tooth="48" onclick="dentalToggleTooth(this)">48</div>
+          <div class="dental-tooth-btn" data-tooth="47" onclick="dentalToggleTooth(this)">47</div>
+          <div class="dental-tooth-btn" data-tooth="46" onclick="dentalToggleTooth(this)">46</div>
+          <div class="dental-tooth-btn" data-tooth="45" onclick="dentalToggleTooth(this)">45</div>
+          <div class="dental-tooth-btn" data-tooth="44" onclick="dentalToggleTooth(this)">44</div>
+          <div class="dental-tooth-btn" data-tooth="43" onclick="dentalToggleTooth(this)">43</div>
+          <div class="dental-tooth-btn" data-tooth="42" onclick="dentalToggleTooth(this)">42</div>
+          <div class="dental-tooth-btn" data-tooth="41" onclick="dentalToggleTooth(this)">41</div>
+          <div class="dental-tooth-btn" data-tooth="31" onclick="dentalToggleTooth(this)">31</div>
+          <div class="dental-tooth-btn" data-tooth="32" onclick="dentalToggleTooth(this)">32</div>
+          <div class="dental-tooth-btn" data-tooth="33" onclick="dentalToggleTooth(this)">33</div>
+          <div class="dental-tooth-btn" data-tooth="34" onclick="dentalToggleTooth(this)">34</div>
+          <div class="dental-tooth-btn" data-tooth="35" onclick="dentalToggleTooth(this)">35</div>
+          <div class="dental-tooth-btn" data-tooth="36" onclick="dentalToggleTooth(this)">36</div>
+          <div class="dental-tooth-btn" data-tooth="37" onclick="dentalToggleTooth(this)">37</div>
+          <div class="dental-tooth-btn" data-tooth="38" onclick="dentalToggleTooth(this)">38</div>
+        </div>
+        <!-- 선택된 치아 태그 -->
+        <div class="dental-tooth-selected-list" id="dentalSelectedTeeth"></div>
+      </div>
+
+      <!-- 임플란트 수량 & 가격 -->
+      <div class="dental-treatment-item">
+        <div class="dental-treatment-item-header">
+          <span class="dental-treatment-item-name">임플란트</span>
+          <span class="dental-treatment-item-price" id="dentalImplantSubtotal">0원</span>
+        </div>
+        <div class="dental-treatment-row">
+          <div class="dental-qty-group">
+            <button class="dental-qty-btn" onclick="dentalChangeQty('implant', -1)">−</button>
+            <span class="dental-qty-value" id="dentalImplantQty">0</span>
+            <button class="dental-qty-btn" onclick="dentalChangeQty('implant', 1)">+</button>
+          </div>
+          <div>
+            <input type="text" class="dental-input dental-price-input" id="dentalImplantPrice" placeholder="단가(원)" oninput="dentalCalcTotal()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 추가 시술 섹션 -->
+    <div class="dental-card">
+      <div class="dental-section-title">
+        <i class="fas fa-plus-circle"></i> 추가 항목
+      </div>
+
+      <!-- 뼈이식 -->
+      <div class="dental-treatment-item">
+        <div class="dental-treatment-item-header">
+          <span class="dental-treatment-item-name">🦴 뼈이식 (Bone Graft)</span>
+          <span class="dental-treatment-item-price" id="dentalBoneSubtotal">0원</span>
+        </div>
+        <div class="dental-treatment-row">
+          <div class="dental-qty-group">
+            <button class="dental-qty-btn" onclick="dentalChangeQty('bone', -1)">−</button>
+            <span class="dental-qty-value" id="dentalBoneQty">0</span>
+            <button class="dental-qty-btn" onclick="dentalChangeQty('bone', 1)">+</button>
+          </div>
+          <input type="text" class="dental-input dental-price-input" id="dentalBonePrice" placeholder="단가(원)" oninput="dentalCalcTotal()">
+        </div>
+      </div>
+
+      <!-- 상악동거상술 -->
+      <div class="dental-treatment-item">
+        <div class="dental-treatment-item-header">
+          <span class="dental-treatment-item-name">🏥 상악동거상술 (Sinus Lift)</span>
+          <span class="dental-treatment-item-price" id="dentalSinusSubtotal">0원</span>
+        </div>
+        <div class="dental-treatment-row">
+          <div class="dental-qty-group">
+            <button class="dental-qty-btn" onclick="dentalChangeQty('sinus', -1)">−</button>
+            <span class="dental-qty-value" id="dentalSinusQty">0</span>
+            <button class="dental-qty-btn" onclick="dentalChangeQty('sinus', 1)">+</button>
+          </div>
+          <input type="text" class="dental-input dental-price-input" id="dentalSinusPrice" placeholder="단가(원)" oninput="dentalCalcTotal()">
+        </div>
+      </div>
+
+      <!-- 임시치아 -->
+      <div class="dental-treatment-item">
+        <div class="dental-treatment-item-header">
+          <span class="dental-treatment-item-name">🦷 임시치아 (Temporary Crown)</span>
+          <span class="dental-treatment-item-price" id="dentalTempSubtotal">0원</span>
+        </div>
+        <div class="dental-treatment-row">
+          <div class="dental-qty-group">
+            <button class="dental-qty-btn" onclick="dentalChangeQty('temp', -1)">−</button>
+            <span class="dental-qty-value" id="dentalTempQty">0</span>
+            <button class="dental-qty-btn" onclick="dentalChangeQty('temp', 1)">+</button>
+          </div>
+          <input type="text" class="dental-input dental-price-input" id="dentalTempPrice" placeholder="단가(원)" oninput="dentalCalcTotal()">
+        </div>
+      </div>
+
+      <!-- 사용자 추가 항목 -->
+      <div id="dentalCustomItems"></div>
+      <button class="dental-btn dental-btn-secondary" style="width:100%;margin-top:8px;" onclick="dentalAddCustomItem()">
+        <i class="fas fa-plus"></i> 항목 추가
+      </button>
+    </div>
+
+    <!-- 4. 견적 요약 -->
+    <div class="dental-card">
+      <div class="dental-section-title">
+        <i class="fas fa-calculator"></i> 견적 요약
+      </div>
+      <div class="dental-estimate-summary" id="dentalEstimateSummary">
+        <div class="dental-estimate-row">
+          <span class="dental-estimate-label">선택 브랜드</span>
+          <span class="dental-estimate-value" id="dentalEstBrand">-</span>
+        </div>
+        <div class="dental-estimate-row">
+          <span class="dental-estimate-label">임플란트</span>
+          <span class="dental-estimate-value" id="dentalEstImplant">0원</span>
+        </div>
+        <div class="dental-estimate-row">
+          <span class="dental-estimate-label">추가 항목</span>
+          <span class="dental-estimate-value" id="dentalEstAdditional">0원</span>
+        </div>
+        <div id="dentalEstCustomRows"></div>
+        <div class="dental-estimate-row total">
+          <span class="dental-estimate-label">총 견적 금액</span>
+          <span class="dental-estimate-value" id="dentalEstTotal">0원</span>
+        </div>
+      </div>
+
+      <div style="margin-top:14px; display:flex; gap:8px;">
+        <button class="dental-btn dental-btn-primary" style="flex:1" onclick="dentalSaveEstimate()">
+          <i class="fas fa-save"></i> 저장
+        </button>
+        <button class="dental-btn dental-btn-secondary" style="flex:0 0 auto;" onclick="dentalResetForm()">
+          <i class="fas fa-redo"></i> 초기화
+        </button>
+      </div>
+    </div>
+
+    <!-- 5. 설정 섹션 -->
+    <div class="dental-card dental-settings-section">
+      <div class="dental-settings-toggle" onclick="dentalToggleSettings()">
+        <span><i class="fas fa-cog" style="margin-right:6px;color:#667eea;"></i> 설정</span>
+        <i class="fas fa-chevron-down" id="dentalSettingsArrow"></i>
+      </div>
+      <div class="dental-settings-body" id="dentalSettingsBody">
+        <div class="dental-form-group">
+          <label class="dental-label">치과 이름</label>
+          <input type="text" class="dental-input" id="dentalClinicNameInput" placeholder="치과 이름">
+        </div>
+        <div class="dental-form-group">
+          <label class="dental-label">전화번호</label>
+          <input type="tel" class="dental-input" id="dentalClinicPhoneInput" placeholder="02-1234-5678">
+        </div>
+        <button class="dental-btn dental-btn-primary" onclick="dentalSaveSettings()">
+          <i class="fas fa-save"></i> 설정 저장
+        </button>
+      </div>
+    </div>
+
+    <div style="height:20px;"></div>
+  </div>
+</div>
+
+<!-- 브랜드 콘텐츠 팝업 모달 -->
+<div class="dental-modal-overlay" id="dentalBrandModal">
+  <div class="dental-modal">
+    <div class="dental-modal-header">
+      <h3 id="dentalBrandModalTitle">브랜드 정보</h3>
+      <button class="dental-modal-close" onclick="dentalCloseBrandModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="dental-modal-body" id="dentalBrandModalBody">
+      <div class="dental-content-empty">
+        <i class="fas fa-spinner fa-spin"></i>
+        로딩 중...
+      </div>
+    </div>
+    <div class="dental-modal-footer">
+      <button class="dental-btn dental-btn-primary" onclick="dentalCloseBrandModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ====== 설정 ======
+  var DENTAL_API = 'https://dental-estimate-api.dentalkmovie.workers.dev';
+  var VERSION = '2.0.0';
+
+  console.log('[DentalWidget] v' + VERSION + ' loaded');
+
+  // ====== 기본 24개 브랜드 (초기값) ======
+  var _defaultBrands = [
+    { id:'brand_osstem', name:'오스템임플란트', category:'domestic', order:0 },
+    { id:'brand_dentium', name:'덴티움', category:'domestic', order:1 },
+    { id:'brand_megagen', name:'메가젠임플란트', category:'domestic', order:2 },
+    { id:'brand_neobiotech', name:'네오바이오텍', category:'domestic', order:3 },
+    { id:'brand_dio', name:'디오', category:'domestic', order:4 },
+    { id:'brand_dentis', name:'덴티스', category:'domestic', order:5 },
+    { id:'brand_shinhung', name:'신흥 / evertis', category:'domestic', order:6 },
+    { id:'brand_ibs', name:'IBS Implant', category:'domestic', order:7 },
+    { id:'brand_point', name:'포인트임플란트', category:'domestic', order:8 },
+    { id:'brand_cowell', name:'코웰메디', category:'domestic', order:9 },
+    { id:'brand_warantec', name:'워랜텍', category:'domestic', order:10 },
+    { id:'brand_biotem', name:'바이오템', category:'domestic', order:11 },
+    { id:'brand_snucone', name:'SNUCONE', category:'domestic', order:12 },
+    { id:'brand_cubotech', name:'쿠보텍(쿠워텍)', category:'domestic', order:13 },
+    { id:'brand_cybermed', name:'사이버메드', category:'domestic', order:14 },
+    { id:'brand_highness', name:'하이니스', category:'domestic', order:15 },
+    { id:'brand_arum', name:'아룸(ARUM Dentistry)', category:'domestic', order:16 },
+    { id:'brand_chaorum', name:'차오름(Chaorum)', category:'domestic', order:17 },
+    { id:'brand_straumann', name:'스트라우만', category:'foreign', order:18 },
+    { id:'brand_nobel', name:'노벨바이오케어', category:'foreign', order:19 },
+    { id:'brand_astra', name:'아스트라 테크', category:'foreign', order:20 },
+    { id:'brand_zimvie', name:'ZimVie', category:'foreign', order:21 },
+    { id:'brand_sic', name:'SIC', category:'foreign', order:22 },
+    { id:'brand_anthogyr', name:'Anthogyr', category:'foreign', order:23 }
+  ];
+
+  // ====== 상태 ======
+  var state = {
+    userKey: '',
+    clinicName: '',
+    clinicPhone: '',
+    masterBrands: _defaultBrands.slice(),          // 마스터 브랜드 전체 목록 (기본 24개로 초기화)
+    masterBrandsFiltered: _defaultBrands.slice(),   // 필터된 브랜드 목록 (기본 24개로 초기화)
+    brandContentsCache: {},    // 브랜드 콘텐츠 캐시
+    selectedBrandId: '',
+    selectedBrandName: '',
+    brandMode: 'master',       // 'master' | 'custom'
+    brandFilter: 'all',        // 'all' | 'domestic' | 'foreign'
+    selectedTeeth: [],
+    quantities: { implant: 0, bone: 0, sinus: 0, temp: 0 },
+    customItems: [],
+    isMaster: false
+  };
+
+  // ====== 아임웹 회원 감지 (기존 코드 보존) ======
+  function getImwebMemberCode() {
+    try {
+      // 방법1: __IMWEB__ SDK
+      if (window.__IMWEB__ && window.__IMWEB__.member) {
+        var mc = window.__IMWEB__.member.code || window.__IMWEB__.member.id || '';
+        if (mc && String(mc).length >= 4 && !/^\d+$/.test(mc)) return String(mc);
+      }
+    } catch(e) {}
+
+    try {
+      // 방법2: __bs_imweb 쿠키/전역
+      var bs = window.__bs_imweb;
+      if (!bs) {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+          var c = cookies[i].trim();
+          if (c.indexOf('__bs_imweb=') === 0) {
+            bs = JSON.parse(decodeURIComponent(c.substring(11)));
+            break;
+          }
+        }
+      }
+      if (bs) {
+        // JWT sub
+        if (bs.sdk_jwt) {
+          try {
+            var parts = bs.sdk_jwt.split('.');
+            if (parts.length === 3) {
+              var p = JSON.parse(atob(parts[1]));
+              var sub = p.sub || p.member_code || p.mc || '';
+              if (sub && sub !== 'null' && String(sub).length >= 4 && !/^\d+$/.test(sub)) return String(sub);
+            }
+          } catch(e) {}
+        }
+        // direct fields
+        var bc = bs.member_code || (bs.member && (bs.member.code || bs.member.member_code)) || '';
+        if (bc && String(bc).length >= 4 && !/^\d+$/.test(bc)) return String(bc);
+      }
+    } catch(e) {}
+
+    // 방법3: 전역 변수
+    var globals = ['member_data', 'JEJU_MEMBER', '__MEMBER__', 'memberData', '_member', 'member', 'user_data'];
+    for (var g = 0; g < globals.length; g++) {
+      try {
+        var obj = window[globals[g]];
+        if (obj && typeof obj === 'object') {
+          var mid = obj.member_code || obj.memberCode || obj.code || '';
+          if (mid && String(mid).length >= 4 && !/^\d+$/.test(mid)) return String(mid);
+        }
+      } catch(e) {}
+    }
+
+    return '';
+  }
+
+  // ====== 유저 키 생성/감지 ======
+  function getUserKey() {
+    // 아임웹 멤버 코드 우선
+    var mc = getImwebMemberCode();
+    if (mc) return mc;
+
+    // localStorage 폴백
+    var saved = localStorage.getItem('dental_widget_user_key');
+    if (saved) return saved;
+
+    // 새로 생성
+    var key = 'dw_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem('dental_widget_user_key', key);
+    return key;
+  }
+
+  // ====== API 호출 ======
+  function apiCall(path, options) {
+    options = options || {};
+    var headers = { 'Content-Type': 'application/json' };
+    // 인증 헤더: noAuth가 아닌 경우에만 추가
+    if (!options.noAuth && state.userKey) {
+      headers['X-User-Key'] = state.userKey;
+    }
+    if (options.headers) {
+      for (var k in options.headers) headers[k] = options.headers[k];
+    }
+    var fetchOpts = {
+      method: options.method || 'GET',
+      headers: headers
+    };
+    if (options.body) {
+      fetchOpts.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+    }
+    return fetch(DENTAL_API + path, fetchOpts).then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok) throw new Error(data.error || 'API error ' + r.status);
+        return data;
+      });
+    });
+  }
+
+  // ====== 토스트 ======
+  function showToast(msg, type) {
+    type = type || 'info';
+    var d = document.createElement('div');
+    d.className = 'dental-toast ' + type;
+    d.textContent = msg;
+    document.body.appendChild(d);
+    setTimeout(function() {
+      d.style.transition = 'opacity 0.3s';
+      d.style.opacity = '0';
+      setTimeout(function() { d.remove(); }, 300);
+    }, 2500);
+  }
+
+  // ====== 숫자 포맷 ======
+  function formatPrice(n) {
+    return Number(n || 0).toLocaleString('ko-KR') + '원';
+  }
+  function parsePrice(s) {
+    return parseInt(String(s || '0').replace(/[^0-9]/g, ''), 10) || 0;
+  }
+
+  // ====== 초기화 ======
+  function init() {
+    state.userKey = getUserKey();
+    console.log('[DentalWidget] userKey:', state.userKey);
+
+    // 기본 24개 브랜드로 드롭다운 즉시 렌더링 (API 응답 전)
+    renderBrandDropdown();
+
+    // 병렬 로드: 마스터 브랜드 + 유저 데이터 + 마스터 권한 확인
+    Promise.all([
+      loadMasterBrands(),
+      loadUserData(),
+      checkMasterPermission()
+    ]).then(function() {
+      document.getElementById('dentalLoading').style.display = 'none';
+      document.getElementById('dentalMainContent').style.display = 'block';
+      updateUI();
+    }).catch(function(err) {
+      console.error('[DentalWidget] Init error:', err);
+      document.getElementById('dentalLoading').innerHTML =
+        '<div style="color:#ef4444;font-size:13px;text-align:center;padding:20px;">' +
+        '<i class="fas fa-exclamation-triangle" style="font-size:24px;display:block;margin-bottom:8px;"></i>' +
+        '초기화 실패: ' + (err.message || '알 수 없는 오류') +
+        '<br><button onclick="location.reload()" style="margin-top:10px;padding:8px 16px;border:none;border-radius:8px;background:#667eea;color:#fff;cursor:pointer;">새로고침</button></div>';
+    });
+  }
+
+  // ====== 마스터 브랜드 로드 ======
+  function loadMasterBrands() {
+    return apiCall('/api/master/brands', { noAuth: true }).then(function(data) {
+      state.masterBrands = (data.brands || []).sort(function(a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+      state.masterBrandsFiltered = state.masterBrands.slice();
+      renderBrandDropdown();
+      console.log('[DentalWidget] Loaded', state.masterBrands.length, 'master brands (source:', data.source + ')');
+    }).catch(function(err) {
+      console.warn('[DentalWidget] Master brands load failed, using defaults:', err);
+      // 하드코딩된 폴백
+      state.masterBrands = getDefaultBrands();
+      state.masterBrandsFiltered = state.masterBrands.slice();
+      renderBrandDropdown();
+    });
+  }
+
+  function getDefaultBrands() {
+    return _defaultBrands.slice();
+  }
+
+  // ====== 유저 데이터 로드 ======
+  function loadUserData() {
+    return apiCall('/api/user-data').then(function(data) {
+      if (data.clinic_name) state.clinicName = data.clinic_name;
+      if (data.clinic_phone) state.clinicPhone = data.clinic_phone;
+      document.getElementById('dentalHeaderClinic').textContent = state.clinicName || '치과 이름';
+      document.getElementById('dentalClinicNameInput').value = state.clinicName || '';
+      document.getElementById('dentalClinicPhoneInput').value = state.clinicPhone || '';
+    }).catch(function(err) {
+      console.warn('[DentalWidget] User data load failed:', err);
+      // localStorage 폴백
+      state.clinicName = localStorage.getItem('dental_clinic_name') || '';
+      state.clinicPhone = localStorage.getItem('dental_clinic_phone') || '';
+    });
+  }
+
+  // ====== 마스터 권한 확인 ======
+  function checkMasterPermission() {
+    return apiCall('/api/master/check', { noAuth: true }).then(function(data) {
+      state.isMaster = data.is_master || false;
+    }).catch(function() {
+      state.isMaster = false;
+    });
+  }
+
+  // ====== 브랜드 드롭다운 렌더링 ======
+  function renderBrandDropdown() {
+    var select = document.getElementById('dentalBrandSelect');
+    if (!select) return;
+
+    var html = '<option value="">브랜드를 선택하세요</option>';
+
+    // 그룹별로 분류
+    var domestic = [];
+    var foreign = [];
+
+    state.masterBrandsFiltered.forEach(function(b) {
+      if (b.category === 'foreign') foreign.push(b);
+      else domestic.push(b);
+    });
+
+    if (state.brandFilter === 'all' || state.brandFilter === 'domestic') {
+      if (domestic.length > 0) {
+        html += '<optgroup label="🇰🇷 국산 (' + domestic.length + '개)">';
+        domestic.forEach(function(b) {
+          html += '<option value="' + b.id + '"' + (state.selectedBrandId === b.id ? ' selected' : '') + '>' + escHtml(b.name) + '</option>';
+        });
+        html += '</optgroup>';
+      }
+    }
+
+    if (state.brandFilter === 'all' || state.brandFilter === 'foreign') {
+      if (foreign.length > 0) {
+        html += '<optgroup label="🌍 외산 (' + foreign.length + '개)">';
+        foreign.forEach(function(b) {
+          html += '<option value="' + b.id + '"' + (state.selectedBrandId === b.id ? ' selected' : '') + '>' + escHtml(b.name) + '</option>';
+        });
+        html += '</optgroup>';
+      }
+    }
+
+    select.innerHTML = html;
+  }
+
+  function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ====== 브랜드 탭 전환 ======
+  window.dentalSwitchBrandTab = function(tab) {
+    state.brandMode = tab;
+
+    document.querySelectorAll('.dental-brand-tab').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.tab === tab);
+    });
+
+    document.getElementById('dentalBrandMasterPanel').style.display = (tab === 'master') ? 'block' : 'none';
+    document.getElementById('dentalBrandCustomPanel').style.display = (tab === 'custom') ? 'block' : 'none';
+
+    updateBrandSelection();
+  };
+
+  // ====== 브랜드 필터 ======
+  window.dentalFilterBrands = function(filter) {
+    state.brandFilter = filter;
+
+    document.querySelectorAll('.dental-brand-filter').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.filter === filter);
+      if (el.dataset.filter === filter) {
+        el.style.background = '#667eea';
+        el.style.color = '#fff';
+        el.style.borderColor = '#667eea';
+      } else {
+        el.style.background = '#f3f4f6';
+        el.style.color = '#374151';
+        el.style.borderColor = '#e5e7eb';
+      }
+    });
+
+    if (filter === 'all') {
+      state.masterBrandsFiltered = state.masterBrands.slice();
+    } else {
+      state.masterBrandsFiltered = state.masterBrands.filter(function(b) { return b.category === filter; });
+    }
+
+    renderBrandDropdown();
+  };
+
+  // ====== 브랜드 선택 이벤트 ======
+  window.dentalOnBrandSelect = function() {
+    var select = document.getElementById('dentalBrandSelect');
+    var brandId = select.value;
+    var infoBtn = document.getElementById('dentalBrandInfoBtn');
+    var preview = document.getElementById('dentalBrandPreview');
+
+    if (brandId) {
+      var brand = state.masterBrands.find(function(b) { return b.id === brandId; });
+      state.selectedBrandId = brandId;
+      state.selectedBrandName = brand ? brand.name : '';
+
+      // 정보 버튼 표시
+      infoBtn.classList.remove('hidden');
+      preview.style.display = 'block';
+
+      document.getElementById('dentalBrandPreviewName').textContent = brand ? brand.name : '';
+      document.getElementById('dentalBrandPreviewCategory').innerHTML = brand ?
+        '<span class="dental-brand-category ' + brand.category + '">' +
+        (brand.category === 'domestic' ? '🇰🇷 국산' : '🌍 외산') + '</span>' : '';
+
+      // 콘텐츠 미리 로드
+      preloadBrandContent(brandId);
+    } else {
+      state.selectedBrandId = '';
+      state.selectedBrandName = '';
+      infoBtn.classList.add('hidden');
+      preview.style.display = 'none';
+    }
+
+    updateBrandSelection();
+    dentalCalcTotal();
+  };
+
+  // ====== 브랜드 콘텐츠 미리 로드 ======
+  function preloadBrandContent(brandId) {
+    if (state.brandContentsCache[brandId]) return; // 이미 캐시됨
+
+    apiCall('/api/master/brand-contents/' + brandId, { noAuth: true }).then(function(data) {
+      state.brandContentsCache[brandId] = {
+        categories: data.categories || [],
+        contents: data.contents || {}
+      };
+    }).catch(function(err) {
+      console.warn('[DentalWidget] Brand content preload failed:', err);
+    });
+  }
+
+  // ====== 브랜드 콘텐츠 팝업 표시 ======
+  window.dentalShowBrandContent = function() {
+    var brandId = state.selectedBrandId;
+    if (!brandId) {
+      showToast('브랜드를 먼저 선택해주세요.', 'error');
+      return;
+    }
+
+    var brand = state.masterBrands.find(function(b) { return b.id === brandId; });
+    var modal = document.getElementById('dentalBrandModal');
+    var title = document.getElementById('dentalBrandModalTitle');
+    var body = document.getElementById('dentalBrandModalBody');
+
+    title.textContent = brand ? brand.name + ' 상세 정보' : '브랜드 정보';
+    modal.classList.add('active');
+
+    // 캐시 확인
+    if (state.brandContentsCache[brandId]) {
+      renderBrandContentModal(state.brandContentsCache[brandId], brand);
+      return;
+    }
+
+    // 로딩 표시
+    body.innerHTML = '<div class="dental-content-empty"><i class="fas fa-spinner fa-spin"></i> 정보를 불러오는 중...</div>';
+
+    apiCall('/api/master/brand-contents/' + brandId, { noAuth: true }).then(function(data) {
+      var content = {
+        categories: data.categories || [],
+        contents: data.contents || {}
+      };
+      state.brandContentsCache[brandId] = content;
+      renderBrandContentModal(content, brand);
+    }).catch(function(err) {
+      body.innerHTML = '<div class="dental-content-empty"><i class="fas fa-exclamation-circle"></i> 콘텐츠를 불러올 수 없습니다.<br><small>' + escHtml(err.message) + '</small></div>';
+    });
+  };
+
+  function renderBrandContentModal(content, brand) {
+    var body = document.getElementById('dentalBrandModalBody');
+    var html = '';
+
+    // 브랜드 기본 정보
+    html += '<div style="padding:12px;background:linear-gradient(135deg,#f0f4ff,#faf0ff);border-radius:10px;margin-bottom:16px;">';
+    html += '<div style="font-size:16px;font-weight:700;color:#1f2937;">' + escHtml(brand ? brand.name : '') + '</div>';
+    if (brand) {
+      html += '<div style="margin-top:4px;"><span class="dental-brand-category ' + brand.category + '">' + (brand.category === 'domestic' ? '🇰🇷 국산' : '🌍 외산') + '</span></div>';
+    }
+    html += '</div>';
+
+    // 카테고리별 콘텐츠
+    if (content.categories && content.categories.length > 0) {
+      content.categories.forEach(function(cat) {
+        html += '<div class="dental-content-section">';
+        html += '<div class="dental-content-section-title"><i class="fas fa-folder"></i> ' + escHtml(cat) + '</div>';
+
+        var items = content.contents[cat];
+        if (items && Array.isArray(items) && items.length > 0) {
+          items.forEach(function(item) {
+            if (typeof item === 'string') {
+              html += '<div class="dental-content-item">' + escHtml(item) + '</div>';
+            } else if (typeof item === 'object') {
+              html += '<div class="dental-content-item">';
+              if (item.title) html += '<strong>' + escHtml(item.title) + '</strong><br>';
+              if (item.description) html += escHtml(item.description);
+              if (item.url) html += '<br><a href="' + escHtml(item.url) + '" target="_blank" style="color:#667eea;font-size:12px;">자세히 보기</a>';
+              html += '</div>';
+            }
+          });
+        } else {
+          html += '<div class="dental-content-item" style="color:#9ca3af;font-style:italic;">등록된 내용이 없습니다.</div>';
+        }
+
+        html += '</div>';
+      });
+    } else {
+      html += '<div class="dental-content-empty">';
+      html += '<i class="fas fa-info-circle"></i>';
+      html += '아직 등록된 상세 정보가 없습니다.';
+      if (state.isMaster) {
+        html += '<br><small style="margin-top:4px;display:block;">마스터 관리 페이지에서 콘텐츠를 추가할 수 있습니다.</small>';
+      }
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+  }
+
+  window.dentalCloseBrandModal = function() {
+    document.getElementById('dentalBrandModal').classList.remove('active');
+  };
+
+  // ====== 현재 선택된 브랜드명 반환 ======
+  function updateBrandSelection() {
+    if (state.brandMode === 'master' && state.selectedBrandId) {
+      var brand = state.masterBrands.find(function(b) { return b.id === state.selectedBrandId; });
+      state.selectedBrandName = brand ? brand.name : '';
+    } else if (state.brandMode === 'custom') {
+      state.selectedBrandName = (document.getElementById('dentalBrandCustomInput') || {}).value || '';
+    } else {
+      state.selectedBrandName = '';
+    }
+    dentalCalcTotal();
+  }
+
+  // ====== 치아 선택 ======
+  window.dentalToggleTooth = function(el) {
+    var tooth = el.dataset.tooth;
+    var idx = state.selectedTeeth.indexOf(tooth);
+    if (idx === -1) {
+      state.selectedTeeth.push(tooth);
+      el.classList.add('selected');
+    } else {
+      state.selectedTeeth.splice(idx, 1);
+      el.classList.remove('selected');
+    }
+
+    // 임플란트 수량 자동 동기화
+    state.quantities.implant = state.selectedTeeth.length;
+    document.getElementById('dentalImplantQty').textContent = state.quantities.implant;
+
+    renderSelectedTeeth();
+    dentalCalcTotal();
+  };
+
+  function renderSelectedTeeth() {
+    var container = document.getElementById('dentalSelectedTeeth');
+    if (state.selectedTeeth.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = state.selectedTeeth.map(function(t) {
+      return '<span class="dental-tooth-tag">#' + t + ' <span class="dental-tooth-tag-remove" onclick="dentalRemoveTooth(\'' + t + '\')">x</span></span>';
+    }).join('');
+  }
+
+  window.dentalRemoveTooth = function(tooth) {
+    var idx = state.selectedTeeth.indexOf(tooth);
+    if (idx !== -1) state.selectedTeeth.splice(idx, 1);
+
+    // UI 동기화
+    var btn = document.querySelector('.dental-tooth-btn[data-tooth="' + tooth + '"]');
+    if (btn) btn.classList.remove('selected');
+
+    state.quantities.implant = state.selectedTeeth.length;
+    document.getElementById('dentalImplantQty').textContent = state.quantities.implant;
+
+    renderSelectedTeeth();
+    dentalCalcTotal();
+  };
+
+  // ====== 수량 변경 ======
+  window.dentalChangeQty = function(type, delta) {
+    var newQty = Math.max(0, (state.quantities[type] || 0) + delta);
+    state.quantities[type] = newQty;
+
+    var qtyEl = document.getElementById('dental' + capitalize(type) + 'Qty');
+    if (qtyEl) qtyEl.textContent = newQty;
+
+    // 임플란트 수량 변경 시 치아 선택과 불일치 안내
+    if (type === 'implant' && newQty !== state.selectedTeeth.length) {
+      // 수동 수량 조정 허용 (치아 선택과 별개로)
+    }
+
+    dentalCalcTotal();
+  };
+
+  function capitalize(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  // ====== 사용자 추가 항목 ======
+  window.dentalAddCustomItem = function() {
+    var id = 'ci_' + Date.now();
+    state.customItems.push({ id: id, name: '', price: 0, qty: 1 });
+    renderCustomItems();
+  };
+
+  window.dentalRemoveCustomItem = function(id) {
+    state.customItems = state.customItems.filter(function(i) { return i.id !== id; });
+    renderCustomItems();
+    dentalCalcTotal();
+  };
+
+  function renderCustomItems() {
+    var container = document.getElementById('dentalCustomItems');
+    container.innerHTML = state.customItems.map(function(item) {
+      return '<div class="dental-custom-item" data-id="' + item.id + '">' +
+        '<input type="text" class="dental-input" placeholder="항목명" value="' + escHtml(item.name) + '" oninput="dentalUpdateCustomItem(\'' + item.id + '\', \'name\', this.value)" style="flex:1.5">' +
+        '<input type="text" class="dental-input dental-price-input" placeholder="금액" value="' + (item.price || '') + '" oninput="dentalUpdateCustomItem(\'' + item.id + '\', \'price\', this.value)" style="flex:1">' +
+        '<button class="dental-custom-item-remove" onclick="dentalRemoveCustomItem(\'' + item.id + '\')"><i class="fas fa-trash"></i></button>' +
+        '</div>';
+    }).join('');
+  }
+
+  window.dentalUpdateCustomItem = function(id, field, value) {
+    var item = state.customItems.find(function(i) { return i.id === id; });
+    if (item) {
+      if (field === 'price') {
+        item.price = parsePrice(value);
+      } else {
+        item[field] = value;
+      }
+      dentalCalcTotal();
+    }
+  };
+
+  // ====== 합계 계산 ======
+  window.dentalCalcTotal = function() {
+    var implantPrice = parsePrice(document.getElementById('dentalImplantPrice').value);
+    var bonePrice = parsePrice(document.getElementById('dentalBonePrice').value);
+    var sinusPrice = parsePrice(document.getElementById('dentalSinusPrice').value);
+    var tempPrice = parsePrice(document.getElementById('dentalTempPrice').value);
+
+    var implantTotal = implantPrice * state.quantities.implant;
+    var boneTotal = bonePrice * state.quantities.bone;
+    var sinusTotal = sinusPrice * state.quantities.sinus;
+    var tempTotal = tempPrice * state.quantities.temp;
+
+    var additionalTotal = boneTotal + sinusTotal + tempTotal;
+
+    // 사용자 추가 항목
+    var customTotal = 0;
+    state.customItems.forEach(function(item) {
+      customTotal += (item.price || 0) * (item.qty || 1);
+    });
+
+    var grandTotal = implantTotal + additionalTotal + customTotal;
+
+    // UI 업데이트 - 소계
+    document.getElementById('dentalImplantSubtotal').textContent = formatPrice(implantTotal);
+    document.getElementById('dentalBoneSubtotal').textContent = formatPrice(boneTotal);
+    document.getElementById('dentalSinusSubtotal').textContent = formatPrice(sinusTotal);
+    document.getElementById('dentalTempSubtotal').textContent = formatPrice(tempTotal);
+
+    // 견적 요약
+    var brandName = state.selectedBrandName || (document.getElementById('dentalBrandCustomInput') || {}).value || '-';
+    document.getElementById('dentalEstBrand').textContent = brandName;
+    document.getElementById('dentalEstImplant').textContent = formatPrice(implantTotal);
+    document.getElementById('dentalEstAdditional').textContent = formatPrice(additionalTotal);
+
+    // 커스텀 항목 행
+    var customRowsHtml = '';
+    state.customItems.forEach(function(item) {
+      if (item.name && item.price) {
+        customRowsHtml += '<div class="dental-estimate-row"><span class="dental-estimate-label">' + escHtml(item.name) + '</span><span class="dental-estimate-value">' + formatPrice(item.price * (item.qty || 1)) + '</span></div>';
+      }
+    });
+    document.getElementById('dentalEstCustomRows').innerHTML = customRowsHtml;
+
+    document.getElementById('dentalEstTotal').textContent = formatPrice(grandTotal);
+  };
+
+  // ====== 설정 토글 ======
+  window.dentalToggleSettings = function() {
+    var body = document.getElementById('dentalSettingsBody');
+    var arrow = document.getElementById('dentalSettingsArrow');
+    var toggle = body.previousElementSibling;
+    body.classList.toggle('open');
+    toggle.classList.toggle('open');
+  };
+
+  // ====== 설정 저장 ======
+  window.dentalSaveSettings = function() {
+    var name = document.getElementById('dentalClinicNameInput').value.trim();
+    var phone = document.getElementById('dentalClinicPhoneInput').value.trim();
+
+    if (!name) {
+      showToast('치과 이름을 입력해주세요.', 'error');
+      return;
+    }
+
+    state.clinicName = name;
+    state.clinicPhone = phone;
+
+    // localStorage 저장
+    localStorage.setItem('dental_clinic_name', name);
+    localStorage.setItem('dental_clinic_phone', phone);
+
+    // API 저장
+    apiCall('/api/user-data', {
+      method: 'PUT',
+      body: { clinic_name: name, clinic_phone: phone }
+    }).then(function() {
+      document.getElementById('dentalHeaderClinic').textContent = name;
+      showToast('설정이 저장되었습니다.', 'success');
+    }).catch(function(err) {
+      // localStorage에는 이미 저장됨
+      document.getElementById('dentalHeaderClinic').textContent = name;
+      showToast('설정 저장됨 (로컬)', 'info');
+    });
+  };
+
+  // ====== 견적 저장 ======
+  window.dentalSaveEstimate = function() {
+    var brandName = state.selectedBrandName || (document.getElementById('dentalBrandCustomInput') || {}).value || '';
+    if (!brandName) {
+      showToast('브랜드를 선택 또는 입력해주세요.', 'error');
+      return;
+    }
+
+    var estimate = {
+      brand_name: brandName,
+      brand_id: state.selectedBrandId || null,
+      brand_mode: state.brandMode,
+      teeth: state.selectedTeeth.slice(),
+      implant: {
+        qty: state.quantities.implant,
+        unit_price: parsePrice(document.getElementById('dentalImplantPrice').value),
+        total: parsePrice(document.getElementById('dentalImplantPrice').value) * state.quantities.implant
+      },
+      bone_graft: {
+        qty: state.quantities.bone,
+        unit_price: parsePrice(document.getElementById('dentalBonePrice').value),
+        total: parsePrice(document.getElementById('dentalBonePrice').value) * state.quantities.bone
+      },
+      sinus_lift: {
+        qty: state.quantities.sinus,
+        unit_price: parsePrice(document.getElementById('dentalSinusPrice').value),
+        total: parsePrice(document.getElementById('dentalSinusPrice').value) * state.quantities.sinus
+      },
+      temp_crown: {
+        qty: state.quantities.temp,
+        unit_price: parsePrice(document.getElementById('dentalTempPrice').value),
+        total: parsePrice(document.getElementById('dentalTempPrice').value) * state.quantities.temp
+      },
+      custom_items: state.customItems.map(function(i) {
+        return { name: i.name, price: i.price, qty: i.qty || 1 };
+      }).filter(function(i) { return i.name && i.price; }),
+      clinic_name: state.clinicName,
+      saved_at: new Date().toISOString()
+    };
+
+    // 합계 계산
+    estimate.grand_total = estimate.implant.total + estimate.bone_graft.total + estimate.sinus_lift.total + estimate.temp_crown.total;
+    estimate.custom_items.forEach(function(i) { estimate.grand_total += i.price * i.qty; });
+
+    // API 저장
+    apiCall('/api/user-data', {
+      method: 'PUT',
+      body: {
+        clinic_name: state.clinicName,
+        clinic_phone: state.clinicPhone,
+        last_estimate: estimate,
+        estimates_history: true // 서버에서 히스토리 관리
+      }
+    }).then(function() {
+      showToast('견적이 저장되었습니다!', 'success');
+    }).catch(function(err) {
+      // localStorage 폴백
+      localStorage.setItem('dental_last_estimate', JSON.stringify(estimate));
+      showToast('견적 저장됨 (로컬)', 'info');
+    });
+  };
+
+  // ====== 폼 초기화 ======
+  window.dentalResetForm = function() {
+    // 브랜드
+    state.selectedBrandId = '';
+    state.selectedBrandName = '';
+    document.getElementById('dentalBrandSelect').value = '';
+    document.getElementById('dentalBrandCustomInput').value = '';
+    document.getElementById('dentalBrandInfoBtn').classList.add('hidden');
+    document.getElementById('dentalBrandPreview').style.display = 'none';
+
+    // 치아
+    state.selectedTeeth = [];
+    document.querySelectorAll('.dental-tooth-btn.selected').forEach(function(el) {
+      el.classList.remove('selected');
+    });
+    document.getElementById('dentalSelectedTeeth').innerHTML = '';
+
+    // 수량
+    state.quantities = { implant: 0, bone: 0, sinus: 0, temp: 0 };
+    document.getElementById('dentalImplantQty').textContent = '0';
+    document.getElementById('dentalBoneQty').textContent = '0';
+    document.getElementById('dentalSinusQty').textContent = '0';
+    document.getElementById('dentalTempQty').textContent = '0';
+
+    // 가격
+    document.getElementById('dentalImplantPrice').value = '';
+    document.getElementById('dentalBonePrice').value = '';
+    document.getElementById('dentalSinusPrice').value = '';
+    document.getElementById('dentalTempPrice').value = '';
+
+    // 커스텀 항목
+    state.customItems = [];
+    document.getElementById('dentalCustomItems').innerHTML = '';
+
+    dentalCalcTotal();
+    showToast('초기화되었습니다.', 'info');
+  };
+
+  // ====== UI 업데이트 ======
+  function updateUI() {
+    document.getElementById('dentalHeaderClinic').textContent = state.clinicName || '치과 이름';
+    document.getElementById('dentalClinicNameInput').value = state.clinicName || '';
+    document.getElementById('dentalClinicPhoneInput').value = state.clinicPhone || '';
+
+    // 초기 필터 스타일 적용
+    dentalFilterBrands('all');
+    dentalCalcTotal();
+  }
+
+  // ====== 모달 바깥 클릭 닫기 ======
+  document.getElementById('dentalBrandModal').addEventListener('click', function(e) {
+    if (e.target === this) dentalCloseBrandModal();
+  });
+
+  // ====== 자유 입력 실시간 반영 ======
+  var customInput = document.getElementById('dentalBrandCustomInput');
+  if (customInput) {
+    customInput.addEventListener('input', function() {
+      updateBrandSelection();
+    });
+  }
+
+  // ====== 시작 ======
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
